@@ -21,7 +21,8 @@
     "deploy:prod": "npm run build && npm run docker:build && npm run docker:run",
     "deploy:analytics": "docker-compose --profile analytics up -d",
     "db:migrate": "npx prisma migrate deploy",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "docs": "typedoc"
   },
   "jest": {
     "preset": "ts-jest",
@@ -89,6 +90,7 @@
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.6.0",
+    "typedoc": "^0.25.13",
     "typescript": "^5.3.2"
   },
   "engines": {

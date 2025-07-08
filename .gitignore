@@ -21,6 +21,12 @@ Thumbs.db
 # Build artifacts
 *.log
 
+# Backup files
+*.backup
+
+# TypeDoc docs output
+docs/api/
+
 # Optional npm cache directory
 yarn-cache/
 .pnpm-store/
