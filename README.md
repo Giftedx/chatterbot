@@ -33,7 +33,7 @@ A **sophisticated Discord AI bot** built with **TypeScript** and **Discord.js v1
 
 ---
 
-## ✨ Working Features
+## ✨ Features
 
 ### 🤖 **Unified Intelligence System** (Primary Feature)
 
