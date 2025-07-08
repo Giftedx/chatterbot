@@ -1,4 +1,9 @@
-# Discord Gemini Bot - Production Ready
+# Chatterbot ![CI](https://github.com/Giftedx/chatterbot/actions/workflows/ci.yml/badge.svg)
+
+> Advanced Discord AI bot powered by Google Gemini.
+
+[**Browse the API Docs »**](./docs/api/index.html)
+
 
 A **sophisticated Discord AI bot** built with **TypeScript** and **Discord.js v14** that provides advanced AI conversation capabilities using Google Gemini. This is a **production-ready application** with excellent architecture and comprehensive test coverage.
 
