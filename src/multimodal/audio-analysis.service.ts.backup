@@ -1,0 +1,738 @@
+/**
+ * Audio Analysis Service
+ * Comprehensive audio processing including speech-to-text, sentiment analysis, and classification
+ */
+
+import {
+  MediaFile,
+  AudioAnalysisResult,
+  FileProcessingOptions,
+  AudioMetadata,
+  ProcessingStatus,
+  TranscriptionSegment,
+  SentimentScore,
+  DetectedSpeaker
+} from './types.js';
+import { prisma } from '../db/prisma.js';
+import { logger } from '../utils/logger.js';
+
+/**
+ * Service for analyzing audio files with speech recognition and audio intelligence
+ */
+export class AudioAnalysisService {
+  private readonly supportedFormats: Set<string>;
+  private readonly maxFileSize: number; // 50MB
+  private readonly maxDuration: number; // 30 minutes in seconds
+  
+  constructor() {
+    this.supportedFormats = new Set([
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/wave',
+      'audio/ogg',
+      'audio/webm',
+      'audio/m4a',
+      'audio/aac',
+      'audio/flac'
+    ]);
+    this.maxFileSize = 50 * 1024 * 1024; // 50MB
+    this.maxDuration = 30 * 60; // 30 minutes
+  }
+
+  /**
+   * Analyze audio file and extract comprehensive information
+   */
+  public async analyzeAudio(
+    mediaFile: MediaFile,
+    options: FileProcessingOptions = {}
+  ): Promise<AudioAnalysisResult | null> {
+    try {
+      const startTime = Date.now();
+
+      // Validate audio file
+      if (!this.isValidAudioFile(mediaFile)) {
+        logger.warn('Invalid audio file for analysis', {
+          operation: 'audio-analysis',
+          metadata: {
+            fileId: mediaFile.id,
+            mimeType: mediaFile.mimeType,
+            fileSize: mediaFile.fileSize
+          }
+        });
+        return null;
+      }
+
+      // Update processing status
+      await this.updateProcessingStatus(mediaFile.id, 'processing');
+
+      const analysisResult: AudioAnalysisResult = {};
+
+      // Extract audio metadata first
+      const audioMetadata = await this.extractAudioMetadata(mediaFile);
+      
+      if (audioMetadata && audioMetadata.duration > this.maxDuration) {
+        logger.warn('Audio file too long for processing', {
+          operation: 'audio-analysis',
+          metadata: {
+            fileId: mediaFile.id,
+            duration: audioMetadata.duration
+          }
+        });
+        
+        await this.updateProcessingStatus(mediaFile.id, 'failed', 'Audio file too long');
+        return null;
+      }
+
+      // Perform speech-to-text if enabled
+      if (options.enableTranscription !== false) {
+        analysisResult.transcription = await this.performSpeechToText(mediaFile);
+      }
+
+      // Perform speaker detection if enabled
+      if (options.enableTranscription !== false && analysisResult.transcription) {
+        analysisResult.speakerDetection = await this.performSpeakerDetection(mediaFile, analysisResult.transcription);
+      }
+
+      // Classify audio content
+      analysisResult.classification = await this.classifyAudioContent(mediaFile);
+
+      // Perform sentiment analysis if transcription is available
+      if (options.enableSentimentAnalysis !== false && analysisResult.transcription) {
+        analysisResult.sentiment = await this.performSentimentAnalysis(analysisResult.transcription);
+      }
+
+      // Assess audio quality
+      analysisResult.quality = await this.assessAudioQuality(mediaFile, audioMetadata);
+
+      // Generate description and extract tags
+      const description = this.generateAudioDescription(analysisResult);
+      const tags = this.extractTagsFromAnalysis(analysisResult);
+      const categories = this.categorizeAudio(analysisResult);
+
+      // Update media file with analysis results
+      await this.updateMediaFileWithAnalysis(mediaFile.id, {
+        audioAnalysis: analysisResult,
+        audioMetadata,
+        description,
+        tags,
+        categories,
+        processingStatus: 'completed',
+        processedAt: new Date()
+      });
+
+      const processingTime = Date.now() - startTime;
+
+      logger.info('Audio analysis completed', {
+        operation: 'audio-analysis',
+        userId: mediaFile.userId,
+        metadata: {
+          fileId: mediaFile.id,
+          hasTranscription: !!analysisResult.transcription?.text,
+          transcriptionLength: analysisResult.transcription?.text?.length || 0,
+          speakerCount: analysisResult.speakerDetection?.speakerCount || 0,
+          audioType: analysisResult.classification?.type,
+          duration: audioMetadata?.duration || 0,
+          processingTime
+        }
+      });
+
+      return analysisResult;
+
+    } catch (error) {
+      logger.error('Failed to analyze audio', {
+        operation: 'audio-analysis',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+
+      await this.updateProcessingStatus(mediaFile.id, 'failed', String(error));
+      return null;
+    }
+  }
+
+  /**
+   * Extract audio metadata from file
+   */
+  private async extractAudioMetadata(mediaFile: MediaFile): Promise<AudioMetadata | null> {
+    try {
+      // In a real implementation, this would use audio processing libraries
+      // like node-ffmpeg or ffprobe to extract metadata
+      
+      // Mock metadata extraction
+      const metadata: AudioMetadata = {
+        duration: 120, // 2 minutes
+        sampleRate: 44100,
+        channels: 2,
+        bitrate: 320,
+        format: 'mp3',
+        codec: 'mp3'
+      };
+
+      logger.debug('Audio metadata extracted', {
+        operation: 'audio-metadata',
+        metadata: {
+          fileId: mediaFile.id,
+          duration: metadata.duration,
+          format: metadata.format
+        }
+      });
+
+      return metadata;
+
+    } catch (error) {
+      logger.error('Failed to extract audio metadata', {
+        operation: 'audio-metadata',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Perform speech-to-text transcription
+   */
+  private async performSpeechToText(mediaFile: MediaFile) {
+    try {
+      // In a real implementation, this would call speech-to-text APIs
+      // like Google Speech-to-Text, Azure Speech, or OpenAI Whisper
+      
+      const segments: TranscriptionSegment[] = [
+        {
+          text: "Hello, this is a sample transcription of the audio file.",
+          startTime: 0.0,
+          endTime: 3.5,
+          confidence: 0.95,
+          speaker: "Speaker_1"
+        },
+        {
+          text: "The speech recognition system has successfully processed the audio content.",
+          startTime: 3.5,
+          endTime: 8.2,
+          confidence: 0.92,
+          speaker: "Speaker_1"
+        },
+        {
+          text: "This demonstrates the capabilities of the multimodal AI system.",
+          startTime: 8.2,
+          endTime: 12.0,
+          confidence: 0.88,
+          speaker: "Speaker_1"
+        }
+      ];
+
+      const fullText = segments.map(seg => seg.text).join(' ');
+
+      logger.debug('Speech-to-text completed', {
+        operation: 'speech-to-text',
+        metadata: {
+          fileId: mediaFile.id,
+          textLength: fullText.length,
+          segmentCount: segments.length
+        }
+      });
+
+      return {
+        text: fullText,
+        confidence: 0.92,
+        segments,
+        language: 'en'
+      };
+
+    } catch (error) {
+      logger.error('Speech-to-text failed', {
+        operation: 'speech-to-text',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Perform speaker detection and diarization
+   */
+  private async performSpeakerDetection(mediaFile: MediaFile, transcription: { segments: TranscriptionSegment[] }) {
+    try {
+      // Mock speaker detection results
+      // In practice, would analyze audio segments from transcription
+      const segmentCount = transcription.segments.length;
+      const speakers: DetectedSpeaker[] = [
+        {
+          id: "Speaker_1",
+          confidence: 0.94,
+          segments: [
+            { startTime: 0.0, endTime: 12.0, confidence: 0.94 }
+          ]
+        }
+      ];
+
+      logger.debug('Speaker detection completed', {
+        operation: 'speaker-detection',
+        metadata: {
+          mediaFileId: mediaFile.id,
+          speakerCount: speakers.length,
+          inputSegments: segmentCount
+        }
+      });
+
+      return {
+        speakers,
+        speakerCount: speakers.length
+      };
+
+    } catch (error) {
+      logger.error('Speaker detection failed', {
+        operation: 'speaker-detection',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Classify audio content type
+   */
+  private async classifyAudioContent(mediaFile: MediaFile) {
+    try {
+      // Mock audio classification
+      // In practice, this would analyze audio features to determine content type
+      
+      const classification = {
+        type: 'speech',
+        confidence: 0.89,
+        subCategories: ['conversation', 'clear_speech', 'single_speaker']
+      };
+
+      logger.debug('Audio classification completed', {
+        operation: 'audio-classification',
+        metadata: {
+          fileId: mediaFile.id,
+          type: classification.type,
+          confidence: classification.confidence
+        }
+      });
+
+      return classification;
+
+    } catch (error) {
+      logger.error('Audio classification failed', {
+        operation: 'audio-classification',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      
+      // Return default classification
+      return {
+        type: 'unknown',
+        confidence: 0.5,
+        subCategories: []
+      };
+    }
+  }
+
+  /**
+   * Perform sentiment analysis on transcribed text
+   */
+  private async performSentimentAnalysis(transcription: { text: string; segments: TranscriptionSegment[] }) {
+    try {
+      // Mock sentiment analysis
+      const overallSentiment: SentimentScore = {
+        sentiment: 'positive',
+        score: 0.7,
+        magnitude: 0.8
+      };
+
+      const segments = transcription.segments.map((segment: TranscriptionSegment) => ({
+        text: segment.text,
+        sentiment: {
+          sentiment: 'neutral' as const,
+          score: 0.1,
+          magnitude: 0.3
+        },
+        startTime: segment.startTime,
+        endTime: segment.endTime
+      }));
+
+      logger.debug('Sentiment analysis completed', {
+        operation: 'sentiment-analysis',
+        metadata: {
+          sentiment: overallSentiment.sentiment,
+          score: overallSentiment.score
+        }
+      });
+
+      return {
+        overall: overallSentiment,
+        segments
+      };
+
+    } catch (error) {
+      logger.error('Sentiment analysis failed', {
+        operation: 'sentiment-analysis',
+        metadata: {
+          error: String(error)
+        }
+      });
+      return undefined;
+    }
+  }
+
+  /**
+   * Assess audio quality metrics
+   */
+  private async assessAudioQuality(mediaFile: MediaFile, metadata: AudioMetadata | null) {
+    try {
+      // Mock quality assessment based on metadata if available
+      // In practice, this would analyze audio signals for quality metrics
+      
+      const quality = {
+        clarity: metadata?.sampleRate && metadata.sampleRate > 22050 ? 0.85 : 0.65,
+        noiseLevel: 0.15,
+        volumeLevel: 0.7
+      };
+
+      logger.debug('Audio quality assessment completed', {
+        operation: 'audio-quality',
+        metadata: {
+          mediaFileId: mediaFile.id,
+          clarity: quality.clarity
+        }
+      });
+
+      return quality;
+
+    } catch (error) {
+      logger.error('Audio quality assessment failed', {
+        operation: 'audio-quality',
+        metadata: {
+          mediaFileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      
+      return {
+        clarity: 0.5,
+        noiseLevel: 0.5,
+        volumeLevel: 0.5
+      };
+    }
+  }
+
+  /**
+   * Generate natural language description of audio
+   */
+  private generateAudioDescription(analysis: AudioAnalysisResult): string {
+    const parts: string[] = [];
+
+    // Add classification information
+    if (analysis.classification) {
+      parts.push(`Audio type: ${analysis.classification.type}`);
+      
+      if (analysis.classification.subCategories.length > 0) {
+        parts.push(`Categories: ${analysis.classification.subCategories.join(', ')}`);
+      }
+    }
+
+    // Add transcription information
+    if (analysis.transcription) {
+      const wordCount = analysis.transcription.text.split(' ').length;
+      parts.push(`Transcribed ${wordCount} words with ${(analysis.transcription.confidence * 100).toFixed(0)}% confidence`);
+    }
+
+    // Add speaker information
+    if (analysis.speakerDetection) {
+      parts.push(`${analysis.speakerDetection.speakerCount} speaker(s) detected`);
+    }
+
+    // Add sentiment information
+    if (analysis.sentiment) {
+      parts.push(`Overall sentiment: ${analysis.sentiment.overall.sentiment}`);
+    }
+
+    // Add quality information
+    if (analysis.quality) {
+      const qualityDesc = analysis.quality.clarity > 0.7 ? 'high' : 
+                         analysis.quality.clarity > 0.4 ? 'medium' : 'low';
+      parts.push(`Audio quality: ${qualityDesc}`);
+    }
+
+    return parts.join('. ') || 'Audio processed successfully';
+  }
+
+  /**
+   * Extract tags from audio analysis
+   */
+  private extractTagsFromAnalysis(analysis: AudioAnalysisResult): string[] {
+    const tags = new Set<string>();
+
+    // Add classification tags
+    if (analysis.classification) {
+      tags.add(analysis.classification.type);
+      analysis.classification.subCategories.forEach((cat: string) => tags.add(cat));
+    }
+
+    // Add speaker-based tags
+    if (analysis.speakerDetection) {
+      if (analysis.speakerDetection.speakerCount === 1) {
+        tags.add('monologue');
+      } else if (analysis.speakerDetection.speakerCount > 1) {
+        tags.add('conversation');
+        tags.add('dialogue');
+      }
+    }
+
+    // Add sentiment tags
+    if (analysis.sentiment) {
+      tags.add(analysis.sentiment.overall.sentiment);
+      if (analysis.sentiment.overall.magnitude > 0.6) {
+        tags.add('emotional');
+      }
+    }
+
+    // Add quality tags
+    if (analysis.quality) {
+      if (analysis.quality.clarity > 0.8) {
+        tags.add('high_quality');
+      }
+      if (analysis.quality.noiseLevel < 0.2) {
+        tags.add('clear');
+      }
+    }
+
+    // Add content-based tags from transcription
+    if (analysis.transcription) {
+      tags.add('transcribed');
+      if (analysis.transcription.text.length > 500) {
+        tags.add('long_form');
+      }
+    }
+
+    return Array.from(tags).slice(0, 15);
+  }
+
+  /**
+   * Categorize audio based on analysis
+   */
+  private categorizeAudio(analysis: AudioAnalysisResult): string[] {
+    const categories = new Set<string>();
+
+    // Primary categorization based on classification
+    if (analysis.classification) {
+      switch (analysis.classification.type) {
+        case 'speech':
+          categories.add('verbal_communication');
+          if (analysis.speakerDetection && analysis.speakerDetection.speakerCount > 1) {
+            categories.add('meeting');
+            categories.add('conversation');
+          } else {
+            categories.add('presentation');
+            categories.add('monologue');
+          }
+          break;
+        case 'music':
+          categories.add('entertainment');
+          categories.add('audio_content');
+          break;
+        case 'noise':
+          categories.add('ambient');
+          categories.add('environmental');
+          break;
+        default:
+          categories.add('general_audio');
+      }
+    }
+
+    // Content-based categorization
+    if (analysis.transcription) {
+      const text = analysis.transcription.text.toLowerCase();
+      
+      if (text.includes('meeting') || text.includes('agenda') || text.includes('action item')) {
+        categories.add('business');
+        categories.add('meeting');
+      }
+      
+      if (text.includes('learn') || text.includes('teach') || text.includes('explain')) {
+        categories.add('educational');
+      }
+      
+      if (text.includes('question') || text.includes('answer') || text.includes('help')) {
+        categories.add('support');
+        categories.add('qa');
+      }
+    }
+
+    // Quality-based categorization
+    if (analysis.quality && analysis.quality.clarity > 0.8) {
+      categories.add('high_quality');
+    }
+
+    // Default category if none detected
+    if (categories.size === 0) {
+      categories.add('audio');
+    }
+
+    return Array.from(categories);
+  }
+
+  /**
+   * Validate if file is a supported audio format
+   */
+  private isValidAudioFile(mediaFile: MediaFile): boolean {
+    return (
+      mediaFile.fileType === 'audio' &&
+      this.supportedFormats.has(mediaFile.mimeType) &&
+      mediaFile.fileSize <= this.maxFileSize
+    );
+  }
+
+  /**
+   * Update media file processing status
+   */
+  private async updateProcessingStatus(
+    fileId: number,
+    status: ProcessingStatus,
+    error?: string
+  ): Promise<void> {
+    try {
+      await prisma.mediaFile.update({
+        where: { id: fileId },
+        data: {
+          processingStatus: status,
+          processingError: error,
+          processedAt: status === 'completed' || status === 'failed' ? new Date() : undefined
+        }
+      });
+    } catch (updateError) {
+      logger.error('Failed to update processing status', {
+        operation: 'status-update',
+        metadata: {
+          fileId,
+          status,
+          error: String(updateError)
+        }
+      });
+    }
+  }
+
+  /**
+   * Update media file with analysis results
+   */
+  private async updateMediaFileWithAnalysis(
+    fileId: number,
+    updates: {
+      audioAnalysis: AudioAnalysisResult;
+      audioMetadata: AudioMetadata | null;
+      description: string;
+      tags: string[];
+      categories: string[];
+      processingStatus: ProcessingStatus;
+      processedAt: Date;
+    }
+  ): Promise<void> {
+    try {
+      await prisma.mediaFile.update({
+        where: { id: fileId },
+        data: {
+          audioAnalysis: updates.audioAnalysis,
+          audioMetadata: updates.audioMetadata,
+          description: updates.description,
+          tags: JSON.stringify(updates.tags),
+          categories: JSON.stringify(updates.categories),
+          processingStatus: updates.processingStatus,
+          processedAt: updates.processedAt
+        }
+      });
+    } catch (updateError) {
+      logger.error('Failed to update media file with analysis', {
+        operation: 'analysis-update',
+        metadata: {
+          fileId,
+          error: String(updateError)
+        }
+      });
+    }
+  }
+
+  /**
+   * Search audio files by transcribed content
+   */
+  public async searchAudioByContent(
+    query: string,
+    userId: string,
+    options: { limit?: number; minConfidence?: number } = {}
+  ): Promise<MediaFile[]> {
+    try {
+      const limit = options.limit || 10;
+
+      // Search in audio analysis results and transcriptions
+      const files = await prisma.mediaFile.findMany({
+        where: {
+          userId,
+          fileType: 'audio',
+          processingStatus: 'completed',
+          OR: [
+            { description: { contains: query } },
+            { extractedText: { contains: query } },
+            { tags: { contains: query } }
+          ]
+        },
+        orderBy: { createdAt: 'desc' },
+        take: limit
+      });
+
+      return files as MediaFile[];
+
+    } catch (error) {
+      logger.error('Failed to search audio by content', {
+        operation: 'audio-search',
+        metadata: {
+          userId,
+          query,
+          error: String(error)
+        }
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Get audio transcription
+   */
+  public async getAudioTranscription(fileId: number): Promise<string | null> {
+    try {
+      const mediaFile = await prisma.mediaFile.findUnique({
+        where: { id: fileId }
+      });
+
+      if (!mediaFile || !mediaFile.audioAnalysis) {
+        return null;
+      }
+
+      const analysis = mediaFile.audioAnalysis as AudioAnalysisResult;
+      return analysis.transcription?.text || null;
+
+    } catch (error) {
+      logger.error('Failed to get audio transcription', {
+        operation: 'get-transcription',
+        metadata: {
+          fileId,
+          error: String(error)
+        }
+      });
+      return null;
+    }
+  }
+}

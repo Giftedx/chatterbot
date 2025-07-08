@@ -1,0 +1,932 @@
+/**
+ * Interactive Monitoring Dashboard
+ * Provides web-based real-time monitoring interface with live updates,
+ * interactive charts, and comprehensive system insights.
+ */
+
+import { logger } from '../utils/logger.js';
+import { RealTimeAnalyticsEngine, AnalyticsDashboard } from './analytics-engine.js';
+import { PerformanceMonitor } from '../utils/resilience.js';
+
+export interface DashboardConfig {
+  port: number;
+  updateInterval: number;
+  enableAuth: boolean;
+  authToken?: string;
+  cors: {
+    enabled: boolean;
+    origins: string[];
+  };
+  features: {
+    realTimeCharts: boolean;
+    exportData: boolean;
+    alerts: boolean;
+    userAnalytics: boolean;
+  };
+}
+
+export interface ChartData {
+  id: string;
+  title: string;
+  type: 'line' | 'bar' | 'pie' | 'gauge' | 'heatmap';
+  data: Array<{
+    timestamp?: number;
+    label: string;
+    value: number;
+    metadata?: Record<string, unknown>;
+  }>;
+  config: {
+    xAxis?: string;
+    yAxis?: string;
+    colors?: string[];
+    thresholds?: Array<{ value: number; color: string; label: string }>;
+    realTime: boolean;
+    refreshRate: number;
+  };
+}
+
+export interface DashboardWidget {
+  id: string;
+  title: string;
+  type: 'chart' | 'metric' | 'alert' | 'table' | 'custom';
+  position: { x: number; y: number; width: number; height: number };
+  data: ChartData | any;
+  config: {
+    refreshInterval: number;
+    autoRefresh: boolean;
+    interactive: boolean;
+    exportable: boolean;
+  };
+}
+
+export interface DashboardLayout {
+  id: string;
+  name: string;
+  description: string;
+  widgets: DashboardWidget[];
+  globalConfig: {
+    theme: 'light' | 'dark' | 'auto';
+    refreshRate: number;
+    autoLayout: boolean;
+  };
+}
+
+/**
+ * Interactive monitoring dashboard with real-time analytics visualization
+ */
+export class InteractiveMonitoringDashboard {
+  private analyticsEngine: RealTimeAnalyticsEngine;
+  private config: DashboardConfig;
+  private layouts: Map<string, DashboardLayout> = new Map();
+  private activeConnections: Set<any> = new Set();
+  private updateIntervals: Map<string, NodeJS.Timeout> = new Map();
+
+  constructor(
+    analyticsEngine: RealTimeAnalyticsEngine,
+    config: Partial<DashboardConfig> = {}
+  ) {
+    this.analyticsEngine = analyticsEngine;
+    this.config = this.mergeDefaultConfig(config);
+    
+    this.initializeDefaultLayouts();
+    this.startDashboardServices();
+
+    logger.info('InteractiveMonitoringDashboard initialized', {
+      operation: 'dashboard-init',
+      metadata: {
+        port: this.config.port,
+        updateInterval: this.config.updateInterval,
+        authEnabled: this.config.enableAuth,
+        features: this.config.features
+      }
+    });
+  }
+
+  /**
+   * Merge user config with defaults
+   */
+  private mergeDefaultConfig(userConfig: Partial<DashboardConfig>): DashboardConfig {
+    return {
+      port: userConfig.port || 3001,
+      updateInterval: userConfig.updateInterval || 5000,
+      enableAuth: userConfig.enableAuth || false,
+      authToken: userConfig.authToken,
+      cors: {
+        enabled: userConfig.cors?.enabled || true,
+        origins: userConfig.cors?.origins || ['http://localhost:3000', 'http://localhost:3001']
+      },
+      features: {
+        realTimeCharts: userConfig.features?.realTimeCharts || true,
+        exportData: userConfig.features?.exportData || true,
+        alerts: userConfig.features?.alerts || true,
+        userAnalytics: userConfig.features?.userAnalytics || true
+      }
+    };
+  }
+
+  /**
+   * Initialize default dashboard layouts
+   */
+  private initializeDefaultLayouts(): void {
+    // Overview Dashboard
+    const overviewLayout: DashboardLayout = {
+      id: 'overview',
+      name: 'System Overview',
+      description: 'High-level system metrics and health indicators',
+      widgets: [
+        {
+          id: 'system-health',
+          title: 'System Health',
+          type: 'metric',
+          position: { x: 0, y: 0, width: 3, height: 2 },
+          data: this.createSystemHealthWidget(),
+          config: {
+            refreshInterval: 5000,
+            autoRefresh: true,
+            interactive: false,
+            exportable: false
+          }
+        },
+        {
+          id: 'request-throughput',
+          title: 'Request Throughput',
+          type: 'chart',
+          position: { x: 3, y: 0, width: 6, height: 3 },
+          data: this.createThroughputChart(),
+          config: {
+            refreshInterval: 2000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'response-time',
+          title: 'Response Time Distribution',
+          type: 'chart',
+          position: { x: 9, y: 0, width: 3, height: 3 },
+          data: this.createResponseTimeChart(),
+          config: {
+            refreshInterval: 5000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'active-alerts',
+          title: 'Active Alerts',
+          type: 'alert',
+          position: { x: 0, y: 2, width: 3, height: 2 },
+          data: this.createAlertsWidget(),
+          config: {
+            refreshInterval: 1000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: false
+          }
+        },
+        {
+          id: 'user-activity',
+          title: 'User Activity Heatmap',
+          type: 'chart',
+          position: { x: 0, y: 4, width: 12, height: 3 },
+          data: this.createUserActivityHeatmap(),
+          config: {
+            refreshInterval: 30000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        }
+      ],
+      globalConfig: {
+        theme: 'dark',
+        refreshRate: 5000,
+        autoLayout: false
+      }
+    };
+
+    // Performance Dashboard
+    const performanceLayout: DashboardLayout = {
+      id: 'performance',
+      name: 'Performance Analytics',
+      description: 'Detailed performance metrics and optimization insights',
+      widgets: [
+        {
+          id: 'cache-performance',
+          title: 'Cache Performance',
+          type: 'chart',
+          position: { x: 0, y: 0, width: 4, height: 3 },
+          data: this.createCachePerformanceChart(),
+          config: {
+            refreshInterval: 10000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'resource-utilization',
+          title: 'Resource Utilization',
+          type: 'chart',
+          position: { x: 4, y: 0, width: 4, height: 3 },
+          data: this.createResourceUtilizationChart(),
+          config: {
+            refreshInterval: 5000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'queue-metrics',
+          title: 'Queue Performance',
+          type: 'chart',
+          position: { x: 8, y: 0, width: 4, height: 3 },
+          data: this.createQueueMetricsChart(),
+          config: {
+            refreshInterval: 3000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        }
+      ],
+      globalConfig: {
+        theme: 'dark',
+        refreshRate: 5000,
+        autoLayout: false
+      }
+    };
+
+    // User Analytics Dashboard
+    const userAnalyticsLayout: DashboardLayout = {
+      id: 'user-analytics',
+      name: 'User Analytics',
+      description: 'User behavior analysis and engagement metrics',
+      widgets: [
+        {
+          id: 'user-distribution',
+          title: 'User Activity Distribution',
+          type: 'chart',
+          position: { x: 0, y: 0, width: 6, height: 3 },
+          data: this.createUserDistributionChart(),
+          config: {
+            refreshInterval: 60000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'top-guilds',
+          title: 'Most Active Guilds',
+          type: 'table',
+          position: { x: 6, y: 0, width: 6, height: 3 },
+          data: this.createTopGuildsTable(),
+          config: {
+            refreshInterval: 30000,
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        },
+        {
+          id: 'usage-patterns',
+          title: 'Usage Patterns (24h)',
+          type: 'chart',
+          position: { x: 0, y: 3, width: 12, height: 3 },
+          data: this.createUsagePatternsChart(),
+          config: {
+            refreshInterval: 300000, // 5 minutes
+            autoRefresh: true,
+            interactive: true,
+            exportable: true
+          }
+        }
+      ],
+      globalConfig: {
+        theme: 'dark',
+        refreshRate: 30000,
+        autoLayout: false
+      }
+    };
+
+    this.layouts.set('overview', overviewLayout);
+    this.layouts.set('performance', performanceLayout);
+    this.layouts.set('user-analytics', userAnalyticsLayout);
+  }
+
+  /**
+   * Create system health widget data
+   */
+  private createSystemHealthWidget(): any {
+    return {
+      type: 'metrics-grid',
+      metrics: [
+        {
+          id: 'uptime',
+          label: 'Uptime',
+          value: '0d 0h 0m',
+          status: 'healthy',
+          trend: 'stable'
+        },
+        {
+          id: 'active-users',
+          label: 'Active Users',
+          value: 0,
+          status: 'healthy',
+          trend: 'up'
+        },
+        {
+          id: 'success-rate',
+          label: 'Success Rate',
+          value: '100%',
+          status: 'healthy',
+          trend: 'stable'
+        },
+        {
+          id: 'avg-response',
+          label: 'Avg Response',
+          value: '0ms',
+          status: 'healthy',
+          trend: 'down'
+        }
+      ]
+    };
+  }
+
+  /**
+   * Create throughput chart data
+   */
+  private createThroughputChart(): ChartData {
+    return {
+      id: 'throughput-chart',
+      title: 'Requests per Second',
+      type: 'line',
+      data: [],
+      config: {
+        xAxis: 'time',
+        yAxis: 'requests/sec',
+        colors: ['#00D4FF', '#FF6B6B'],
+        realTime: true,
+        refreshRate: 2000
+      }
+    };
+  }
+
+  /**
+   * Create response time chart data
+   */
+  private createResponseTimeChart(): ChartData {
+    return {
+      id: 'response-time-chart',
+      title: 'Response Time Percentiles',
+      type: 'line',
+      data: [],
+      config: {
+        xAxis: 'time',
+        yAxis: 'milliseconds',
+        colors: ['#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'],
+        thresholds: [
+          { value: 1000, color: '#00FF00', label: 'Excellent' },
+          { value: 3000, color: '#FFFF00', label: 'Good' },
+          { value: 5000, color: '#FF0000', label: 'Poor' }
+        ],
+        realTime: true,
+        refreshRate: 5000
+      }
+    };
+  }
+
+  /**
+   * Create alerts widget data
+   */
+  private createAlertsWidget(): any {
+    return {
+      type: 'alert-list',
+      alerts: [],
+      config: {
+        maxAlerts: 10,
+        severityColors: {
+          low: '#74B9FF',
+          medium: '#FDCB6E',
+          high: '#E17055',
+          critical: '#D63031'
+        }
+      }
+    };
+  }
+
+  /**
+   * Create user activity heatmap
+   */
+  private createUserActivityHeatmap(): ChartData {
+    return {
+      id: 'user-activity-heatmap',
+      title: 'User Activity by Hour',
+      type: 'heatmap',
+      data: [],
+      config: {
+        colors: ['#313395', '#2C6FBB', '#3498DB', '#52C4E0', '#76E5E5'],
+        realTime: true,
+        refreshRate: 30000
+      }
+    };
+  }
+
+  /**
+   * Create cache performance chart
+   */
+  private createCachePerformanceChart(): ChartData {
+    return {
+      id: 'cache-performance',
+      title: 'Cache Hit Rate & Performance',
+      type: 'line',
+      data: [],
+      config: {
+        xAxis: 'time',
+        yAxis: 'percentage',
+        colors: ['#00FF7F', '#FFD700'],
+        thresholds: [
+          { value: 80, color: '#00FF00', label: 'Excellent' },
+          { value: 60, color: '#FFFF00', label: 'Good' },
+          { value: 40, color: '#FF0000', label: 'Poor' }
+        ],
+        realTime: true,
+        refreshRate: 10000
+      }
+    };
+  }
+
+  /**
+   * Create resource utilization chart
+   */
+  private createResourceUtilizationChart(): ChartData {
+    return {
+      id: 'resource-utilization',
+      title: 'System Resource Usage',
+      type: 'gauge',
+      data: [],
+      config: {
+        colors: ['#4ECDC4', '#45B7D1', '#FF6B6B'],
+        thresholds: [
+          { value: 70, color: '#FFFF00', label: 'Warning' },
+          { value: 90, color: '#FF0000', label: 'Critical' }
+        ],
+        realTime: true,
+        refreshRate: 5000
+      }
+    };
+  }
+
+  /**
+   * Create queue metrics chart
+   */
+  private createQueueMetricsChart(): ChartData {
+    return {
+      id: 'queue-metrics',
+      title: 'Queue Size & Processing Time',
+      type: 'bar',
+      data: [],
+      config: {
+        xAxis: 'metric',
+        yAxis: 'value',
+        colors: ['#E17055', '#74B9FF'],
+        realTime: true,
+        refreshRate: 3000
+      }
+    };
+  }
+
+  /**
+   * Create user distribution chart
+   */
+  private createUserDistributionChart(): ChartData {
+    return {
+      id: 'user-distribution',
+      title: 'User Activity Levels',
+      type: 'pie',
+      data: [],
+      config: {
+        colors: ['#74B9FF', '#0984E3', '#6C5CE7', '#A29BFE'],
+        realTime: true,
+        refreshRate: 60000
+      }
+    };
+  }
+
+  /**
+   * Create top guilds table
+   */
+  private createTopGuildsTable(): any {
+    return {
+      type: 'data-table',
+      columns: [
+        { key: 'guildId', label: 'Guild ID', type: 'text' },
+        { key: 'requests', label: 'Requests', type: 'number' },
+        { key: 'users', label: 'Active Users', type: 'number' },
+        { key: 'avgResponse', label: 'Avg Response', type: 'duration' }
+      ],
+      data: [],
+      config: {
+        sortable: true,
+        searchable: true,
+        pageSize: 10
+      }
+    };
+  }
+
+  /**
+   * Create usage patterns chart
+   */
+  private createUsagePatternsChart(): ChartData {
+    return {
+      id: 'usage-patterns',
+      title: 'Hourly Usage Patterns',
+      type: 'bar',
+      data: [],
+      config: {
+        xAxis: 'hour',
+        yAxis: 'requests',
+        colors: ['#00D4FF', '#FF6B6B'],
+        realTime: true,
+        refreshRate: 300000
+      }
+    };
+  }
+
+  /**
+   * Start dashboard background services
+   */
+  private startDashboardServices(): void {
+    // Start real-time data updates
+    this.startRealtimeUpdates();
+
+    // Start web server (simplified representation)
+    this.startWebServer();
+
+    logger.info('Dashboard services started', {
+      operation: 'dashboard-services-start',
+      metadata: {
+        layouts: this.layouts.size,
+        updateInterval: this.config.updateInterval
+      }
+    });
+  }
+
+  /**
+   * Start real-time data updates
+   */
+  private startRealtimeUpdates(): void {
+    const updateInterval = setInterval(() => {
+      this.updateAllWidgets();
+    }, this.config.updateInterval);
+
+    this.updateIntervals.set('global', updateInterval);
+
+    // Individual widget updates for different refresh rates
+    this.layouts.forEach(layout => {
+      layout.widgets.forEach(widget => {
+        if (widget.config.autoRefresh && widget.config.refreshInterval !== this.config.updateInterval) {
+          const widgetInterval = setInterval(() => {
+            this.updateWidget(widget);
+          }, widget.config.refreshInterval);
+
+          this.updateIntervals.set(widget.id, widgetInterval);
+        }
+      });
+    });
+  }
+
+  /**
+   * Start web server (simplified)
+   */
+  private startWebServer(): void {
+    // This would typically start an Express server or similar
+    // For this implementation, we'll simulate the server functionality
+    
+    logger.info('Dashboard web server started', {
+      operation: 'dashboard-web-server',
+      metadata: {
+        port: this.config.port,
+        corsEnabled: this.config.cors.enabled,
+        authEnabled: this.config.enableAuth
+      }
+    });
+  }
+
+  /**
+   * Update all widgets with fresh data
+   */
+  private updateAllWidgets(): void {
+    return PerformanceMonitor.monitor('dashboard-update-all', () => {
+      this.layouts.forEach(layout => {
+        layout.widgets.forEach(widget => {
+          this.updateWidget(widget);
+        });
+      });
+
+      // Notify connected clients of updates
+      this.notifyConnectedClients();
+    });
+  }
+
+  /**
+   * Update individual widget data
+   */
+  private updateWidget(widget: DashboardWidget): void {
+    try {
+      const dashboard = this.analyticsEngine.generateDashboard();
+      
+      switch (widget.id) {
+        case 'system-health':
+          this.updateSystemHealthWidget(widget, dashboard);
+          break;
+        case 'request-throughput':
+          this.updateThroughputChart(widget, dashboard);
+          break;
+        case 'response-time':
+          this.updateResponseTimeChart(widget, dashboard);
+          break;
+        case 'active-alerts':
+          this.updateAlertsWidget(widget, dashboard);
+          break;
+        case 'user-activity':
+          this.updateUserActivityHeatmap(widget, dashboard);
+          break;
+        case 'cache-performance':
+          this.updateCachePerformanceChart(widget, dashboard);
+          break;
+        case 'resource-utilization':
+          this.updateResourceUtilizationChart(widget, dashboard);
+          break;
+        case 'queue-metrics':
+          this.updateQueueMetricsChart(widget, dashboard);
+          break;
+        case 'user-distribution':
+          this.updateUserDistributionChart(widget, dashboard);
+          break;
+        case 'top-guilds':
+          this.updateTopGuildsTable(widget, dashboard);
+          break;
+        case 'usage-patterns':
+          this.updateUsagePatternsChart(widget, dashboard);
+          break;
+      }
+
+      logger.debug('Widget updated', {
+        widgetId: widget.id,
+        operation: 'dashboard-widget-update'
+      });
+
+    } catch (error) {
+      logger.error('Failed to update widget', {
+        widgetId: widget.id,
+        operation: 'dashboard-widget-error',
+        metadata: { error: String(error) }
+      });
+    }
+  }
+
+  /**
+   * Update system health widget
+   */
+  private updateSystemHealthWidget(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const uptime = process.uptime();
+    const uptimeStr = `${Math.floor(uptime / 86400)}d ${Math.floor((uptime % 86400) / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`;
+
+    widget.data.metrics = [
+      {
+        id: 'uptime',
+        label: 'Uptime',
+        value: uptimeStr,
+        status: 'healthy',
+        trend: 'stable'
+      },
+      {
+        id: 'active-users',
+        label: 'Active Users',
+        value: dashboard.overview.activeUsers,
+        status: dashboard.overview.activeUsers > 0 ? 'healthy' : 'warning',
+        trend: 'stable'
+      },
+      {
+        id: 'success-rate',
+        label: 'Success Rate',
+        value: `${Math.round(dashboard.overview.successRate * 100)}%`,
+        status: dashboard.overview.successRate > 0.95 ? 'healthy' : 'warning',
+        trend: 'stable'
+      },
+      {
+        id: 'avg-response',
+        label: 'Avg Response',
+        value: `${Math.round(dashboard.overview.avgResponseTime)}ms`,
+        status: dashboard.overview.avgResponseTime < 2000 ? 'healthy' : 'warning',
+        trend: 'stable'
+      }
+    ];
+  }
+
+  /**
+   * Update throughput chart
+   */
+  private updateThroughputChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    const now = Date.now();
+
+    chartData.data.push({
+      timestamp: now,
+      label: 'RPS',
+      value: dashboard.realTime.currentRPS
+    });
+
+    // Keep only last 50 data points
+    if (chartData.data.length > 50) {
+      chartData.data.shift();
+    }
+  }
+
+  /**
+   * Update response time chart
+   */
+  private updateResponseTimeChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    const now = Date.now();
+
+    chartData.data = [
+      { timestamp: now, label: 'P50', value: dashboard.performance.latency.p50 },
+      { timestamp: now, label: 'P90', value: dashboard.performance.latency.p90 },
+      { timestamp: now, label: 'P95', value: dashboard.performance.latency.p95 },
+      { timestamp: now, label: 'P99', value: dashboard.performance.latency.p99 }
+    ];
+  }
+
+  /**
+   * Update alerts widget
+   */
+  private updateAlertsWidget(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    widget.data.alerts = dashboard.realTime.alerts.slice(0, 10);
+  }
+
+  /**
+   * Update user activity heatmap
+   */
+  private updateUserActivityHeatmap(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    
+    chartData.data = dashboard.usage.timeBasedMetrics.map(metric => ({
+      label: `Hour ${metric.hour}`,
+      value: metric.requests,
+      metadata: { users: metric.users }
+    }));
+  }
+
+  /**
+   * Update cache performance chart
+   */
+  private updateCachePerformanceChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    const now = Date.now();
+
+    chartData.data.push({
+      timestamp: now,
+      label: 'Hit Rate',
+      value: dashboard.performance.cacheHitRate * 100
+    });
+
+    if (chartData.data.length > 50) {
+      chartData.data.shift();
+    }
+  }
+
+  /**
+   * Update resource utilization chart
+   */
+  private updateResourceUtilizationChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    
+    chartData.data = [
+      { label: 'Memory', value: dashboard.performance.resourceUtilization.memory },
+      { label: 'CPU', value: dashboard.performance.resourceUtilization.cpu },
+      { label: 'Connections', value: dashboard.performance.resourceUtilization.connections }
+    ];
+  }
+
+  /**
+   * Update queue metrics chart
+   */
+  private updateQueueMetricsChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    
+    chartData.data = [
+      { label: 'Queue Size', value: dashboard.realTime.queueSize },
+      { label: 'Processing Time', value: dashboard.realTime.processingTime }
+    ];
+  }
+
+  /**
+   * Update user distribution chart
+   */
+  private updateUserDistributionChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    
+    chartData.data = Object.entries(dashboard.usage.userDistribution).map(([label, value]) => ({
+      label,
+      value
+    }));
+  }
+
+  /**
+   * Update top guilds table
+   */
+  private updateTopGuildsTable(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    widget.data.data = dashboard.usage.topGuilds.map(guild => ({
+      guildId: guild.guildId.substring(0, 8) + '...',
+      requests: guild.requests,
+      users: guild.users,
+      avgResponse: '~' + Math.round(dashboard.overview.avgResponseTime) + 'ms'
+    }));
+  }
+
+  /**
+   * Update usage patterns chart
+   */
+  private updateUsagePatternsChart(widget: DashboardWidget, dashboard: AnalyticsDashboard): void {
+    const chartData = widget.data as ChartData;
+    
+    chartData.data = dashboard.usage.timeBasedMetrics.map(metric => ({
+      label: `${metric.hour}:00`,
+      value: metric.requests,
+      metadata: { users: metric.users }
+    }));
+  }
+
+  /**
+   * Notify connected clients of updates
+   */
+  private notifyConnectedClients(): void {
+    // In a real implementation, this would use WebSockets or Server-Sent Events
+    // to push updates to connected dashboard clients
+    
+    this.activeConnections.forEach(connection => {
+      // Send updated dashboard data to client
+      try {
+        // connection.send(JSON.stringify(this.getLayoutData('overview')));
+      } catch (error) {
+        // Remove failed connections
+        this.activeConnections.delete(connection);
+      }
+    });
+  }
+
+  /**
+   * Get layout data for client
+   */
+  getLayoutData(layoutId: string): DashboardLayout | undefined {
+    return this.layouts.get(layoutId);
+  }
+
+  /**
+   * Get all available layouts
+   */
+  getAvailableLayouts(): Array<{ id: string; name: string; description: string }> {
+    return Array.from(this.layouts.values()).map(layout => ({
+      id: layout.id,
+      name: layout.name,
+      description: layout.description
+    }));
+  }
+
+  /**
+   * Export dashboard configuration
+   */
+  exportConfiguration(): {
+    layouts: DashboardLayout[];
+    config: DashboardConfig;
+  } {
+    return {
+      layouts: Array.from(this.layouts.values()),
+      config: this.config
+    };
+  }
+
+  /**
+   * Cleanup and shutdown dashboard
+   */
+  shutdown(): void {
+    // Clear all update intervals
+    this.updateIntervals.forEach(interval => clearInterval(interval));
+    this.updateIntervals.clear();
+
+    // Close all connections
+    this.activeConnections.clear();
+
+    logger.info('Dashboard shutdown completed', {
+      operation: 'dashboard-shutdown'
+    });
+  }
+}
+
+export default InteractiveMonitoringDashboard;

@@ -1,0 +1,831 @@
+/**
+ * File Intelligence Service
+ * Unified service for processing all file types and providing comprehensive intelligence
+ */
+
+import {
+  MediaFile,
+  FileProcessingOptions,
+  MultimodalAnalysisResult,
+  ProcessingStatus,
+  FileIntelligenceResult
+} from './types.js';
+import { ImageAnalysisService } from './image-analysis.service.js';
+import { AudioAnalysisService } from './audio-analysis.service.js';
+import { DocumentProcessingService } from './document-processing.service.js';
+import { prisma } from '../db/prisma.js';
+import { logger } from '../utils/logger.js';
+
+/**
+ * Comprehensive file intelligence service that coordinates all multimodal processing
+ */
+export class FileIntelligenceService {
+  private readonly imageService: ImageAnalysisService;
+  private readonly audioService: AudioAnalysisService;
+  private readonly documentService: DocumentProcessingService;
+  
+  constructor() {
+    this.imageService = new ImageAnalysisService();
+    this.audioService = new AudioAnalysisService();
+    this.documentService = new DocumentProcessingService();
+  }
+
+  /**
+   * Process any file type and provide comprehensive intelligence
+   */
+  public async processFile(
+    mediaFile: MediaFile,
+    options: FileProcessingOptions = {}
+  ): Promise<FileIntelligenceResult | null> {
+    try {
+      const startTime = Date.now();
+
+      logger.info('Starting file intelligence processing', {
+        operation: 'file-intelligence',
+        userId: mediaFile.userId,
+        metadata: {
+          fileId: mediaFile.id,
+          fileType: mediaFile.fileType,
+          mimeType: mediaFile.mimeType,
+          fileName: mediaFile.originalName
+        }
+      });
+
+      // Update processing status
+      await this.updateProcessingStatus(mediaFile.id, 'processing');
+
+      const result: FileIntelligenceResult = {
+        fileId: mediaFile.id,
+        fileType: mediaFile.fileType,
+        processingStatus: 'processing',
+        startedAt: new Date(startTime),
+        analysis: {}
+      };
+
+      // Route to appropriate service based on file type
+      switch (mediaFile.fileType) {
+        case 'image':
+          result.analysis.vision = await this.imageService.analyzeImage(mediaFile, options);
+          break;
+          
+        case 'audio':
+          result.analysis.audio = await this.audioService.analyzeAudio(mediaFile, options);
+          break;
+          
+        case 'document':
+          result.analysis.document = await this.documentService.processDocument(mediaFile, options);
+          break;
+          
+        case 'video':
+          // Video processing would combine image and audio analysis
+          result.analysis = await this.processVideoFile(mediaFile, options);
+          break;
+          
+        default:
+          logger.warn('Unsupported file type for processing', {
+            operation: 'file-intelligence',
+            metadata: {
+              fileId: mediaFile.id,
+              fileType: mediaFile.fileType
+            }
+          });
+          result.processingStatus = 'failed';
+          result.error = `Unsupported file type: ${mediaFile.fileType}`;
+      }
+
+      // Generate cross-modal insights if multiple types are analyzed
+      if (this.hasMultipleAnalysisTypes(result.analysis)) {
+        result.crossModalInsights = await this.generateCrossModalInsights(result.analysis);
+      }
+
+      // Generate comprehensive metadata and recommendations
+      result.intelligenceMetadata = await this.generateIntelligenceMetadata(mediaFile, result);
+      result.recommendations = await this.generateRecommendations(mediaFile, result);
+
+      // Finalize processing
+      const processingTime = Date.now() - startTime;
+      result.completedAt = new Date();
+      result.processingTimeMs = processingTime;
+      result.processingStatus = result.analysis ? 'completed' : 'failed';
+
+      // Store intelligence results
+      await this.storeIntelligenceResults(mediaFile.id, result);
+
+      logger.info('File intelligence processing completed', {
+        operation: 'file-intelligence',
+        userId: mediaFile.userId,
+        metadata: {
+          fileId: mediaFile.id,
+          processingTime,
+          status: result.processingStatus,
+          hasVision: !!result.analysis.vision,
+          hasAudio: !!result.analysis.audio,
+          hasDocument: !!result.analysis.document,
+          hasCrossModal: !!result.crossModalInsights
+        }
+      });
+
+      return result;
+
+    } catch (error) {
+      logger.error('Failed to process file intelligence', {
+        operation: 'file-intelligence',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+
+      await this.updateProcessingStatus(mediaFile.id, 'failed', String(error));
+      
+      return {
+        fileId: mediaFile.id,
+        fileType: mediaFile.fileType,
+        processingStatus: 'failed',
+        startedAt: new Date(),
+        error: String(error),
+        analysis: {}
+      };
+    }
+  }
+
+  /**
+   * Process video files (combines image and audio analysis)
+   */
+  private async processVideoFile(
+    mediaFile: MediaFile,
+    options: FileProcessingOptions
+  ): Promise<MultimodalAnalysisResult> {
+    const analysis: MultimodalAnalysisResult = {};
+
+    try {
+      // In a real implementation, this would:
+      // 1. Extract keyframes from video for image analysis
+      // 2. Extract audio track for audio analysis
+      // 3. Analyze video metadata (duration, resolution, etc.)
+      
+      logger.info('Processing video file', {
+        operation: 'video-processing',
+        metadata: {
+          fileId: mediaFile.id,
+          fileName: mediaFile.originalName
+        }
+      });
+
+      // Mock video processing - would need actual video processing libraries
+      // like ffmpeg, opencv, etc.
+      
+      // Simulate keyframe extraction and analysis
+      if (options.enableVisionAnalysis !== false) {
+        // Create mock image analysis for video keyframes
+        analysis.vision = {
+          objects: [
+            { name: 'person', confidence: 0.92, boundingBox: { x: 100, y: 50, width: 200, height: 300 } },
+            { name: 'background', confidence: 0.85, boundingBox: { x: 0, y: 0, width: 1920, height: 1080 } }
+          ],
+          scenes: [
+            { name: 'indoor', confidence: 0.88 },
+            { name: 'meeting', confidence: 0.75 }
+          ],
+          text: [],
+          faces: [],
+          description: 'Video containing people in an indoor meeting environment',
+          keyframes: [
+            { timestamp: 0, description: 'Opening scene with people gathering' },
+            { timestamp: 30, description: 'Main presentation or discussion' },
+            { timestamp: 60, description: 'Closing remarks and conclusion' }
+          ]
+        };
+      }
+
+      // Simulate audio track analysis
+      if (options.enableTranscription !== false) {
+        analysis.audio = {
+          transcription: {
+            text: 'Welcome to our meeting. Today we will discuss the quarterly results and future planning.',
+            confidence: 0.89,
+            segments: [
+              { text: 'Welcome to our meeting.', startTime: 0, endTime: 2.5, confidence: 0.92, speaker: 'Speaker_1' },
+              { text: 'Today we will discuss the quarterly results and future planning.', startTime: 2.5, endTime: 8.0, confidence: 0.86, speaker: 'Speaker_1' }
+            ],
+            language: 'en'
+          },
+          speakerDetection: {
+            speakers: [
+              { id: 'Speaker_1', confidence: 0.94, segments: [{ startTime: 0, endTime: 8.0, confidence: 0.94 }] }
+            ],
+            speakerCount: 1
+          },
+          classification: {
+            type: 'speech',
+            confidence: 0.91,
+            subCategories: ['meeting', 'business', 'presentation']
+          }
+        };
+      }
+
+      logger.debug('Video processing completed', {
+        operation: 'video-processing',
+        metadata: {
+          fileId: mediaFile.id,
+          hasVision: !!analysis.vision,
+          hasAudio: !!analysis.audio
+        }
+      });
+
+      return analysis;
+
+    } catch (error) {
+      logger.error('Video processing failed', {
+        operation: 'video-processing',
+        metadata: {
+          fileId: mediaFile.id,
+          error: String(error)
+        }
+      });
+      
+      return analysis;
+    }
+  }
+
+  /**
+   * Generate cross-modal insights from multiple analysis types
+   */
+  private async generateCrossModalInsights(analysis: MultimodalAnalysisResult) {
+    try {
+      const insights = [];
+
+      // Vision + Audio insights
+      if (analysis.vision && analysis.audio) {
+        // Check for consistency between visual and audio content
+        if (analysis.vision.scenes?.some(scene => scene.name === 'meeting') &&
+            analysis.audio.transcription?.text.toLowerCase().includes('meeting')) {
+          insights.push({
+            type: 'consistency_match',
+            confidence: 0.89,
+            description: 'Visual and audio content consistently indicate a meeting context',
+            sources: ['vision', 'audio']
+          });
+        }
+
+        // Detect multimodal content types
+        if (analysis.vision.objects?.some(obj => obj.name === 'person') &&
+            analysis.audio.speakerDetection) {
+          insights.push({
+            type: 'speaker_visual_correlation',
+            confidence: 0.85,
+            description: `${analysis.audio.speakerDetection.speakerCount} speaker(s) detected in audio matching visible people`,
+            sources: ['vision', 'audio']
+          });
+        }
+      }
+
+      // Vision + Document insights
+      if (analysis.vision && analysis.document) {
+        // Check for text consistency
+        if (analysis.vision.text && analysis.document.textContent) {
+          const visionText = analysis.vision.text.map(t => t.text).join(' ');
+          const documentText = analysis.document.textContent.fullText;
+          
+          if (this.calculateTextSimilarity(visionText, documentText) > 0.7) {
+            insights.push({
+              type: 'text_consistency',
+              confidence: 0.92,
+              description: 'OCR text from image matches document content',
+              sources: ['vision', 'document']
+            });
+          }
+        }
+      }
+
+      // Audio + Document insights
+      if (analysis.audio && analysis.document) {
+        // Check for content topic alignment
+        if (analysis.audio.transcription && analysis.document.keyInformation) {
+          const audioText = analysis.audio.transcription.text.toLowerCase();
+          const documentTopics = analysis.document.keyInformation.topics;
+          
+          const matchingTopics = documentTopics.filter((topic: string) => 
+            audioText.includes(topic.toLowerCase())
+          );
+          
+          if (matchingTopics.length > 0) {
+            insights.push({
+              type: 'topic_alignment',
+              confidence: 0.81,
+              description: `Audio content aligns with document topics: ${matchingTopics.join(', ')}`,
+              sources: ['audio', 'document']
+            });
+          }
+        }
+      }
+
+      logger.debug('Cross-modal insights generated', {
+        operation: 'cross-modal-insights',
+        metadata: {
+          insightCount: insights.length,
+          types: insights.map(i => i.type)
+        }
+      });
+
+      return insights;
+
+    } catch (error) {
+      logger.error('Failed to generate cross-modal insights', {
+        operation: 'cross-modal-insights',
+        metadata: {
+          error: String(error)
+        }
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Generate comprehensive intelligence metadata
+   */
+  private async generateIntelligenceMetadata(mediaFile: MediaFile, result: FileIntelligenceResult) {
+    try {
+      const metadata = {
+        processingVersion: '1.0.0',
+        modelVersions: {
+          vision: analysis.vision ? '1.0.0' : undefined,
+          audio: result.analysis.audio ? '1.0.0' : undefined,
+          document: result.analysis.document ? '1.0.0' : undefined
+        },
+        confidenceScores: this.calculateConfidenceScores(result.analysis),
+        contentComplexity: this.assessContentComplexity(result.analysis),
+        informationDensity: this.calculateInformationDensity(result.analysis),
+        accessibilityFeatures: this.identifyAccessibilityFeatures(result.analysis),
+        contentRichness: this.assessContentRichness(result.analysis)
+      };
+
+      return metadata;
+
+    } catch (error) {
+      logger.error('Failed to generate intelligence metadata', {
+        operation: 'intelligence-metadata',
+        metadata: {
+          error: String(error)
+        }
+      });
+      return {};
+    }
+  }
+
+  /**
+   * Generate actionable recommendations based on analysis
+   */
+  private async generateRecommendations(mediaFile: MediaFile, result: FileIntelligenceResult) {
+    try {
+      const recommendations = [];
+
+      // Content optimization recommendations
+      if (result.analysis.vision?.quality) {
+        if (result.analysis.vision.quality.brightness < 0.3) {
+          recommendations.push({
+            type: 'quality_improvement',
+            category: 'visual',
+            priority: 'medium',
+            description: 'Image appears underexposed. Consider increasing brightness for better visibility.',
+            action: 'enhance_brightness'
+          });
+        }
+      }
+
+      if (result.analysis.audio?.quality) {
+        if (result.analysis.audio.quality.noiseLevel > 0.5) {
+          recommendations.push({
+            type: 'quality_improvement',
+            category: 'audio',
+            priority: 'high',
+            description: 'High noise level detected. Consider noise reduction for better audio clarity.',
+            action: 'noise_reduction'
+          });
+        }
+      }
+
+      // Content organization recommendations
+      if (result.analysis.document?.structure) {
+        if (!result.analysis.document.structure.hasHeadings) {
+          recommendations.push({
+            type: 'organization',
+            category: 'document',
+            priority: 'medium',
+            description: 'Document lacks clear headings. Consider adding section headers for better structure.',
+            action: 'add_headings'
+          });
+        }
+      }
+
+      // Accessibility recommendations
+      if (result.analysis.vision?.text && result.analysis.vision.text.length > 0 && !result.analysis.audio?.transcription) {
+        recommendations.push({
+          type: 'accessibility',
+          category: 'multimodal',
+          priority: 'low',
+          description: 'Image contains text but no audio description. Consider adding audio narration for accessibility.',
+          action: 'add_audio_description'
+        });
+      }
+
+      // Content enrichment recommendations
+      if (result.analysis.document?.keyInformation?.actionItems && result.analysis.document.keyInformation.actionItems.length > 0) {
+        recommendations.push({
+          type: 'workflow',
+          category: 'productivity',
+          priority: 'medium',
+          description: 'Document contains action items. Consider creating task reminders or calendar events.',
+          action: 'create_tasks'
+        });
+      }
+
+      return recommendations;
+
+    } catch (error) {
+      logger.error('Failed to generate recommendations', {
+        operation: 'recommendations',
+        metadata: {
+          error: String(error)
+        }
+      });
+      return [];
+    }
+  }
+
+  // Helper methods
+
+  private hasMultipleAnalysisTypes(analysis: MultimodalAnalysisResult): boolean {
+    const types = [analysis.vision, analysis.audio, analysis.document].filter(Boolean);
+    return types.length > 1;
+  }
+
+  private calculateTextSimilarity(text1: string, text2: string): number {
+    // Simple similarity calculation - in production would use more sophisticated NLP
+    const words1 = new Set(text1.toLowerCase().split(/\s+/));
+    const words2 = new Set(text2.toLowerCase().split(/\s+/));
+    
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+    
+    return intersection.size / union.size;
+  }
+
+  private calculateConfidenceScores(analysis: MultimodalAnalysisResult) {
+    const scores: Record<string, number> = {};
+    
+    if (analysis.vision) {
+      const visionScores = [
+        ...(analysis.vision.objects?.map(obj => obj.confidence) || []),
+        ...(analysis.vision.scenes?.map(scene => scene.confidence) || []),
+        ...(analysis.vision.text?.map(text => text.confidence) || [])
+      ];
+      scores.vision = visionScores.length > 0 ? visionScores.reduce((a, b) => a + b) / visionScores.length : 0;
+    }
+    
+    if (analysis.audio?.transcription) {
+      scores.audio = analysis.audio.transcription.confidence;
+    }
+    
+    if (analysis.document?.classification) {
+      scores.document = analysis.document.classification.confidence;
+    }
+    
+    const allScores = Object.values(scores);
+    scores.overall = allScores.length > 0 ? allScores.reduce((a, b) => a + b) / allScores.length : 0;
+    
+    return scores;
+  }
+
+  private assessContentComplexity(analysis: MultimodalAnalysisResult): string {
+    let complexity = 0;
+    
+    // Vision complexity
+    if (analysis.vision) {
+      complexity += (analysis.vision.objects?.length || 0) * 0.1;
+      complexity += (analysis.vision.text?.length || 0) * 0.2;
+      complexity += (analysis.vision.faces?.length || 0) * 0.15;
+    }
+    
+    // Audio complexity
+    if (analysis.audio) {
+      complexity += (analysis.audio.speakerDetection?.speakerCount || 0) * 0.3;
+      complexity += (analysis.audio.transcription?.segments?.length || 0) * 0.05;
+    }
+    
+    // Document complexity
+    if (analysis.document?.structure) {
+      complexity += analysis.document.structure.sectionCount * 0.1;
+      if (analysis.document.structure.hasTables) complexity += 0.5;
+      if (analysis.document.structure.hasHeadings) complexity += 0.3;
+    }
+    
+    if (complexity < 1) return 'simple';
+    if (complexity < 3) return 'moderate';
+    if (complexity < 6) return 'complex';
+    return 'very_complex';
+  }
+
+  private calculateInformationDensity(analysis: MultimodalAnalysisResult): number {
+    let density = 0;
+    let factors = 0;
+    
+    if (analysis.vision) {
+      density += (analysis.vision.objects?.length || 0) * 0.1;
+      density += (analysis.vision.text?.length || 0) * 0.2;
+      factors++;
+    }
+    
+    if (analysis.audio?.transcription) {
+      density += (analysis.audio.transcription.text.split(' ').length || 0) * 0.001;
+      factors++;
+    }
+    
+    if (analysis.document?.textContent) {
+      density += (analysis.document.textContent.wordCount || 0) * 0.0001;
+      factors++;
+    }
+    
+    return factors > 0 ? Math.min(1, density / factors) : 0;
+  }
+
+  private identifyAccessibilityFeatures(analysis: MultimodalAnalysisResult): string[] {
+    const features = [];
+    
+    if (analysis.vision?.text && analysis.vision.text.length > 0) {
+      features.push('ocr_text_available');
+    }
+    
+    if (analysis.audio?.transcription) {
+      features.push('audio_transcription_available');
+    }
+    
+    if (analysis.vision?.faces && analysis.vision.faces.length > 0) {
+      features.push('face_detection_available');
+    }
+    
+    if (analysis.document?.structure?.hasHeadings) {
+      features.push('structured_headings');
+    }
+    
+    return features;
+  }
+
+  private assessContentRichness(analysis: MultimodalAnalysisResult): Record<string, number> {
+    const richness: Record<string, number> = {
+      visual: 0,
+      textual: 0,
+      audio: 0,
+      structural: 0
+    };
+    
+    // Visual richness
+    if (analysis.vision) {
+      richness.visual += (analysis.vision.objects?.length || 0) * 0.1;
+      richness.visual += (analysis.vision.scenes?.length || 0) * 0.2;
+      richness.visual += (analysis.vision.faces?.length || 0) * 0.15;
+      richness.visual = Math.min(1, richness.visual);
+    }
+    
+    // Textual richness
+    if (analysis.vision?.text) {
+      richness.textual += (analysis.vision.text.length || 0) * 0.1;
+    }
+    if (analysis.document?.textContent) {
+      richness.textual += Math.min(1, (analysis.document.textContent.wordCount || 0) / 1000);
+    }
+    richness.textual = Math.min(1, richness.textual);
+    
+    // Audio richness
+    if (analysis.audio) {
+      if (analysis.audio.transcription) richness.audio += 0.5;
+      if (analysis.audio.speakerDetection) richness.audio += 0.3;
+      if (analysis.audio.sentiment) richness.audio += 0.2;
+      richness.audio = Math.min(1, richness.audio);
+    }
+    
+    // Structural richness
+    if (analysis.document?.structure) {
+      if (analysis.document.structure.hasHeadings) richness.structural += 0.3;
+      if (analysis.document.structure.hasTables) richness.structural += 0.3;
+      if (analysis.document.structure.hasLists) richness.structural += 0.2;
+      richness.structural += Math.min(0.2, analysis.document.structure.sectionCount * 0.05);
+      richness.structural = Math.min(1, richness.structural);
+    }
+    
+    return richness;
+  }
+
+  /**
+   * Update media file processing status
+   */
+  private async updateProcessingStatus(
+    fileId: number,
+    status: ProcessingStatus,
+    error?: string
+  ): Promise<void> {
+    try {
+      await prisma.mediaFile.update({
+        where: { id: fileId },
+        data: {
+          processingStatus: status,
+          processingError: error,
+          processedAt: status === 'completed' || status === 'failed' ? new Date() : undefined
+        }
+      });
+    } catch (updateError) {
+      logger.error('Failed to update processing status', {
+        operation: 'status-update',
+        metadata: {
+          fileId,
+          status,
+          error: String(updateError)
+        }
+      });
+    }
+  }
+
+  /**
+   * Store comprehensive intelligence results
+   */
+  private async storeIntelligenceResults(fileId: number, result: FileIntelligenceResult): Promise<void> {
+    try {
+      // Store main intelligence results in MediaFile
+      await prisma.mediaFile.update({
+        where: { id: fileId },
+        data: {
+          processingStatus: result.processingStatus,
+          processedAt: result.completedAt,
+          processingError: result.error
+        }
+      });
+
+      // Store detailed insights in MediaInsight records
+      const insights = [];
+
+      if (result.crossModalInsights) {
+        insights.push(...result.crossModalInsights.map((insight: { type: string; confidence: number; description: string; sources: string[] }) => ({
+          mediaFileId: fileId,
+          insightType: `cross_modal_${insight.type}`,
+          confidence: insight.confidence,
+          content: insight,
+          generatedBy: 'file_intelligence_service'
+        })));
+      }
+
+      if (result.recommendations) {
+        insights.push(...result.recommendations.map((rec: { type: string; category: string; priority: string; description: string; action: string }) => ({
+          mediaFileId: fileId,
+          insightType: `recommendation_${rec.type}`,
+          confidence: 1.0,
+          content: rec,
+          generatedBy: 'file_intelligence_service'
+        })));
+      }
+
+      if (insights.length > 0) {
+        await prisma.mediaInsight.createMany({
+          data: insights
+        });
+      }
+
+      logger.debug('Intelligence results stored', {
+        operation: 'store-intelligence',
+        metadata: {
+          fileId,
+          insightCount: insights.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('Failed to store intelligence results', {
+        operation: 'store-intelligence',
+        metadata: {
+          fileId,
+          error: String(error)
+        }
+      });
+    }
+  }
+
+  /**
+   * Search across all file types with intelligent ranking
+   */
+  public async intelligentSearch(
+    query: string,
+    userId: string,
+    options: {
+      fileTypes?: string[];
+      limit?: number;
+      includeInsights?: boolean;
+    } = {}
+  ): Promise<Array<MediaFile & { relevanceScore: number; matchType: string }>> {
+    try {
+      const limit = options.limit || 20;
+      const fileTypes = options.fileTypes || ['image', 'audio', 'document', 'video'];
+
+      // Search across all media files
+      const files = await prisma.mediaFile.findMany({
+        where: {
+          userId,
+          fileType: { in: fileTypes },
+          processingStatus: 'completed',
+          OR: [
+            { description: { contains: query } },
+            { extractedText: { contains: query } },
+            { tags: { contains: query } },
+            { originalName: { contains: query } }
+          ]
+        },
+        include: options.includeInsights ? {
+          mediaInsights: true
+        } : undefined,
+        take: limit * 2 // Get more results for ranking
+      });
+
+      // Calculate relevance scores and rank results
+      const rankedFiles = files.map(file => {
+        const relevanceScore = this.calculateRelevanceScore(file, query);
+        const matchType = this.determineMatchType(file, query);
+        
+        return {
+          ...file,
+          relevanceScore,
+          matchType
+        };
+      });
+
+      // Sort by relevance and return top results
+      return rankedFiles
+        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .slice(0, limit);
+
+    } catch (error) {
+      logger.error('Intelligent search failed', {
+        operation: 'intelligent-search',
+        metadata: {
+          userId,
+          query,
+          error: String(error)
+        }
+      });
+      return [];
+    }
+  }
+
+  private calculateRelevanceScore(file: MediaFile & { tags?: string; extractedText?: string; description?: string }, query: string): number {
+    let score = 0;
+    const queryLower = query.toLowerCase();
+
+    // Filename match (highest weight)
+    if (file.originalName.toLowerCase().includes(queryLower)) {
+      score += 10;
+    }
+
+    // Description match
+    if (file.description?.toLowerCase().includes(queryLower)) {
+      score += 5;
+    }
+
+    // Extracted text match
+    if (file.extractedText?.toLowerCase().includes(queryLower)) {
+      score += 7;
+    }
+
+    // Tags match
+    if (file.tags) {
+      try {
+        const tags = JSON.parse(file.tags);
+        if (tags.some((tag: string) => tag.toLowerCase().includes(queryLower))) {
+          score += 3;
+        }
+      } catch {
+        // Ignore JSON parse errors
+      }
+    }
+
+    // Recency bonus (newer files get slight boost)
+    const daysSinceCreation = (Date.now() - new Date(file.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    score += Math.max(0, 2 - (daysSinceCreation / 30)); // 2 points for very recent, declining over month
+
+    return score;
+  }
+
+  private determineMatchType(file: MediaFile & { tags?: string; extractedText?: string; description?: string }, query: string): string {
+    const queryLower = query.toLowerCase();
+
+    if (file.originalName.toLowerCase().includes(queryLower)) {
+      return 'filename';
+    }
+    if (file.extractedText?.toLowerCase().includes(queryLower)) {
+      return 'content';
+    }
+    if (file.description?.toLowerCase().includes(queryLower)) {
+      return 'description';
+    }
+    if (file.tags && JSON.parse(file.tags || '[]').some((tag: string) => tag.toLowerCase().includes(queryLower))) {
+      return 'tags';
+    }
+    return 'metadata';
+  }
+}

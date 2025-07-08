@@ -1,0 +1,58 @@
+# Docker ignore file for Discord Gemini Bot
+
+# Development files
+node_modules/
+npm-debug.log*
+*.log
+
+# Build artifacts
+dist/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Database files
+prisma/dev.db*
+data/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+coverage/
+*.test.js
+
+# Temporary files
+*.tmp
+*.temp
+
+# Git files
+.git/
+.gitignore
+
+# Documentation (keep only essential)
+*.md
+docs/
+archive/
+
+# Configuration that shouldn't be in container
+jest.config.js
+.eslintrc.*
+tsconfig.json
+
+# Keep only necessary files:
+# package.json, package-lock.json - for dependencies
+# src/ - source code
+# prisma/ - database schema and migrations
+# Dockerfile, docker-compose.yml - for deployment

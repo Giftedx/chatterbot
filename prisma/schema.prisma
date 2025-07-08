@@ -1,0 +1,372 @@
+// Prisma schema for Discord Bot persistence
+// Using SQLite for lightweight, file-based storage in production.
+// Run `npx prisma migrate dev --name init` after editing.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Persona {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  systemPrompt String
+  styleHints   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("personas")
+}
+
+model AnalyticsEvent {
+  id        Int      @id @default(autoincrement())
+  timestamp DateTime @default(now())
+  guildId   String?
+  userId    String
+  command   String
+  isSuccess Boolean
+
+  @@map("analytics")
+}
+
+model ModerationConfig {
+  id               Int      @id @default(autoincrement())
+  guildId          String   @unique
+  strictnessLevel  String   @default("medium") // "low", "medium", "high"
+  enabledFeatures  String   @default("text,image") // JSON array as string
+  logChannelId     String?
+  autoDeleteUnsafe Boolean  @default(true)
+  customKeywords   String?  // JSON array as string
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("moderation_configs")
+}
+
+model ModerationIncident {
+  id          Int      @id @default(autoincrement())
+  guildId     String
+  userId      String
+  type        String   // "text", "image", "attachment"
+  severity    String   // "low", "medium", "high", "critical"
+  action      String   // "blocked", "warned", "logged"
+  reason      String?
+  contentHash String?  // Hash of content for privacy
+  metadata    String?  // JSON metadata
+  createdAt   DateTime @default(now())
+
+  @@map("moderation_incidents")
+}
+
+model UserMemory {
+  id         Int      @id @default(autoincrement())
+  userId     String   
+  guildId    String?  // Optional: guild-specific memories
+  memories   String   // JSON object storing key-value memories
+  preferences String? // JSON object for user preferences
+  summary    String?  // Summarized memory for prompt injection
+  lastUpdated DateTime @default(now()) @updatedAt
+  memoryCount Int     @default(0) // Track number of stored memories
+  tokenCount  Int     @default(0) // Approximate token count for size control
+  createdAt   DateTime @default(now())
+
+  @@map("user_memories")
+  @@unique([userId, guildId])
+}
+
+model ConversationThread {
+  id            Int      @id @default(autoincrement())
+  channelId     String
+  userId        String
+  guildId       String?
+  threadTitle   String?  // Optional user-defined or AI-generated title
+  currentTopic  String?  // Current active topic
+  status        String   @default("active") // "active", "paused", "completed", "archived"
+  summary       String?  // AI-generated summary of the thread
+  importance    Float    @default(0.5) // 0-1 importance score for context retention
+  messageCount  Int      @default(0) // Number of messages in thread
+  tokenCount    Int      @default(0) // Approximate token count for the thread
+  createdAt     DateTime @default(now())
+  lastActivity  DateTime @default(now()) @updatedAt
+  
+  // Relations
+  messages      ConversationMessage[]
+  topics        ConversationThreadTopic[]
+  multimodalConversations MultimodalConversation[]
+
+  @@map("conversation_threads")
+  @@index([channelId, userId])
+  @@index([status, lastActivity])
+}
+
+model ConversationMessage {
+  id               Int      @id @default(autoincrement())
+  threadId         Int?     // Optional: can be part of a thread
+  channelId        String
+  userId           String
+  content          String
+  role             String   // "user" or "assistant"
+  tokens           Int      @default(0) // Token count for this message
+  topicTags        String?  // JSON array of detected topics
+  importance       Float    @default(0.5) // 0-1 relevance score for context retention
+  contextRelevant  Boolean  @default(true) // Whether to include in context windows
+  hasAttachments   Boolean  @default(false) // Whether message has image/file attachments
+  attachmentData   String?  // JSON metadata about attachments
+  
+  // Multimodal content flags
+  hasImages        Boolean  @default(false)
+  hasAudio         Boolean  @default(false)
+  hasDocuments     Boolean  @default(false)
+  hasCode          Boolean  @default(false)
+  mediaFileIds     String?  // JSON array of related MediaFile IDs
+  
+  createdAt        DateTime @default(now())
+
+  // Relations
+  thread           ConversationThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  mediaFiles       MediaFile[]
+
+  @@map("conversation_messages")
+  @@index([channelId, createdAt])
+  @@index([threadId, createdAt])
+  @@index([importance, contextRelevant])
+  @@index([hasImages, hasAudio, hasDocuments])
+}
+
+model ConversationTopic {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique // Topic name (e.g., "python-programming", "react-hooks")
+  displayName     String   // Human-readable name (e.g., "Python Programming", "React Hooks")
+  description     String?  // Optional description of the topic
+  category        String?  // Topic category (e.g., "programming", "general", "support")
+  firstMentioned  DateTime @default(now())
+  lastMentioned   DateTime @default(now()) @updatedAt
+  frequency       Int      @default(1) // How often this topic appears
+  importance      Float    @default(0.5) // 0-1 importance score
+
+  // Relations
+  threadTopics    ConversationThreadTopic[]
+
+  @@map("conversation_topics")
+  @@index([category, importance])
+  @@index([frequency, lastMentioned])
+}
+
+model ConversationThreadTopic {
+  id         Int      @id @default(autoincrement())
+  threadId   Int
+  topicId    Int
+  relevance  Float    @default(0.5) // 0-1 how relevant this topic is to the thread
+  firstSeen  DateTime @default(now())
+  lastSeen   DateTime @default(now()) @updatedAt
+
+  // Relations
+  thread     ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  topic      ConversationTopic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@map("conversation_thread_topics")
+  @@unique([threadId, topicId])
+  @@index([relevance, lastSeen])
+}
+
+// Media and File Processing Models for Multimodal AI Integration
+
+model MediaFile {
+  id              Int       @id @default(autoincrement())
+  userId          String
+  guildId         String?
+  channelId       String
+  messageId       String?
+  
+  // File metadata
+  filename        String
+  originalName    String
+  fileType        String    // image, audio, video, document, code, other
+  mimeType        String
+  fileSize        Int
+  filePath        String    // Storage path or URL
+  
+  // Processing status
+  processingStatus String   @default("pending") // pending, processing, completed, failed
+  processedAt     DateTime?
+  processingError String?
+  
+  // Content analysis results
+  extractedText   String?   // OCR or document text
+  description     String?   // AI-generated description
+  tags            String?   // JSON array of auto-generated tags
+  categories      String?   // JSON array of content categories
+  
+  // Metadata and analysis
+  imageMetadata   Json?     // Image dimensions, format, EXIF data
+  audioMetadata   Json?     // Duration, format, audio properties  
+  documentMetadata Json?    // Pages, word count, document properties
+  
+  // AI analysis results
+  visionAnalysis  Json?     // Object detection, OCR, scene analysis
+  audioAnalysis   Json?     // Transcription, speaker detection, sentiment
+  contentSafety   Json?     // Safety scores, content warnings
+  
+  // Relationships
+  conversationMessages ConversationMessage[]
+  mediaInsights   MediaInsight[]
+  moderationResults ContentModerationResult[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("media_files")
+  @@index([userId, createdAt])
+  @@index([fileType, createdAt])
+  @@index([processingStatus])
+  @@index([channelId, createdAt])
+}
+
+model MediaInsight {
+  id              Int       @id @default(autoincrement())
+  mediaFileId     Int
+  
+  // Insight type and content
+  insightType     String    // object_detection, text_recognition, scene_analysis, audio_transcription, sentiment_analysis
+  confidence      Float
+  content         Json      // Structured insight data
+  
+  // Metadata
+  generatedBy     String    // Service that generated insight (google_vision, openai_gpt4v, etc.)
+  processingTime  Int?      // Time taken to generate insight (ms)
+  
+  // Relationships
+  mediaFile       MediaFile @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@map("media_insights")
+  @@index([mediaFileId, insightType])
+  @@index([insightType, confidence])
+}
+
+model MultimodalConversation {
+  id              Int       @id @default(autoincrement())
+  conversationThreadId Int
+  
+  // Multimodal context
+  mediaReferences String?   // JSON array of related media files
+  visualContext   Json?     // Visual context summary
+  audioContext    Json?     // Audio context summary
+  documentContext Json?     // Document context summary
+  
+  // AI processing
+  multimodalSummary String? // Summary incorporating all modalities
+  keyVisualElements String? // JSON array of important visual elements
+  extractedEntities String? // JSON array of named entities from all content
+  
+  // Relationships
+  conversationThread ConversationThread @relation(fields: [conversationThreadId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@map("multimodal_conversations")
+  @@index([conversationThreadId])
+}
+
+model ContentModerationResult {
+  id              Int       @id @default(autoincrement())
+  mediaFileId     Int?
+  messageId       String?
+  
+  // Moderation results
+  moderationStatus String   // approved, flagged, rejected, pending_review
+  safetyScore     Float?    // Overall safety score (0-1)
+  flaggedCategories String? // JSON array of categories that triggered flags
+  
+  // Detailed analysis
+  adultContent    Float?    // Adult content probability
+  violenceContent Float?    // Violence content probability
+  hateSpeech      Float?    // Hate speech probability
+  spamContent     Float?    // Spam probability
+  
+  // Actions taken
+  actionTaken     String?   // none, warning_sent, content_hidden, user_timeout
+  reviewRequired  Boolean   @default(false)
+  reviewedBy      String?   // Admin who reviewed
+  reviewedAt      DateTime?
+  
+  // Relationships
+  mediaFile       MediaFile? @relation(fields: [mediaFileId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@map("content_moderation_results")
+  @@index([moderationStatus])
+  @@index([safetyScore])
+  @@index([reviewRequired])
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model KnowledgeEntry {
+  id         String   @id @default(cuid())
+  content    String
+  source     String   // 'discord_message', 'faq', 'document', 'manual'
+  sourceId   String   // Discord message ID, FAQ ID, etc.
+  sourceUrl  String?  // Optional URL to source
+  channelId  String?  // Discord channel ID
+  authorId   String?  // Discord user ID
+  tags       String?  // JSON array of tags for categorization
+  confidence Float    @default(0.8) // 0-1 confidence score
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([source])
+  @@index([channelId])
+  @@index([confidence])
+  @@index([tags])
+}
+
+model EscalationTicket {
+  id          String   @id @default(cuid())
+  query       String
+  userId      String
+  channelId   String
+  reason      String
+  priority    String   // 'low', 'medium', 'high', 'urgent'
+  status      String   @default("open") // 'open', 'assigned', 'in_progress', 'resolved', 'closed'
+  assignedTo  String?
+  context     String?  // JSON string of context
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([userId])
+  @@index([channelId])
+}
+
+model InteractionLog {
+  id              String   @id @default(cuid())
+  query           String
+  response        String
+  userId          String
+  channelId       String
+  confidence      Float
+  knowledgeGrounded Boolean
+  shouldEscalate  Boolean
+  processingTime  Int      // milliseconds
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([channelId])
+  @@index([createdAt])
+  @@index([confidence])
+}

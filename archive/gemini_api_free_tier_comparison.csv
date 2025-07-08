@@ -1,0 +1,9 @@
+Model,RPM (Requests/Min),TPM (Tokens/Min),RPD (Requests/Day),Input Cost,Output Cost,Best For Chatbots
+Gemini 2.5 Pro,5,"250,000",100,Not Available,Not Available,No (Not available on free)
+Gemini 2.5 Flash,10,"250,000",250,Free,Free,Yes
+Gemini 2.5 Flash-Lite,15,"250,000",1000,Free,Free,Yes
+Gemini 2.0 Flash,15,"1,000,000",200,Free,Free,Yes
+Gemini 2.0 Flash-Lite,30,"1,000,000",200,Free,Free,Yes
+Gemini 1.5 Flash,15,"250,000",50,Free,Free,Yes (Deprecated)
+Gemini 1.5 Flash-8B,15,"250,000",50,Free,Free,Yes (Deprecated)
+Gemma 3 & 3n,30,"15,000",14400,Free,Free,Limited (Low TPM)
