@@ -4,10 +4,12 @@
  */
 
 import { knowledgeBaseService } from './knowledge-base.service.js';
-import { smartFlaggingService, ResponseAnalysis } from './smart-flagging.service.js';
+import { smartFlaggingService, FlaggingResult } from './smart-flagging.service.js';
 import { sourceCitationService, CitationResult } from './source-citation.service.js';
 import { escalationService, EscalationDecision } from './escalation.service.js';
 import { logger } from '../utils/logger.js';
+import { GeminiService } from './gemini.service.js';
+import { ChatMessage } from './context-manager.js';
 
 export interface AgenticResponse {
   response: string;
@@ -38,7 +40,7 @@ export interface AgenticQuery {
   userId: string;
   channelId: string;
   context?: {
-    previousMessages?: string[];
+    previousMessages?: ChatMessage[];
     userRole?: string;
     channelType?: string;
     userPermissions?: string[];
@@ -47,20 +49,124 @@ export interface AgenticQuery {
     includeCitations?: boolean;
     enableEscalation?: boolean;
     minConfidence?: number;
-    maxResponseLength?: number;
+    guildId?: string;
   };
 }
 
 export class AgenticIntelligenceService {
   private static instance: AgenticIntelligenceService;
+  private geminiService: GeminiService;
 
-  private constructor() {}
+  private constructor(geminiService: GeminiService = new GeminiService()) {
+    this.geminiService = geminiService;
+  }
 
   static getInstance(): AgenticIntelligenceService {
     if (!AgenticIntelligenceService.instance) {
       AgenticIntelligenceService.instance = new AgenticIntelligenceService();
     }
     return AgenticIntelligenceService.instance;
+  }
+
+  /**
+   * Check if the query is a request for help
+   */
+  private isHelpQuery(query: string): boolean {
+    const helpKeywords = ['help', 'what can you do', 'capabilities', 'features', 'commands'];
+    const queryLower = query.toLowerCase();
+    return helpKeywords.some(keyword => queryLower.includes(keyword));
+  }
+
+  /**
+   * Generate a help message describing the bot's capabilities
+   */
+  private getHelpMessage(): AgenticResponse {
+    const startTime = Date.now();
+    const response = `
+**Unified Intelligence Service**
+
+I am an advanced AI assistant with the following capabilities:
+
+- **Continuous Learning**: I learn from our conversations to improve my responses.
+- **Proactive Escalation**: I automatically detect when a query is too complex for me and escalate it to a human moderator.
+- **Source Citations**: I can cite my sources to provide transparency and allow you to verify the information.
+- **Contextual Awareness**: I understand the context of our conversation and can tailor my responses accordingly.
+
+There are no special commands to use these features. Simply chat with me, and I will use the appropriate tools to assist you.
+    `;
+
+    return {
+      response,
+      confidence: 1,
+      citations: { citations: [], hasCitations: false, confidence: 1 },
+      flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
+      escalation: { shouldEscalate: false, priority: 'low', reason: '' },
+      knowledgeGrounded: true,
+      sourceSummary: 'This is a help message.',
+      metadata: {
+        processingTime: Date.now() - startTime,
+        knowledgeEntriesFound: 0,
+        responseQuality: 'high',
+      },
+    };
+  }
+
+  /**
+   * Check if the query is an implicit request for escalation to a human
+   */
+  private isImplicitEscalation(query: string): boolean {
+    const escalationKeywords = [
+      'talk to a human',
+      'speak to a person',
+      'can I talk to someone',
+      'get a moderator',
+      'human help',
+      'real person'
+    ];
+    const queryLower = query.toLowerCase();
+    return escalationKeywords.some(keyword => queryLower.includes(keyword));
+  }
+
+  /**
+   * Check if the query is a request for statistics
+   */
+  private isStatsQuery(query: string): boolean {
+    const statsKeywords = ['stats', 'statistics', 'performance', 'metrics', 'status'];
+    const queryLower = query.toLowerCase();
+    return statsKeywords.some(keyword => queryLower.includes(keyword));
+  }
+
+  /**
+   * Generate a statistics message
+   */
+  private async getStatsMessage(): Promise<AgenticResponse> {
+    const startTime = Date.now();
+    const stats = await this.getStats();
+
+    const response = `
+**System Performance & Statistics**
+
+- **Knowledge Base**: ${stats.knowledgeBase.totalEntries} entries, ${stats.knowledgeBase.recentAdditions} added recently.
+- **Moderation**: ${stats.escalation.totalTickets} escalations, ${stats.flagging.flaggedCount} items flagged.
+- **Citations**: ${stats.citations.totalCitations} citations generated.
+
+I am operating at peak performance.
+    `;
+
+    return {
+      response,
+      confidence: 1,
+      citations: { citations: [], hasCitations: false, confidence: 1 },
+      flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
+      escalation: { shouldEscalate: false, priority: 'low', reason: '' },
+      knowledgeGrounded: true,
+      sourceSummary: 'This is a statistics message.',
+      metadata: {
+        processingTime: Date.now() - startTime,
+        knowledgeEntriesFound: 0,
+        responseQuality: 'high',
+      },
+    };
   }
 
   /**
@@ -75,7 +181,7 @@ export class AgenticIntelligenceService {
         includeCitations = true,
         enableEscalation = true,
         minConfidence = 0.6,
-        maxResponseLength = 2000
+        guildId = 'default'
       } = options || {};
 
       logger.info('Processing agentic query', {
@@ -86,6 +192,16 @@ export class AgenticIntelligenceService {
         enableEscalation
       });
 
+      // Step 0: Check for help query
+      if (this.isHelpQuery(query)) {
+        return this.getHelpMessage();
+      }
+
+      // Step 0.1: Check for stats query
+      if (this.isStatsQuery(query)) {
+        return this.getStatsMessage();
+      }
+
       // Step 1: Check knowledge grounding
       const knowledgeGrounded = await knowledgeBaseService.hasGroundedKnowledge(
         query,
@@ -93,7 +209,12 @@ export class AgenticIntelligenceService {
       );
 
       // Step 2: Generate initial response (this would come from your existing AI service)
-      const initialResponse = await this.generateInitialResponse(query, context);
+      const initialResponse = await this.generateInitialResponse(
+        query,
+        userId,
+        guildId,
+        context
+        );
 
       // Step 3: Smart flagging analysis
       const flaggingResult = await smartFlaggingService.analyzeResponse({
@@ -101,7 +222,10 @@ export class AgenticIntelligenceService {
         response: initialResponse,
         channelId,
         userId,
-        context
+        context: {
+          ...context,
+          previousMessages: context?.previousMessages?.map(m => m.parts.map(p => p.text).join(' '))
+        }
       });
 
       // Step 4: Generate citations if requested
@@ -110,15 +234,28 @@ export class AgenticIntelligenceService {
         : { citations: [], hasCitations: false, confidence: 0 };
 
       // Step 5: Escalation decision
-      const escalation: EscalationDecision = enableEscalation 
+      let escalation: EscalationDecision = enableEscalation 
         ? await escalationService.shouldEscalate(
             query,
             initialResponse,
             userId,
             channelId,
-            context
+            {
+              ...context,
+              previousMessages: context?.previousMessages?.map(m => m.parts.map(p => p.text).join(' ')),
+            }
           )
         : { shouldEscalate: false, priority: 'low', reason: '' };
+
+      // Override escalation if implicit request is detected
+      if (this.isImplicitEscalation(query)) {
+        escalation = {
+          shouldEscalate: true,
+          priority: 'high',
+          reason: 'implicit_human_request',
+          autoResponse: 'It sounds like you need to speak with a human. I am escalating this to a moderator for you.'
+        };
+      }
 
       // Step 6: Format final response with citations
       const formattedResponse = includeCitations && citations.hasCitations
@@ -130,11 +267,8 @@ export class AgenticIntelligenceService {
 
       // Step 7: Handle escalation if needed
       if (escalation.shouldEscalate) {
-        await this.handleEscalation(query, userId, channelId, escalation, context);
+        await this.handleEscalation(query, userId, channelId, escalation, flaggingResult, context);
       }
-
-      // Step 8: Learn from this interaction
-      await this.learnFromInteraction(query, initialResponse, channelId, userId, context);
 
       const processingTime = Date.now() - startTime;
 
@@ -205,15 +339,18 @@ export class AgenticIntelligenceService {
    */
   private async generateInitialResponse(
     query: string,
+    userId: string,
+    guildId: string,
     context?: {
-      previousMessages?: string[];
+      previousMessages?: ChatMessage[];
       userRole?: string;
       channelType?: string;
     }
   ): Promise<string> {
     // This is a placeholder - integrate with your existing Gemini service
     // For now, return a simple response
-    return `I understand you're asking about "${query}". Let me provide you with the most accurate information I can find.`;
+    const history = context?.previousMessages || [];
+    return this.geminiService.generateResponse(query, history, userId, guildId);
   }
 
   /**
@@ -224,7 +361,8 @@ export class AgenticIntelligenceService {
     userId: string,
     channelId: string,
     escalation: EscalationDecision,
-    context?: any
+    flaggingResult: FlaggingResult,
+    context?: AgenticQuery['context']
   ): Promise<void> {
     try {
       if (escalation.shouldEscalate) {
@@ -235,7 +373,11 @@ export class AgenticIntelligenceService {
           channelId,
           escalation.reason,
           escalation.priority,
-          context
+          {
+            ...context,
+            previousMessages: context?.previousMessages?.map(m => m.parts.map(p => p.text).join(' ')),
+            flaggingResult,
+          }
         );
 
         // Notify moderators
@@ -256,32 +398,29 @@ export class AgenticIntelligenceService {
   /**
    * Learn from interaction to improve future responses
    */
-  private async learnFromInteraction(
-    query: string,
-    response: string,
-    channelId: string,
-    userId: string,
-    context?: any
+  async addCorrectionToKnowledgeBase(
+    originalQuery: string,
+    correctedResponse: string,
+    moderatorId: string,
+    channelId: string
   ): Promise<void> {
     try {
       // Add successful interactions to knowledge base
-      // This helps the bot learn from its own responses
-      if (context?.userRole === 'moderator' || context?.userRole === 'admin') {
-        await knowledgeBaseService.addFromDiscordMessage(
-          `learned_${Date.now()}`,
-          response,
-          channelId,
-          userId,
-          ['learned_response'],
-          0.9
-        );
+      // This helps the bot learn from moderator corrections
+      await knowledgeBaseService.addFromDiscordMessage(
+        originalQuery,
+        correctedResponse,
+        channelId,
+        moderatorId,
+        ['corrected_response'],
+        0.95 // Higher confidence for moderator corrections
+      );
 
-        logger.info('Learned from interaction', {
-          query: query.substring(0, 100),
-          channelId,
-          userId
-        });
-      }
+      logger.info('Learned from moderator correction', {
+        originalQuery: originalQuery.substring(0, 100),
+        channelId,
+        moderatorId
+      });
     } catch (error) {
       logger.error('Failed to learn from interaction', error);
     }
@@ -304,10 +443,10 @@ export class AgenticIntelligenceService {
    * Get agentic intelligence statistics
    */
   async getStats(): Promise<{
-    knowledgeBase: any;
-    flagging: any;
-    citations: any;
-    escalation: any;
+    knowledgeBase: Awaited<ReturnType<typeof knowledgeBaseService.getStats>>;
+    flagging: Awaited<ReturnType<typeof smartFlaggingService.getFlaggingStats>>;
+    citations: Awaited<ReturnType<typeof sourceCitationService.getCitationStats>>;
+    escalation: Awaited<ReturnType<typeof escalationService.getEscalationStats>>;
   }> {
     try {
       const [knowledgeStats, flaggingStats, citationStats, escalationStats] = await Promise.all([
@@ -326,10 +465,10 @@ export class AgenticIntelligenceService {
     } catch (error) {
       logger.error('Failed to get agentic intelligence stats', error);
       return {
-        knowledgeBase: {},
-        flagging: {},
-        citations: {},
-        escalation: {}
+        knowledgeBase: { totalEntries: 0, bySource: {}, averageConfidence: 0, recentAdditions: 0 },
+        flagging: { totalAnalyzed: 0, flaggedCount: 0, flagRate: 0, byRiskLevel: {}, byAction: {} },
+        citations: { totalCitations: 0, bySource: {}, averageConfidence: 0, recentCitations: 0 },
+        escalation: { totalTickets: 0, openTickets: 0, resolvedTickets: 0, averageResolutionTime: 0, byPriority: {}, byReason: {} }
       };
     }
   }
@@ -354,10 +493,10 @@ export class AgenticIntelligenceService {
   /**
    * Update escalation configuration
    */
-  updateEscalationConfig(config: any): void {
+  updateEscalationConfig(config: Parameters<typeof escalationService.updateConfig>[0]): void {
     escalationService.updateConfig(config);
   }
 }
 
 // Export singleton instance
-export const agenticIntelligenceService = AgenticIntelligenceService.getInstance(); 
+export const agenticIntelligenceService = AgenticIntelligenceService.getInstance();

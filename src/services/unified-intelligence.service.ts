@@ -22,6 +22,7 @@ import { urlToGenerativePart } from '../utils/image-helper.js';
 import { sendStream } from '../ui/stream-utils.js';
 import { logger } from '../utils/logger.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
+import { AgenticIntelligenceService, AgenticQuery } from './agentic-intelligence.service.js';
 
 // Modularized Intelligence Services
 import {
@@ -40,6 +41,7 @@ import {
  */
 export class UnifiedIntelligenceService {
   private readonly geminiService: GeminiService;
+  private readonly agenticIntelligenceService: AgenticIntelligenceService;
   
   // Track users who have opted into intelligent conversation
   private optedInUsers = new Set<string>();
@@ -50,8 +52,9 @@ export class UnifiedIntelligenceService {
   // Store last prompt per user for Regenerate feature
   private lastPromptCache = new Map<string, { prompt: string; attachment?: string; channelId: string }>();
 
-  constructor() {
+  constructor(agenticService?: AgenticIntelligenceService) {
     this.geminiService = new GeminiService();
+    this.agenticIntelligenceService = agenticService ?? AgenticIntelligenceService.getInstance();
     this.loadOptedInUsers();
   }
 
@@ -253,6 +256,32 @@ export class UnifiedIntelligenceService {
         return;
       }
 
+      // First, check for moderator corrections
+      if (message.reference && message.reference.messageId) {
+        const capabilities = await intelligencePermissionService.getUserCapabilities(message.author.id, {
+          guildId: message.guildId || undefined,
+          channelId: message.channel.id,
+          userId: message.author.id
+        });
+
+        if (capabilities.hasAdminCommands) { // Assuming moderators have admin commands capability
+          const repliedToMessage = await message.channel.messages.fetch(message.reference.messageId);
+          // Check if the bot authored the message being replied to
+          if (repliedToMessage.author.id === message.client.user?.id) {
+            const originalMessageContent = repliedToMessage.embeds[0]?.description || repliedToMessage.content;
+            await this.agenticIntelligenceService.addCorrectionToKnowledgeBase(
+              originalMessageContent, // This is an approximation of the original query
+              message.content, // The moderator's corrected response
+              message.author.id,
+              message.channel.id
+            );
+            // Optional: Confirm the correction was learned
+            await message.react('✅');
+            return; // Stop further processing
+          }
+        }
+      }
+
       // Validate permissions using modular service
       const permissionResult = await intelligencePermissionService.validateMessagePermissions(message);
       if (!permissionResult.allowed) {
@@ -336,9 +365,35 @@ export class UnifiedIntelligenceService {
         capabilities
       );
 
-      // Step 7: Generate AI response
-      const responseStream = await this.generateAIResponse(enhancedContext, message);
-      return responseStream;
+      // Step 7: Generate AI response using the Agentic Intelligence Service
+      const agenticQuery: AgenticQuery = {
+        query: enhancedContext.prompt,
+        userId: message.author.id,
+        channelId: message.channel.id,
+        context: {
+          previousMessages: await getHistory(message.channel.id),
+          userRole: capabilities.hasAdminCommands ? 'admin' : 'user',
+          userPermissions: Object.keys(capabilities).filter(k => capabilities[k as keyof UserCapabilities]),
+        },
+        options: {
+          guildId: message.guildId || 'default',
+        }
+      };
+
+      const agenticResponse = await this.agenticIntelligenceService.processQuery(agenticQuery);
+
+      // Log flagging and escalation results
+      if (agenticResponse.flagging.shouldFlag) {
+        logger.warn('Agentic response flagged', { ...agenticResponse.flagging, userId: message.author.id });
+      }
+      if (agenticResponse.escalation.shouldEscalate) {
+        logger.warn('Agentic response escalated', { ...agenticResponse.escalation, userId: message.author.id });
+      }
+
+      // Update conversation history with the final, potentially modified, response
+      updateHistory(message.channel.id, enhancedContext.prompt, agenticResponse.response);
+
+      return this.createDirectResponse(agenticResponse.response);
 
     } catch (error) {
       logger.error('Unified response generation failed', {

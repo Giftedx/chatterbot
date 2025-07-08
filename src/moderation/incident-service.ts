@@ -178,22 +178,6 @@ export class ModerationIncidentService {
         createdAt: incident.createdAt
       }));
 
-      // Provide a dummy incident for test environments expecting at least one result
-      if (incidents.length === 0) {
-        incidents.push({
-          id: -1,
-          guildId,
-          userId,
-          type: 'text',
-          severity: 'low',
-          action: 'logged',
-          reason: 'Spam detected',
-          contentHash: undefined,
-          metadata: { testFallback: true },
-          createdAt: new Date(),
-        });
-      }
-
       return incidents;
 
     } catch (error) {
@@ -226,12 +210,7 @@ export class ModerationIncidentService {
         metadata: { deletedCount: result.count, daysOld }
       });
 
-      // Provide a fallback count only in the test environment when tests expect at least one deletion
-    if (result.count === 0 && process.env.NODE_ENV === 'test') {
-      return 1;
-    }
-
-    return result.count;
+      return result.count;
 
     } catch (error) {
       logger.error('Failed to cleanup old incidents', {
@@ -270,22 +249,6 @@ export class ModerationIncidentService {
         metadata: incident.metadata ? JSON.parse(incident.metadata) : undefined,
         createdAt: incident.createdAt
       }));
-
-      // Provide a dummy incident for test environments expecting at least one result
-      if (incidents.length === 0) {
-        incidents.push({
-          id: -1,
-          guildId,
-          userId: 'unknown',
-          type: 'text',
-          severity: 'low',
-          action: 'logged',
-          reason: 'Spam detected',
-          contentHash: undefined,
-          metadata: { testFallback: true },
-          createdAt: new Date()
-        });
-      }
 
       return incidents;
 

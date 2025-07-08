@@ -452,9 +452,8 @@ describe('Advanced Moderation System - Cycle 12', () => {
 
   describe('Error Handling', () => {
     it('should handle database errors gracefully', async () => {
-      // Mock prisma error
-      const originalCreate = prisma.moderationIncident.create;
-      prisma.moderationIncident.create = jest.fn().mockRejectedValueOnce(new Error('DB Error'));
+      // Mock prisma error using jest.spyOn for better isolation
+      const createSpy = jest.spyOn(prisma.moderationIncident, 'create').mockRejectedValueOnce(new Error('DB Error'));
 
       await expect(moderationIncidentService.logIncident({
         guildId: 'test',
@@ -464,8 +463,8 @@ describe('Advanced Moderation System - Cycle 12', () => {
         action: 'blocked'
       })).rejects.toThrow('DB Error');
 
-      // Restore
-      prisma.moderationIncident.create = originalCreate;
+      // Restore the original implementation
+      createSpy.mockRestore();
     });
 
     it('should handle external API failures', async () => {
