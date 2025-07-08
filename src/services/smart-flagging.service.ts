@@ -93,7 +93,7 @@ export class SmartFlaggingService {
     }
 
     // Determine suggested action
-    const suggestedAction = this.determineAction(confidence, riskLevel, reasons);
+    const suggestedAction = this.determineAction(confidence, riskLevel);
 
     // Normalize confidence to 0-1 range
     confidence = Math.min(1, confidence);
@@ -167,7 +167,7 @@ export class SmartFlaggingService {
     ];
 
     harmfulPatterns.forEach(pattern => {
-      if (pattern.test(response)) {
+      if (pattern.test(responseLower)) {
         issues.push('Potentially harmful content detected');
       }
     });
@@ -193,7 +193,8 @@ export class SmartFlaggingService {
     }
 
     // Check for repetitive content
-    const words = response.toLowerCase().split(/\s+/);
+    const responseLower = response.toLowerCase();
+    const words = responseLower.split(/\s+/);
     const uniqueWords = new Set(words);
     const repetitionRatio = uniqueWords.size / words.length;
     
@@ -209,7 +210,7 @@ export class SmartFlaggingService {
     ];
 
     nonsensicalPatterns.forEach(pattern => {
-      if (pattern.test(response)) {
+      if (pattern.test(responseLower)) {
         issues.push('Response contains nonsensical patterns');
       }
     });
@@ -253,8 +254,7 @@ export class SmartFlaggingService {
    */
   private determineAction(
     confidence: number, 
-    riskLevel: 'low' | 'medium' | 'high',
-    reasons: string[]
+    riskLevel: 'low' | 'medium' | 'high'
   ): 'allow' | 'review' | 'escalate' | 'block' {
     
     if (riskLevel === 'high') {

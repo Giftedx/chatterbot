@@ -3,7 +3,7 @@
  * Provides transparency by citing sources of information
  */
 
-import { knowledgeBaseService, KnowledgeEntry } from './knowledge-base.service.js';
+import { knowledgeBaseService } from './knowledge-base.service.js';
 import { logger } from '../utils/logger.js';
 
 export interface Citation {
