@@ -7,7 +7,7 @@
  * by analyzing the current codebase and providing actionable recommendations.
  */
 
-import { analyzeServiceOverlaps } from './src/utils/service-overlap-analysis.ts';
+import { analyzeServiceOverlaps } from './src/utils/service-overlap-analysis.js';
 
 console.log('🚀 Discord Gemini Bot - Refactoring Analysis');
 console.log('==============================================\n');
