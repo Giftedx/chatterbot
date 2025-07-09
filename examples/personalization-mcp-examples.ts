@@ -8,7 +8,7 @@ import { MCPManager } from '../src/services/mcp-manager.service.js';
 
 /**
  * Example 1: Research-Oriented User Personalization - Uses the `/chat <message>` command for intelligent conversation
-`/chat enable:true` - Enables full MCP-enhanced personalizationn
+`/chat enable:true` - Enables full MCP-enhanced personalization
  * Shows how the system adapts to users interested in research and current events
  */
 async function example1_ResearchUserPersonalization() {
