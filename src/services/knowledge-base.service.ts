@@ -143,7 +143,7 @@ export class KnowledgeBaseService {
       });
 
       // Filter by relevance (simple keyword matching for now)
-      const relevantEntries = entries.filter(entry => 
+      const relevantEntries = entries.filter((entry: any) => 
         this.calculateRelevance(searchQuery, entry.content) > 0.3
       );
 

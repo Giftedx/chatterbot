@@ -169,7 +169,7 @@ export class TopicDetectionService {
         take: limit
       });
 
-      return topics.map(topic => ({
+      return topics.map((topic: any) => ({
         id: topic.id,
         name: topic.name,
         displayName: topic.displayName,
@@ -214,7 +214,7 @@ export class TopicDetectionService {
         take: limit
       });
 
-      return topics.map(topic => ({
+      return topics.map((topic: any) => ({
         id: topic.id,
         name: topic.name,
         displayName: topic.displayName,

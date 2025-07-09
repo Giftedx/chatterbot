@@ -61,6 +61,8 @@ interface OSRSDataResult {
 
 type MCPResultValue = WebSearchResult | ContentExtractionResult | MemoryRetrievalResult | OSRSDataResult | { error: string };
 
+export type { MCPResultValue };
+
 export interface CapabilityExecutionResult {
   mcpResults?: Map<string, MCPResultValue>;
   personaSwitched?: boolean;

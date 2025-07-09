@@ -904,7 +904,7 @@ export class MultimodalIntegrationService {
         select: { id: true }
       });
 
-      similarTimeFiles.forEach(f => {
+      similarTimeFiles.forEach((f: any) => {
         connections.push({
           connectedFileId: f.id,
           connectionType: 'temporal_proximity',

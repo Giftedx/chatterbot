@@ -179,7 +179,7 @@ export class ModerationConfigService {
     try {
       const dbConfigs = await prisma.moderationConfig.findMany();
       
-      return dbConfigs.map(dbConfig => ({
+      return dbConfigs.map((dbConfig: any) => ({
         guildId: dbConfig.guildId,
         strictnessLevel: dbConfig.strictnessLevel as 'low' | 'medium' | 'high',
         enabledFeatures: JSON.parse(dbConfig.enabledFeatures) as ('text' | 'image' | 'attachment')[],

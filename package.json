@@ -31,7 +31,7 @@
       ".ts"
     ],
     "transform": {
-      "^.+\\.[tj]s$": [
+      "^.+\\.ts$": [
         "ts-jest",
         {
           "useESM": true

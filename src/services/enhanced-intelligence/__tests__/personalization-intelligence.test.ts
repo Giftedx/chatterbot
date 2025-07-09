@@ -131,7 +131,12 @@ describe('Cross-Session Learning & Personalization Engine', () => {
       expect(metrics).toHaveProperty('totalInteractions');
       expect(metrics).toHaveProperty('averageInteractionsPerUser');
       expect(metrics).toHaveProperty('recommendationAccuracy');
-      expect(typeof metrics.activeUsers).toBe('number');
+      expect(metrics).toHaveProperty('averageConfidence');
+      expect(typeof metrics.totalUsers).toBe('number');
+      expect(typeof metrics.totalInteractions).toBe('number');
+      expect(typeof metrics.averageInteractionsPerUser).toBe('number');
+      expect(typeof metrics.recommendationAccuracy).toBe('number');
+      expect(typeof metrics.averageConfidence).toBe('number');
     });
   });
 
