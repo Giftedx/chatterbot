@@ -146,7 +146,7 @@ npm run test:ci
 - [ ] Discord bot token valid
 - [ ] Gemini API key valid
 - [ ] Health check endpoint working
-- [ ] Bot responds to `/optin` command
+- [ ] Bot responds to `/chat` command
 
 ## 💰 Cost Optimization
 

@@ -1,36 +1,26 @@
-# Copilot Instructions for Discord Gemini Bot
+# Discord Gemini Bot - AI Agent Instructions
 
-## 1. Triple Intelligence Architecture
+## Core Architecture & Entry Points
 
-This Discord bot implements a sophisticated AI system with layered intelligence that automatically scales capabilities based on environment configuration:
+This is a **production-ready Discord AI bot** with triple intelligence architecture:
 
-### Core Entry Point: `/optin` Command
-- **Single command activates everything** - users run `/optin` once and get intelligent conversation
-- **Automatic mode selection** - bot chooses between Unified/Enhanced/Agentic intelligence based on env vars
-- **Message-based interaction** - after optin, bot responds to all user messages naturally with contextual capability selection
+### Primary Entry Point: `/chat` Command
+- **Main interface**: Users run `/chat <prompt>` for AI conversation
+- **Auto-opt-in**: First-time users automatically enrolled
+- **Intelligence routing**: Automatically selects Core/Enhanced/Agentic based on environment flags
+- **MCP tool integration**: Real-time web search, memory, content extraction via Model Context Protocol
 
-### Intelligence Modes (orchestrated in `src/index.ts`)
-- **Basic Mode**: Direct Gemini API (emergency fallback only) 
-- **Unified Intelligence**: `UnifiedIntelligenceService` - modular AI with permission-gated features via `src/services/intelligence/`
-- **Enhanced Intelligence**: `EnhancedInvisibleIntelligenceService` - adds real MCP tools (web search, content extraction, sequential thinking)
-- **Agentic Intelligence**: `AgenticIntelligenceService` - adds knowledge base, confidence scoring, auto-escalation, and self-improvement
-
-### Key Architecture Principle
-**Never add new slash commands**. All capabilities integrate into the intelligent conversation flow through automatic context analysis and permission-based feature activation.
-
-### Current Status (Production Ready)
-- ✅ **360+ tests passing** across 38 test suites with comprehensive coverage
-- ✅ **TypeScript build works** but `npm run build` hangs - use `tsx` for development and production
-- ✅ **All intelligence modes operational** with graceful degradation
-- ✅ **MCP integration architecture complete** with external API enhancement
-- ✅ **Production deployment ready** with Docker support and health checks
+### Intelligence Levels (hierarchical activation)
+1. **Core**: `CoreIntelligenceService` - base conversation with modular `src/services/intelligence/`
+2. **Enhanced**: Advanced MCP tools (web search, content extraction) via `ENABLE_ENHANCED_INTELLIGENCE=true`
+3. **Agentic**: Knowledge base + auto-escalation via `ENABLE_AGENTIC_INTELLIGENCE=true`
 
 ## 2. Critical Development Patterns
 
 ### ESM Module Requirements (MANDATORY)
 ```typescript
 // ✅ ALWAYS use .js extension for imports in TypeScript files
-import { UnifiedIntelligenceService } from './services/unified-intelligence.service.js';
+import { CoreIntelligenceService } from './services/core-intelligence.service.js';
 import { intelligencePermissionService } from './services/intelligence/index.js';
 
 // ❌ NEVER use these - will break at runtime in production
@@ -92,24 +82,33 @@ Advanced user pattern learning with phase-aware MCP integration:
 The main entry point implements a sophisticated routing system:
 ```typescript
 // 1. Route to agentic intelligence if enabled
-if (ENABLE_AGENTIC_INTELLIGENCE) {
-  await handleAgenticMessage(message);
-} else {
-  // 2. Route to enhanced or unified intelligence
-  if (enhancedIntelligenceService && 'handleIntelligentMessage' in enhancedIntelligenceService) {
-    await enhancedIntelligenceService.handleIntelligentMessage(message);
-  } else {
-    await unifiedIntelligenceService.handleIntelligentMessage(message);
+if (enableAgenticFeatures && interaction.isChatInputCommand()) {
+  const agenticCommand = agenticCommands.find(cmd => cmd.data.name === interaction.commandName);
+  if (agenticCommand) {
+    await agenticCommand.execute(interaction);
+    return;
   }
 }
+
+// 2. Route all other interactions (including core /chat) to CoreIntelligenceService
+await coreIntelligenceService.handleInteraction(interaction);
 ```
 
 #### Intelligence Service Pattern
 Each intelligence service follows a consistent interface:
-- `createSlashCommand()` - builds the `/optin` command with service-specific capabilities
-- `handleIntelligentMessage(message)` - processes natural conversations from opted-in users
-- `shouldProcessMessage(message)` - validates permissions and context
+- `buildCommands()` - builds the `/chat` command with service-specific capabilities
+- `handleInteraction(interaction)` - processes slash command interactions
+- `handleMessage(message)` - processes natural conversations from opted-in users
 - Graceful degradation when external dependencies fail
+
+#### Automatic Opt-in System
+The current `/chat` command automatically opts users in when they first use it:
+```typescript
+if (!this.optedInUsers.has(userId)) {
+     this.optedInUsers.add(userId);
+     await this.saveOptedInUsers();
+}
+```
 
 #### MCP Manager Integration (Enhanced Mode)
 ```typescript
@@ -119,14 +118,14 @@ const status = mcpManager.getStatus();
 console.log(`✅ MCP Manager initialized: ${status.connectedServers}/${status.totalServers} servers connected`);
 
 // Services check for MCP availability and fallback gracefully
-unifiedIntelligenceService = new UnifiedIntelligenceService(undefined, mcpManager);
+coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 ```
 
 ## 3. Development Workflow & Commands
 
 ### Essential Commands
 - **Development**: `npm run dev` (uses `tsx` - THE ONLY reliable way to run TypeScript)
-- **Testing**: `npm test` (360+ tests across 38 suites, ~96% pass rate with property-based tests)
+- **Testing**: `npm test` (447+ tests across 51+ suites, comprehensive coverage with property-based tests)
 - **Production**: `npm start` (runs compiled JS - works perfectly when build succeeds)
 - **Database**: `npx prisma db push` for schema changes, `npx prisma studio` to view data
 
@@ -187,6 +186,18 @@ AGENTIC_ESCALATION_CHANNEL=moderator_channel_id      # Escalation notifications
 AGENTIC_MODERATOR_ROLES=role_id_1,role_id_2         # Auto-escalation permissions
 ```
 
+### Additional Configuration
+```bash
+# Environment and Health Checks
+NODE_ENV=production
+HEALTH_CHECK_PORT=3000
+
+# Rate Limiting and Logging
+MAX_REQUESTS_PER_MINUTE=60
+MAX_REQUESTS_PER_HOUR=1000
+LOG_LEVEL=info
+```
+
 ## 5. MCP Tool Integration System
 
 ### Safe Wrapper Pattern (`src/mcp/index.ts`)
@@ -238,7 +249,7 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 - **Performance testing**: Validates streaming, rate limiting, and batch processing
 - **ESM mocking strategy**: Dependency injection over global mocking for reliability
 
-### Test Categories & Coverage (360+ tests, ~96% pass)
+### Test Categories & Coverage (447+ tests, comprehensive coverage)
 - **Unit tests**: Individual service functionality and business logic
 - **Integration tests**: Cross-component communication and workflow validation
 - **Property tests**: Edge case discovery through generative testing (uses `fast-check`)
@@ -345,20 +356,45 @@ await PerformanceMonitor.monitor('operation-name', async () => {
 }, { userId, context });
 ```
 
-## 12. Project-Specific Conventions & Patterns
+## 10. Current Project Status & Architecture Evolution
+
+### Recent Architecture Evolution
+This project has evolved from a legacy `/optin` command system to a sophisticated `/chat` command architecture:
+
+**Previous State (archived)**:
+- Legacy `/optin` command for user activation
+- `UnifiedIntelligenceService` as primary handler
+- Manual opt-in required for users
+
+**Current State (production)**:
+- `/chat` command as primary entry point with automatic opt-in
+- `CoreIntelligenceService` as main orchestrator
+- Hierarchical intelligence levels (Core → Enhanced → Agentic)
+- Modular intelligence services in `src/services/intelligence/`
+
+### Current Implementation Status
+**Fully Operational**:
+- ✅ Core Intelligence with `/chat` command
+- ✅ Modular service architecture with dependency injection
+- ✅ MCP tool integration with safe wrappers
+- ✅ Comprehensive test suite (447+ tests)
+- ✅ TypeScript ESM modules with `.js` import requirements
+- ✅ Environment-based feature flag system
+- ✅ Performance monitoring and analytics
+- ✅ Graceful degradation patterns throughout
+
+**Current Development Focus**:
+- Enhanced Intelligence activation through feature flags
+- Agentic Intelligence with confidence scoring and escalation
+- Personalization Engine with MCP tool recommendations
+- Production deployment optimization with `tsx` workflow
 
 ### Message Processing Architecture Pattern
 ```typescript
 // Standard message flow in src/index.ts
 client.on('messageCreate', async (message) => {
-  // 1. Route based on enabled intelligence mode
-  if (ENABLE_AGENTIC_INTELLIGENCE) {
-    await handleAgenticMessage(message);
-  } else if (enhancedIntelligenceService?.handleIntelligentMessage) {
-    await enhancedIntelligenceService.handleIntelligentMessage(message);  
-  } else {
-    await unifiedIntelligenceService.handleIntelligentMessage(message);
-  }
+  // Message handling is now primarily through CoreIntelligenceService
+  await coreIntelligenceService.handleMessage(message);
 });
 ```
 
@@ -366,9 +402,9 @@ client.on('messageCreate', async (message) => {
 All intelligence services implement this consistent interface:
 ```typescript
 class SomeIntelligenceService {
-  createSlashCommand() // Build /optin command with service capabilities
-  handleIntelligentMessage(message) // Process natural conversations
-  shouldProcessMessage(message) // Permission and context validation
+  buildCommands() // Build /chat command with service capabilities
+  handleInteraction(interaction) // Process slash command interactions
+  handleMessage(message) // Process natural conversations from opted-in users
 }
 ```
 
@@ -417,20 +453,16 @@ global.testUtils = {
 };
 ```
 
----
+## 11. Project-Specific Conventions & Patterns
 
-This is a **production-ready Discord AI bot** with sophisticated architecture designed for scalability, reliability, and extensibility. The modular design allows adding new intelligence capabilities without disrupting existing functionality.
-
-## 11. Project Structure & Key Files
-
-### Critical Architecture Files (Read These First)
+## 12. Project Structure & Key Files
 - `src/index.ts` - **Main entry point** with intelligence routing and graceful shutdown handling
-- `src/services/unified-intelligence.service.ts` - **Core conversation handler** with modular intelligence pattern
+- `src/services/core-intelligence.service.ts` - **Core conversation handler** with modular intelligence pattern
 - `src/services/enhanced-intelligence/index.ts` - **Advanced MCP-enabled service** with timeout protection
 - `src/services/agentic-intelligence.service.ts` - **Knowledge base and escalation** with confidence scoring
 - `src/mcp/index.ts` - **Type-safe MCP tool wrappers** with availability checks
 
-### Modular Intelligence Services (`src/services/intelligence/`)
+### Critical Architecture Files (Read These First)
 ```
 intelligence/
 ├── index.ts              # Exports and type definitions
@@ -471,3 +503,23 @@ src/
 - `capability-debug.js` - Test specific bot capabilities
 - `quick-debug.js` - Fast service testing
 - `availability-debug.js` - Service health checks
+
+
+---
+
+This is a **production-ready Discord AI bot** with sophisticated architecture designed for scalability, reliability, and extensibility. The modular design allows adding new intelligence capabilities without disrupting existing functionality.
+
+**Key Insights for AI Collaboration:**
+- **Use `tsx` for all development** - it's the most reliable way to run the bot
+- **Test-Driven Development** - The comprehensive test suite makes refactoring safe
+- **Modular Architecture** - Easy to add new intelligence capabilities without breaking existing features
+- **Environment Configuration** - Feature flags allow gradual capability rollout
+- **Graceful Degradation** - Bot works even when external services are unavailable
+- **Automatic User Onboarding** - `/chat` command automatically opts users in for seamless experience
+
+**Current Command Structure**:
+- **Primary**: `/chat <prompt> [attachment]` - Main entry point with automatic opt-in
+- **Agentic**: Additional commands when `ENABLE_AGENTIC_INTELLIGENCE=true`
+- **Natural Messages**: Opted-in users can chat normally without commands
+
+REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.

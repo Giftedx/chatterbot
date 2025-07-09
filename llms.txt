@@ -1,0 +1,55 @@
+# Discord Gemini Bot
+
+> Advanced Discord AI bot powered by Google Gemini with triple intelligence architecture (Core/Enhanced/Agentic) providing sophisticated conversation capabilities, multimodal processing, and MCP tool integration.
+
+This is a production-ready Discord bot built with TypeScript and Discord.js v14 that features a modular intelligence system. Users interact through a simple `/chat` command that automatically activates comprehensive AI assistance including persona management, memory systems, web search capabilities, and advanced conversation processing. The bot uses ESM modules with dependency injection for testability and includes comprehensive security features with role-based access control.
+
+## Documentation
+
+- [Main README](README.md): Complete project overview, features, and getting started guide
+- [Deployment Guide](DEPLOYMENT.md): Production deployment instructions for Railway, Heroku, and Docker
+- [AI Agent Instructions](.github/copilot-instructions.md): Comprehensive guidance for AI coding agents working with this codebase
+- [Enhanced Intelligence Setup](ENHANCED_INTELLIGENCE_SETUP.md): Configuration guide for advanced MCP tool integration
+- [Agentic Features](AGENTIC_FEATURES.md): Documentation of autonomous AI capabilities and escalation systems
+
+## Architecture
+
+- [Architectural Refactoring Summary](ARCHITECTURAL_REFACTORING_SUMMARY.md): Overview of system evolution from unified to modular intelligence
+- [Current State Analysis](CURRENT_STATE_ANALYSIS.md): Technical analysis of architecture patterns and implementation status
+- [MCP Integration Complete](MCP_INTEGRATION_COMPLETE.md): Model Context Protocol tool integration documentation
+- [Personalization MCP Integration](PERSONALIZATION_MCP_INTEGRATION_COMPLETE.md): User learning and adaptation system details
+
+## Configuration
+
+- [Environment Variables](env.example): Complete environment configuration template with API keys and feature flags
+- [Package Configuration](package.json): ESM module setup, scripts, and dependencies
+- [TypeScript Configuration](tsconfig.json): ES2022 module configuration for modern JavaScript
+- [Database Schema](prisma/schema.prisma): Prisma ORM schema for user memory, analytics, and moderation data
+- [Docker Configuration](Dockerfile): Container setup for production deployment
+
+## Examples
+
+- [MCP Integration Examples](examples/mcp-integration-examples.ts): Code samples for Model Context Protocol tool usage
+- [Personalization Examples](examples/personalization-mcp-examples.ts): User learning and adaptation implementation patterns
+
+## API Documentation
+
+- [TypeDoc API Documentation](docs/api/index.html): Complete API documentation generated from TypeScript code
+- [Direct MCP Executor Fix](docs/DIRECT_MCP_EXECUTOR_FIX.md): Technical implementation details for MCP tool execution
+- [Next Steps Roadmap](docs/NEXT_STEPS_ROADMAP.md): Development roadmap and future feature planning
+
+## Source Code
+
+- [Main Entry Point](src/index.ts): Bot initialization with intelligence routing and graceful shutdown
+- [Core Intelligence Service](src/services/core-intelligence.service.ts): Primary conversation handler with modular architecture
+- [Modular Intelligence Services](src/services/intelligence/): Permission, analysis, capability, admin, and context services
+- [MCP Tool Wrappers](src/mcp/index.ts): Type-safe Model Context Protocol tool integration with safety checks
+- [Enhanced Intelligence Service](src/services/enhanced-intelligence/): Advanced MCP-enabled processing with personalization
+
+## Optional
+
+- [License](LICENSE): MIT license terms
+- [Phase Completion Reports](PHASE_1_MESSAGE_ANALYSIS_COMPLETE.md): Development milestone documentation
+- [MCP Integration Demo](MCP_INTEGRATION_DEMO.md): Demonstration of advanced tool capabilities
+- [Priority Fixes Applied](PRIORITY_FIXES_APPLIED.md): Bug fixes and stability improvements
+- [Test Coverage Reports](coverage/): Automated test coverage analysis and reports

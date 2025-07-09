@@ -99,11 +99,11 @@ export class EnhancedInvisibleIntelligenceService {
   }
 
   /**
-   * Creates the enhanced /optin slash command
+   * Creates the enhanced /chat slash command
    */
   createSlashCommand() {
     return new SlashCommandBuilder()
-      .setName('optin')
+      .setName('chat')
       .setDescription('Opt into enhanced AI conversation with images, research and more')
       .addStringOption(option =>
         option.setName('message')
@@ -347,7 +347,7 @@ export class EnhancedInvisibleIntelligenceService {
       logInteraction({
         guildId: context.guildId,
         userId: context.userId,
-        command: 'enhanced_optin',
+        command: 'enhanced_chat',
         isSuccess: true
       });
       

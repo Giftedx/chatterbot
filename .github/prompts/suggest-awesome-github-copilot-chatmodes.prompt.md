@@ -1,7 +1,7 @@
 ---
 mode: 'agent'
 description: 'Suggest relevant GitHub Copilot chatmode files from the awesome-copilot repository based on current repository context and chat history, avoiding duplicates with existing chatmodes in this repository.'
-tools: ['changes', 'codebase', 'editFiles', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'runCommands', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'usages', 'vscodeAPI', 'github']
+tools: ['changes', 'codebase', 'editFiles', 'extensions', 'fetch', 'findTestFiles', 'githubRepo', 'new', 'openSimpleBrowser', 'problems', 'readCellOutput', 'runCommands', 'runNotebooks', 'runTasks', 'runTests', 'search', 'searchResults', 'terminalLastCommand', 'terminalSelection', 'testFailure', 'updateUserPreferences', 'usages', 'vscodeAPI', 'brave-search', 'context7', 'sequentialthinking', 'playwright', 'huggingface', 'memory', 'firecrawl', 'prisma-postgres', 'memory', 'sequential-thinking', 'mcp-playwright', 'prisma-mcp-server', 'pylance mcp server', 'activePullRequest', 'copilotCodingAgent', 'mssql_connect', 'mssql_disconnect', 'mssql_list_servers', 'mssql_show_schema', 'configurePythonEnvironment', 'getPythonEnvironmentInfo', 'getPythonExecutableCommand', 'installPythonPackage']
 ---
 
 # Suggest Awesome GitHub Copilot Chatmodes

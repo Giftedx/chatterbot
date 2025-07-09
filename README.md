@@ -14,7 +14,7 @@ A **sophisticated Discord AI bot** built with **TypeScript** and **Discord.js v1
 - ✅ **369/395 tests passing** (93.4% success rate) - comprehensive validation
 - ✅ **TypeScript build working** - production-ready compilation
 - ✅ **Agentic Intelligence fully operational** - all 4 contextual features working
-- ✅ **Unified Intelligence System** - comprehensive AI assistance via `/optin` command
+- ✅ **Core Intelligence System** - comprehensive AI assistance via `/chat` command
 
 **Phase 2: Enhanced Intelligence (Ready for Activation):**
 - ✅ **Enhanced Intelligence Service** - built and tested with real MCP API integration
@@ -39,7 +39,7 @@ A **sophisticated Discord AI bot** built with **TypeScript** and **Discord.js v1
 
 ### 🤖 **Unified Intelligence System** (Primary Feature)
 
-- **Single `/optin` command** activates ALL bot capabilities automatically
+- **Single `/chat` command** activates ALL bot capabilities automatically
 - **Natural conversation mode** - just talk to the bot normally after opting in
 - **AI-driven feature selection** - bot automatically uses appropriate features based on context
 - **Intelligent message processing** - responds to all messages from opted-in users
@@ -125,7 +125,7 @@ npm run dev
 ## 🎮 **How Users Experience the Bot**
 
 ### **Simple Activation:**
-1. **User runs `/optin`** - Single command activates all intelligence
+1. **User runs `/chat`** - Single command activates all intelligence
 2. **Bot immediately starts responding** to all user messages naturally
 3. **No complex commands needed** - just talk to the bot normally!
 
@@ -153,8 +153,8 @@ Bot: [Detects research need → performs web search → extracts key content →
 
 | Command | Description | Status | Notes |
 |---------|------------|--------|-------|
-| `/optin [enable]` | **PRIMARY COMMAND** - Enable/disable unified intelligence | ✅ **Main Feature** | This is all users need! |
-| `/gemini <prompt> [image]` | Legacy AI conversation command | ✅ Working | Superseded by /optin mode |
+| `/chat <prompt> [image]` | **PRIMARY COMMAND** - Core AI conversation with comprehensive capabilities | ✅ **Main Feature** | This is all users need! |
+| `/gemini <prompt> [image]` | Legacy AI conversation command | ✅ Working | Superseded by /chat mode |
 | `/persona list` | Show available personas | ✅ Working | Auto-handled in conversation |
 | `/persona set <name>` | Switch active persona | ✅ Working | Auto-handled in conversation |
 | `/persona create <name> <prompt>` | Create custom persona | ✅ Working | Auto-handled in conversation |
@@ -180,7 +180,7 @@ Bot: [Detects research need → performs web search → extracts key content →
 src/
 ├── index.ts                           # Main bot entry point with unified service
 ├── services/
-│   ├── unified-intelligence.service.ts  # ✅ CORE: Single /optin command handler
+│   ├── core-intelligence.service.ts     # ✅ CORE: Single /chat command handler
 │   ├── gemini.service.ts              # ✅ Google Gemini AI integration
 │   ├── persona-manager.ts             # ✅ Dynamic persona management
 │   ├── analytics.ts                   # ✅ Usage analytics and monitoring
@@ -306,7 +306,7 @@ The bot delivers **enterprise-grade intelligence** with seamless user experience
 
 ### **What Works Flawlessly**
 
-- ✅ **Unified Intelligence** - Single `/optin` command activates comprehensive AI assistance
+- ✅ **Core Intelligence** - Single `/chat` command activates comprehensive AI assistance
 - ✅ **Natural Conversation** - Users just talk normally, bot handles everything intelligently  
 - ✅ **Streaming AI Responses** - Real-time Gemini integration with stop/regenerate controls
 - ✅ **Smart Persona System** - Automatic adaptation plus manual control for admins
@@ -399,7 +399,7 @@ This is a **production-excellence Discord AI bot** that delivers enterprise-grad
 
 ### **Key Achievements:**
 
-- ✅ **Simplified User Experience** - Single `/optin` command activates comprehensive AI assistance
+- ✅ **Simplified User Experience** - Single `/chat` command activates comprehensive AI assistance
 - ✅ **Advanced AI Integration** - Google Gemini with streaming, multimodal processing, and smart features
 - ✅ **Enterprise Architecture** - Modular services, RBAC security, comprehensive monitoring
 - ✅ **Production Quality** - 96.3% test coverage, robust error handling, graceful degradation
