@@ -6,16 +6,41 @@ import { PrismaClient } from '@prisma/client';
 
 let prisma: PrismaClient | any;
 
-// Use mock in test environment when needed
+// Initialize Prisma client synchronously 
+async function initializePrisma() {
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      // Try to create the real PrismaClient first
+      prisma = new PrismaClient();
+    } catch (error) {
+      // Fall back to mock if PrismaClient is not available
+      console.log('⚠️ Using mock Prisma client for tests (real client not available)');
+      const { mockPrisma } = await import('./prisma-mock.js');
+      prisma = mockPrisma;
+    }
+  } else {
+    try {
+      prisma = new PrismaClient();
+    } catch (error) {
+      console.error('❌ PrismaClient not available. Run "npx prisma generate" to generate the client.');
+      throw error;
+    }
+  }
+  return prisma;
+}
+
+// Initialize immediately for test environment  
 if (process.env.NODE_ENV === 'test') {
+  // Use mock for tests to avoid async initialization issues
   try {
-    // Try to create the real PrismaClient first
-    prisma = new PrismaClient();
-  } catch (error) {
-    // Fall back to mock if PrismaClient is not available
-    console.log('⚠️ Using mock Prisma client for tests (real client not available)');
-    const { mockPrisma } = await import('./prisma-mock.js');
+    const { mockPrisma } = require('./prisma-mock.js');
     prisma = mockPrisma;
+  } catch (error) {
+    console.log('⚠️ Mock Prisma not available, creating minimal mock');
+    prisma = {
+      $connect: () => Promise.resolve(),
+      $disconnect: () => Promise.resolve(),
+    };
   }
 } else {
   try {

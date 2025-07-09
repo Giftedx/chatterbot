@@ -100,6 +100,19 @@ export class MockPrismaClient {
         this.moderationConfigs.set(id, created);
         return created;
       }
+    },
+    delete: async (query: any) => {
+      const existing = Array.from(this.moderationConfigs.values()).find(c => c.guildId === query.where.guildId);
+      if (existing) {
+        this.moderationConfigs.delete(existing.id);
+        return existing;
+      }
+      return null;
+    },
+    deleteMany: async () => {
+      const count = this.moderationConfigs.size;
+      this.moderationConfigs.clear();
+      return { count };
     }
   };
 
@@ -219,3 +232,6 @@ export class MockPrismaClient {
 }
 
 export const mockPrisma = new MockPrismaClient();
+
+// CommonJS export for tests that use require()
+module.exports = { mockPrisma };
