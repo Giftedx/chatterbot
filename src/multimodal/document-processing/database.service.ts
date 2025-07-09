@@ -473,7 +473,7 @@ export class DocumentDatabaseService {
         take: limit
       });
 
-      const historyWithProcessingTime = history.map(item => ({
+      const historyWithProcessingTime = history.map((item: any) => ({
         ...item,
         processingTime: item.processedAt && item.createdAt 
           ? item.processedAt.getTime() - item.createdAt.getTime()
