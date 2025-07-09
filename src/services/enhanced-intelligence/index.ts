@@ -19,9 +19,19 @@ import { EnhancedMemoryService } from './memory.service.js';
 import { EnhancedUIService } from './ui.service.js';
 import { EnhancedResponseService } from './response.service.js';
 import { EnhancedCacheService } from './cache.service.js';
+import { mcpToolRegistration } from './mcp-tool-registration.service.js';
+import { mcpRegistry } from './mcp-registry.service.js';
+
+// Import personalization intelligence services
+import { PersonalizationEngine } from './personalization-engine.service.js';
+import { UserBehaviorAnalyticsService } from './behavior-analytics.service.js';
+import { SmartRecommendationService } from './smart-recommendation.service.js';
+// TODO: Re-enable when interface compatibility is resolved
+// import { CrossSessionLearningEngine } from './cross-session-learning.service.js';
 
 // Import types
 import { ProcessingContext } from './types.js';
+import type { MCPManager } from '../mcp-manager.service.js';
 
 export class EnhancedInvisibleIntelligenceService {
   
@@ -34,7 +44,14 @@ export class EnhancedInvisibleIntelligenceService {
   private cacheService: EnhancedCacheService;
   private userMemoryService: UserMemoryService;
 
-  constructor() {
+  // Personalization intelligence services (optional features)
+  private personalizationEngine?: PersonalizationEngine;
+  private behaviorAnalytics?: UserBehaviorAnalyticsService;
+  private smartRecommendations?: SmartRecommendationService;
+  // TODO: Add crossSessionLearning when interface compatibility is resolved
+  // private crossSessionLearning: CrossSessionLearningEngine;
+
+  constructor(mcpManager?: MCPManager) {
     this.analysisService = new EnhancedMessageAnalysisService();
     this.mcpToolsService = new EnhancedMCPToolsService();
     this.memoryService = new EnhancedMemoryService();
@@ -43,7 +60,20 @@ export class EnhancedInvisibleIntelligenceService {
     this.cacheService = new EnhancedCacheService();
     this.userMemoryService = new UserMemoryService();
     
-    console.log('� Enhanced Intelligence Service initialized with API integrations');
+    // Initialize personalization intelligence services
+    try {
+      this.behaviorAnalytics = new UserBehaviorAnalyticsService();
+      this.smartRecommendations = new SmartRecommendationService();
+      // TODO: Fix interface compatibility for CrossSessionLearningEngine
+      // this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
+      this.personalizationEngine = new PersonalizationEngine(mcpManager);
+      
+      console.log('🧠 Enhanced Intelligence Service initialized with personalization capabilities and MCP integration');
+    } catch (personalizationError) {
+      console.error('⚠️ Personalization services failed to initialize:', personalizationError);
+      // Initialize with fallback implementations if needed
+      console.log('📝 Enhanced Intelligence Service initialized with API integrations');
+    }
   }
 
   /**
@@ -144,10 +174,17 @@ export class EnhancedInvisibleIntelligenceService {
         context.errors.push('Processing timeout - using basic response');
       }
       
-      // Step 5: Generate enhanced response
+      // Step 5: Generate enhanced response with personalization
       let finalResponse: string;
       try {
-        finalResponse = await this.responseService.generateEnhancedResponse(content, context);
+        const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+        
+        // Apply personalization if available
+        finalResponse = await this.adaptPersonalizedResponse(
+          interaction.user.id, 
+          baseResponse, 
+          interaction.guildId || undefined
+        );
       } catch (responseError) {
         console.error('❌ Failed to generate enhanced response:', responseError);
         finalResponse = 'I encountered an issue while processing your request. Please try again with a simpler prompt.';
@@ -175,6 +212,9 @@ export class EnhancedInvisibleIntelligenceService {
       try {
         await this.memoryService.storeConversationMemory(context, content, finalResponse);
         await this.trackEnhancedAnalytics(context, startTime);
+        
+        // Personalization: Record interaction for adaptive learning
+        await this.recordPersonalizedInteraction(context, content, finalResponse, Date.now() - startTime);
       } catch (memoryError) {
         console.warn('⚠️ Failed to store memory or analytics:', memoryError);
       }
@@ -331,22 +371,28 @@ export class EnhancedInvisibleIntelligenceService {
         await message.channel.sendTyping();
       }
 
-      // Process with all available tools
-      await this.mcpToolsService.processWithAllTools(content, attachments, context);
+      // Process with intelligent tool selection using registry and personalization
+      await this.processWithIntelligentToolSelection(content, attachments, context);
       
-      // Generate enhanced response
-      const response = await this.responseService.generateEnhancedResponse(content, context);
+      // Generate enhanced response with personalization
+      const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+      const personalizedResponse = await this.adaptPersonalizedResponse(
+        message.author.id, 
+        baseResponse, 
+        message.guildId || undefined
+      );
       
       // Cache the response for future use (if no attachments)
       if (attachments.length === 0) {
-        this.cacheService.cacheResponse(content, message.author.id, response, 10 * 60 * 1000); // 10 minute TTL
+        this.cacheService.cacheResponse(content, message.author.id, personalizedResponse, 10 * 60 * 1000); // 10 minute TTL
       }
       
       // Send response
-      await message.reply(response);
+      await message.reply(personalizedResponse);
       
-      // Store in memory and update analytics
-      await this.memoryService.storeConversationMemory(context, content, response);
+      // Store in memory and update analytics with personalization tracking
+      await this.memoryService.storeConversationMemory(context, content, personalizedResponse);
+      await this.recordPersonalizedInteraction(context, content, personalizedResponse, Date.now() - Date.now()); // Simple timing
       
     } catch (error) {
       console.error('Enhanced message processing error:', error);
@@ -356,6 +402,126 @@ export class EnhancedInvisibleIntelligenceService {
         console.error('Failed to send error reply:', replyError);
       }
     }
+  }
+
+  /**
+   * Process message with intelligent tool selection using registry
+   */
+  private async processWithIntelligentToolSelection(
+    content: string, 
+    attachments: { name: string; url: string; contentType?: string }[], 
+    context: ProcessingContext
+  ): Promise<void> {
+    try {
+      // Get tool recommendations from registry
+      const recommendations = mcpToolRegistration.getToolRecommendations(content, {
+        userId: context.userId,
+        channelId: context.channelId,
+        priority: this.determinePriority(content, attachments)
+      });
+
+      console.log(`🔧 Registry recommended ${recommendations.length} tools:`, 
+        recommendations.map(t => t.id).join(', ')
+      );
+
+      // Execute tools in order of priority
+      for (const tool of recommendations.slice(0, 2)) { // Execute top 2 tools
+        try {
+          const params = this.buildToolParams(content, attachments, tool.id);
+          const executionContext = {
+            userId: context.userId,
+            channelId: context.channelId,
+            messageContent: content,
+            priority: this.determinePriority(content, attachments),
+            requiredCapabilities: tool.capabilities,
+            fallbackAllowed: true,
+            timeoutMs: 15000
+          };
+
+          const result = await mcpRegistry.executeTool(tool.id, params, executionContext);
+          context.results.set(tool.id, result);
+
+          console.log(`✅ Tool ${tool.id} executed: ${result.success ? 'SUCCESS' : 'FAILED'}`);
+        } catch (toolError) {
+          console.error(`❌ Tool ${tool.id} execution failed:`, toolError);
+          context.errors.push(`Tool ${tool.id}: ${toolError}`);
+        }
+      }
+
+      // Fallback to traditional processing if no tools succeeded
+      if (context.results.size === 0 || !Array.from(context.results.values()).some(r => {
+        const result = r as { success: boolean };
+        return result.success;
+      })) {
+        console.log('🔄 Falling back to traditional MCP processing');
+        await this.mcpToolsService.processWithAllTools(content, attachments, context);
+      }
+    } catch (error) {
+      console.error('Intelligent tool selection failed:', error);
+      // Fallback to traditional processing
+      await this.mcpToolsService.processWithAllTools(content, attachments, context);
+    }
+  }
+
+  /**
+   * Determine processing priority based on content and attachments
+   */
+  private determinePriority(content: string, attachments: { name: string; url: string; contentType?: string }[]): 'low' | 'medium' | 'high' | 'critical' {
+    // Critical: Contains urgent words or multiple attachments
+    if (content.toLowerCase().includes('urgent') || content.toLowerCase().includes('emergency') || attachments.length > 2) {
+      return 'critical';
+    }
+
+    // High: Contains analysis requests or URLs
+    if (content.toLowerCase().includes('analyze') || content.toLowerCase().includes('research') || /https?:\/\//.test(content)) {
+      return 'high';
+    }
+
+    // Medium: Normal questions or requests
+    if (content.includes('?') || content.toLowerCase().includes('help') || attachments.length > 0) {
+      return 'medium';
+    }
+
+    // Low: Simple statements
+    return 'low';
+  }
+
+  /**
+   * Build tool-specific parameters
+   */
+  private buildToolParams(content: string, attachments: { name: string; url: string; contentType?: string }[], toolId: string): Record<string, unknown> {
+    const params: Record<string, unknown> = {
+      query: content,
+      thought: content
+    };
+
+    // Add tool-specific parameters
+    switch (toolId) {
+      case 'mcp-brave-search': {
+        params.count = 5;
+        break;
+      }
+      case 'mcp-firecrawl': {
+        const urls = this.extractUrls(content);
+        params.urls = urls.length > 0 ? urls : attachments.map(a => a.url).filter(url => url);
+        break;
+      }
+      case 'mcp-playwright': {
+        const url = this.extractUrls(content)[0];
+        if (url) params.url = url;
+        break;
+      }
+    }
+
+    return params;
+  }
+
+  /**
+   * Extract URLs from content
+   */
+  private extractUrls(text: string): string[] {
+    const urlRegex = /https?:\/\/[^\s]+/g;
+    return text.match(urlRegex) || [];
   }
 
   /**
@@ -391,5 +557,90 @@ export class EnhancedInvisibleIntelligenceService {
       cache: this.cacheService.getStats(),
       service: 'Enhanced Intelligence v2.0'
     };
+  }
+
+  /**
+   * Record personalized interaction for adaptive learning
+   */
+  private async recordPersonalizedInteraction(
+    context: ProcessingContext, 
+    userMessage: string, 
+    botResponse: string, 
+    processingTime: number
+  ): Promise<void> {
+    try {
+      if (!this.personalizationEngine) {
+        return; // Personalization not available
+      }
+
+      // Record behavior metrics with basic interaction tracking
+      if (this.behaviorAnalytics) {
+        await this.behaviorAnalytics.recordBehaviorMetric({
+          userId: context.userId,
+          metricType: 'response_time',
+          value: processingTime,
+          timestamp: new Date()
+        });
+      }
+
+      // Record interaction in personalization engine with correct format
+      await this.personalizationEngine.recordInteraction({
+        userId: context.userId,
+        guildId: context.guildId || undefined,
+        messageType: 'enhanced_conversation',
+        toolsUsed: Array.from(context.results.keys()),
+        responseTime: processingTime,
+        conversationContext: `${userMessage.substring(0, 200)}...`,
+        timestamp: new Date()
+      });
+
+      console.log('✅ Personalized interaction recorded for adaptive learning');
+    } catch (error) {
+      console.warn('⚠️ Failed to record personalized interaction:', error);
+    }
+  }
+
+  /**
+   * Get personalized tool recommendations (simplified for initial integration)
+   */
+  private async getPersonalizedToolRecommendations(userId: string): Promise<string[]> {
+    try {
+      if (!this.smartRecommendations) {
+        return [];
+      }
+
+      // Get recommendations using the actual API with correct context format
+      const recommendations = await this.smartRecommendations.getContextualToolRecommendations({
+        userId,
+        guildId: undefined,
+        currentMessage: 'enhanced_conversation_context'
+      });
+      
+      return recommendations.map((rec) => rec.type);
+    } catch (error) {
+      console.warn('⚠️ Failed to get personalized recommendations:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Adapt response based on user personalization
+   */
+  private async adaptPersonalizedResponse(
+    userId: string, 
+    originalResponse: string,
+    guildId?: string
+  ): Promise<string> {
+    try {
+      if (!this.personalizationEngine) {
+        return originalResponse;
+      }
+
+      const adaptedResponse = await this.personalizationEngine.adaptResponse(userId, originalResponse, guildId);
+      return adaptedResponse.personalizedResponse;
+    } catch (error) {
+      console.warn('⚠️ Failed to adapt personalized response:', error);
+      return originalResponse;
+    }
   }
 }

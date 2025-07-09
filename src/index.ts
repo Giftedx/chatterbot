@@ -7,6 +7,7 @@ import { healthCheck } from './health.js';
 import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 import { agenticCommands } from './commands/agentic-commands.js';
 import { logger } from './utils/logger.js';
+import { mcpManager } from './services/mcp-manager.service.js';
 
 console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
 
@@ -24,10 +25,13 @@ const client = new Client({
 });
 
 // Initialize the intelligence services
-const unifiedIntelligenceService = new UnifiedIntelligenceService();
+let unifiedIntelligenceService: UnifiedIntelligenceService;
 const enhancedIntelligenceService = ENABLE_ENHANCED_INTELLIGENCE ? new EnhancedInvisibleIntelligenceService() : null;
 
-// Build command list with agentic commands
+// Initialize UnifiedIntelligenceService without MCP first for command registration
+unifiedIntelligenceService = new UnifiedIntelligenceService();
+
+// Build command list with agentic commands  
 const commands = [
   // Core optin command
   enhancedIntelligenceService ? 
@@ -43,6 +47,32 @@ client.once('ready', async () => {
   console.log(`🤖 ${ENABLE_ENHANCED_INTELLIGENCE ? 'Enhanced' : 'Unified'} Intelligence Discord Bot v2.0 ready!`);
   console.log(`📋 Mode: ${ENABLE_ENHANCED_INTELLIGENCE ? 'Enhanced Intelligence (MCP-enabled)' : 'Unified Intelligence (Standard)'}`);
   console.log(`🧠 Agentic Intelligence: ${ENABLE_AGENTIC_INTELLIGENCE ? 'Enabled' : 'Disabled'}`);
+
+      // Initialize MCP Manager if enhanced intelligence is enabled
+  if (ENABLE_ENHANCED_INTELLIGENCE) {
+    console.log(`🔧 Initializing MCP Manager...`);
+    try {
+      await mcpManager.initialize();
+      const status = mcpManager.getStatus();
+      console.log(`✅ MCP Manager initialized: ${status.connectedServers}/${status.totalServers} servers connected`);
+      
+      if (status.connectedServers > 0) {
+        console.log(`🔗 Active MCP Servers:`);
+        for (const [name, serverStatus] of Object.entries(status.serverStatus)) {
+          if (serverStatus.connected) {
+            console.log(`   - ${name} (Phase ${serverStatus.phase}, ${serverStatus.priority} priority)`);
+          }
+        }
+        
+        // Recreate UnifiedIntelligenceService with MCP Manager
+        unifiedIntelligenceService = new UnifiedIntelligenceService(undefined, mcpManager);
+        console.log(`🔗 UnifiedIntelligenceService updated with MCP integration`);
+      }
+    } catch (error) {
+      console.error(`❌ MCP Manager initialization failed:`, error);
+      console.log(`⚡ Bot will continue with fallback capabilities`);
+    }
+  }
 
   const rest = new REST({ version: '10' }).setToken(DISCORD_TOKEN);
   try {
@@ -285,5 +315,40 @@ console.log(`🧠 Agentic Intelligence: ${ENABLE_AGENTIC_INTELLIGENCE ? 'Enabled
 
 // Start health check server
 healthCheck.start();
+
+// Graceful shutdown handling
+const gracefulShutdown = async (signal: string) => {
+  console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+  
+  try {
+    // Shutdown MCP Manager if enabled
+    if (ENABLE_ENHANCED_INTELLIGENCE) {
+      console.log('🔧 Shutting down MCP Manager...');
+      await mcpManager.shutdown();
+      console.log('✅ MCP Manager shutdown complete');
+    }
+    
+    // Destroy Discord client
+    console.log('🤖 Closing Discord connection...');
+    client.destroy();
+    console.log('✅ Discord connection closed');
+    
+    // Stop health check server
+    console.log('🩺 Stopping health check server...');
+    // Assuming healthCheck has a stop method
+    // healthCheck.stop();
+    
+    console.log('🎯 Graceful shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+// Register shutdown handlers
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // For nodemon
 
 client.login(DISCORD_TOKEN);

@@ -23,6 +23,8 @@ import { sendStream } from '../ui/stream-utils.js';
 import { logger } from '../utils/logger.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
 import { AgenticIntelligenceService, AgenticQuery } from './agentic-intelligence.service.js';
+import { MCPManager } from './mcp-manager.service.js';
+import { mcpIntegrationOrchestrator, MCPIntegrationOrchestratorService } from './mcp-integration-orchestrator.service.js';
 
 // Modularized Intelligence Services
 import {
@@ -42,6 +44,8 @@ import {
 export class UnifiedIntelligenceService {
   private readonly geminiService: GeminiService;
   private readonly agenticIntelligenceService: AgenticIntelligenceService;
+  private readonly mcpManager?: MCPManager;
+  private readonly mcpOrchestrator: MCPIntegrationOrchestratorService;
   
   // Track users who have opted into intelligent conversation
   private optedInUsers = new Set<string>();
@@ -52,10 +56,41 @@ export class UnifiedIntelligenceService {
   // Store last prompt per user for Regenerate feature
   private lastPromptCache = new Map<string, { prompt: string; attachment?: string; channelId: string }>();
 
-  constructor(agenticService?: AgenticIntelligenceService) {
+  constructor(agenticService?: AgenticIntelligenceService, mcpManager?: MCPManager) {
     this.geminiService = new GeminiService();
     this.agenticIntelligenceService = agenticService ?? AgenticIntelligenceService.getInstance();
+    this.mcpManager = mcpManager;
+    this.mcpOrchestrator = new MCPIntegrationOrchestratorService(mcpManager);
     this.loadOptedInUsers();
+    
+    // Initialize MCP orchestrator
+    this.initializeMCPOrchestrator();
+    
+    // Log MCP integration status
+    if (this.mcpManager) {
+      logger.info('UnifiedIntelligenceService initialized with MCP Manager', {
+        operation: 'unified-service-init',
+        metadata: { mcpEnabled: true }
+      });
+    }
+  }
+
+  /**
+   * Initialize MCP Orchestrator for enhanced capabilities
+   */
+  private async initializeMCPOrchestrator(): Promise<void> {
+    try {
+      await this.mcpOrchestrator.initialize();
+      logger.info('MCP Orchestrator initialized successfully', {
+        operation: 'mcp-orchestrator-init',
+        metadata: { status: this.mcpOrchestrator.getOrchestratorStatus() }
+      });
+    } catch (error) {
+      logger.warn('MCP Orchestrator initialization failed, continuing with fallback', {
+        operation: 'mcp-orchestrator-init',
+        metadata: { error: String(error) }
+      });
+    }
   }
 
   /**
@@ -355,14 +390,22 @@ export class UnifiedIntelligenceService {
         }
       }
 
-      // Step 5: Execute detected capabilities
-      await intelligenceCapabilityService.executeCapabilities(analysis, message);
-
-      // Step 6: Build enhanced context with all gathered information
-      const enhancedContext = await intelligenceContextService.buildEnhancedContext(
+      // Step 5: Execute MCP orchestration for enhanced capabilities
+      const mcpResult = await this.mcpOrchestrator.orchestrateIntelligentResponse(
         message,
         analysis,
         capabilities
+      );
+
+      // Step 6: Execute traditional capabilities (as fallback or supplement)
+      await intelligenceCapabilityService.executeCapabilities(analysis, message);
+
+      // Step 7: Build enhanced context with all gathered information including MCP results
+      const enhancedContext = await intelligenceContextService.buildEnhancedContext(
+        message,
+        analysis,
+        capabilities,
+        mcpResult.results as Map<string, MCPResultValue>
       );
 
       // Step 7: Generate AI response using the Agentic Intelligence Service
