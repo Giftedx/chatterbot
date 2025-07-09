@@ -5,7 +5,6 @@ import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard
 import { healthCheck } from './health.js';
 import { agenticCommands } from './commands/agentic-commands.js';
 import { logger } from './utils/logger.js';
-import { mcpManager } from './services/mcp-manager-v2.service.js';
 // Import AgenticIntelligenceService if its direct command handling is to be preserved outside CoreIntelligenceService
 // import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 
@@ -44,9 +43,11 @@ const coreIntelConfig: CoreIntelligenceConfig = {
 
 // Initialize MCP Manager if any enhanced features that depend on it are enabled
 // For instance, if PersonalizationEngine within CoreIntelligenceService needs it.
-let mcpManagerInstance: typeof mcpManager | undefined = undefined;
+let mcpManagerInstance: import('./services/mcp-manager.service.js').MCPManager | undefined = undefined;
 if (enablePersonalization) { // Example: Personalization needs MCP Manager
-    mcpManagerInstance = mcpManager;
+    const { MCPManager } = await import('./services/mcp-manager.service.js');
+    mcpManagerInstance = new MCPManager();
+    await mcpManagerInstance.initialize();
 }
 coreIntelConfig.mcpManager = mcpManagerInstance;
 

@@ -384,10 +384,72 @@ This project has evolved from a legacy `/optin` command system to a sophisticate
 - ✅ Graceful degradation patterns throughout
 
 **Current Development Focus**:
+- ✅ Unified Architecture Migration: Core Intelligence Service integrated with UnifiedMessageAnalysisService, UnifiedMCPOrchestratorService, and UnifiedAnalyticsService
+- ✅ Comprehensive Testing Infrastructure: Created performance benchmarks, error handling tests, and integration tests for unified services
 - Enhanced Intelligence activation through feature flags
-- Agentic Intelligence with confidence scoring and escalation
+- Agentic Intelligence with confidence scoring and escalation  
 - Personalization Engine with MCP tool recommendations
 - Production deployment optimization with `tsx` workflow
+
+### Unified Architecture Pattern (NEW)
+The Core Intelligence Service now uses a unified architecture integrating three core services:
+
+```typescript
+// Unified service integration pattern in CoreIntelligenceService
+class CoreIntelligenceService {
+  constructor(config: CoreIntelligenceConfig) {
+    this.unifiedAnalytics = new UnifiedAnalyticsService();
+    this.unifiedMessageAnalysis = new UnifiedMessageAnalysisService();
+    this.mcpOrchestrator = new UnifiedMCPOrchestratorService();
+  }
+
+  // Unified processing pipeline
+  private async _processMessagePipeline(uiContext, promptText, commonAttachments, userId, channelId, guildId) {
+    // 1. Unified message analysis
+    const unifiedAnalysis = await this.unifiedMessageAnalysis.analyzeMessage(messageForPipeline, analysisAttachmentsData, capabilities);
+    
+    // 2. Unified MCP orchestration
+    const mcpOrchestrationResult = await this.mcpOrchestrator.processMessage(messageForAnalysis, unifiedAnalysis, capabilities);
+    
+    // 3. Adapter pattern for modular intelligence services
+    const adaptedAnalysisForContext = this.contextService.adaptUnifiedAnalysis(unifiedAnalysis);
+    const adaptedMcpResultsForContext = this.contextService.convertUnifiedMCPResults(mcpOrchestrationResult);
+    
+    // 4. Enhanced context building with unified results
+    const agenticContextData = await this.contextService.buildEnhancedContext(messageForAnalysis, adaptedAnalysisForContext, capabilities, adaptedMcpResultsForContext);
+  }
+}
+```
+
+### Adapter Pattern for Backward Compatibility
+Modular intelligence services use adapter methods to maintain compatibility:
+
+```typescript
+// In capability.service.ts and context.service.ts
+class IntelligenceCapabilityService {
+  // Adapter method for unified analysis
+  adaptUnifiedAnalysis(unifiedAnalysis: UnifiedMessageAnalysis): IntelligenceAnalysis {
+    return {
+      complexity: unifiedAnalysis.complexity,
+      intents: unifiedAnalysis.detectedIntents,
+      topics: unifiedAnalysis.topics,
+      requiresPersona: unifiedAnalysis.requiresPersona,
+      suggestedTools: unifiedAnalysis.suggestedMCPTools
+    };
+  }
+
+  // Adapter method for unified MCP results
+  convertMCPOrchestrationResults(mcpResult: MCPOrchestrationResult) {
+    const adaptedResults = new Map<string, any>();
+    for (const [toolId, toolResult] of mcpResult.toolResults) {
+      if (toolResult.success && toolResult.data) {
+        adaptedResults.set(toolId, toolResult.data);
+      }
+    }
+    return adaptedResults;
+  }
+}
+```
 
 ### Message Processing Architecture Pattern
 ```typescript

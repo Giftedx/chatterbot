@@ -838,6 +838,24 @@ export class PersonalizationEngine {
       });
     }
 
+    // Always provide at least one workflow recommendation if there are interactions
+    if (recommendations.length === 0 && pattern.behaviorMetrics.feedbackScores.length > 0) {
+      recommendations.push({
+        type: 'workflow',
+        priority: 'low',
+        title: 'Optimize Your AI Workflow',
+        description: 'Improve your interaction efficiency with AI tools',
+        actionableSteps: [
+          'Be specific with your questions',
+          'Provide relevant context in your queries',
+          'Use follow-up questions to refine results'
+        ],
+        expectedBenefit: 'More accurate responses and better conversation flow',
+        confidenceScore: 0.5,
+        basedOn: ['Basic interaction patterns', 'General workflow principles']
+      });
+    }
+
     return recommendations;
   }
 

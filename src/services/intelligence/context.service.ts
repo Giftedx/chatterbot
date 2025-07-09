@@ -3,6 +3,8 @@
  * 
  * Builds comprehensive context for AI responses by integrating
  * memory, permissions, attachments, and conversation history.
+ * 
+ * Updated to work with unified architecture pattern.
  */
 
 import { Message, Attachment } from 'discord.js';
@@ -11,6 +13,8 @@ import { getActivePersona } from '../persona-manager.js';
 import { UserMemoryService } from '../../memory/user-memory.service.js';
 import { UserCapabilities } from './permission.service.js';
 import { IntelligenceAnalysis } from './analysis.service.js';
+import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
+import { MCPOrchestrationResult } from '../core/mcp-orchestrator.service.js';
 import { intelligenceAdminService } from './admin.service.js';
 import { logger } from '../../utils/logger.js';
 
@@ -65,6 +69,110 @@ export class IntelligenceContextService {
 
   constructor() {
     this.userMemoryService = new UserMemoryService();
+  }
+
+  /**
+   * Build enhanced context using unified MCP orchestration results
+   */
+  public async buildEnhancedContextWithUnified(
+    message: Message,
+    unifiedAnalysis: UnifiedMessageAnalysis,
+    capabilities: UserCapabilities,
+    mcpResult?: MCPOrchestrationResult
+  ): Promise<EnhancedContext> {
+    try {
+      // Convert unified analysis to intelligence analysis
+      const analysis = this.adaptAnalysisInterface(unifiedAnalysis);
+      
+      // Convert unified MCP results to legacy format for compatibility
+      let mcpResults: Map<string, MCPResultValue> | undefined;
+      if (mcpResult && mcpResult.success) {
+        mcpResults = this.convertUnifiedMCPResults(mcpResult);
+      }
+
+      // Use existing enhanced context building with converted data
+      return await this.buildEnhancedContext(message, analysis, capabilities, mcpResults);
+      
+    } catch (error) {
+      logger.warn('Enhanced context building with unified services failed, using fallback', {
+        operation: 'build-context-unified',
+        metadata: { error: String(error) }
+      });
+
+      // Fallback to basic context
+      return {
+        prompt: message.content,
+        systemPrompt: this.buildBasicSystemPrompt(),
+        hasAttachments: message.attachments.size > 0,
+        complexity: unifiedAnalysis.complexity
+      };
+    }
+  }
+
+  /**
+   * Convert unified MCP orchestration results to legacy format
+   */
+  private convertUnifiedMCPResults(mcpResult: MCPOrchestrationResult): Map<string, MCPResultValue> {
+    const convertedResults = new Map<string, MCPResultValue>();
+
+    for (const [toolId, toolResult] of mcpResult.results.entries()) {
+      if (toolResult.success && toolResult.data) {
+        // Map specific tool types to expected legacy format
+        if (toolId.includes('search')) {
+          convertedResults.set('webSearch', toolResult.data as WebSearchResult);
+        } else if (toolId.includes('extraction')) {
+          convertedResults.set('contentExtraction', toolResult.data as ContentExtractionResult);
+        } else if (toolId.includes('osrs')) {
+          convertedResults.set('osrsData', toolResult.data as OSRSDataResult);
+        } else {
+          // Generic data wrapper for other tools
+          convertedResults.set(toolId, { data: toolResult.data } as MCPResultValue);
+        }
+      } else if (toolResult.error) {
+        convertedResults.set(`${toolId}Error`, { error: toolResult.error });
+      }
+    }
+
+    return convertedResults;
+  }
+
+  /**
+   * Adapter function to convert UnifiedMessageAnalysis to IntelligenceAnalysis
+   * for context service compatibility
+   */
+  public adaptAnalysisInterface(unifiedAnalysis: UnifiedMessageAnalysis): IntelligenceAnalysis {
+    return {
+      // Core analysis (direct mapping)
+      hasAttachments: unifiedAnalysis.hasAttachments,
+      hasUrls: unifiedAnalysis.hasUrls,
+      attachmentTypes: unifiedAnalysis.attachmentTypes,
+      urls: unifiedAnalysis.urls,
+      complexity: unifiedAnalysis.complexity === 'advanced' ? 'complex' : unifiedAnalysis.complexity,
+      intents: unifiedAnalysis.intents,
+      requiredTools: unifiedAnalysis.requiredTools,
+      
+      // Intelligence-specific analysis (direct mapping)
+      needsPersonaSwitch: unifiedAnalysis.needsPersonaSwitch,
+      suggestedPersona: unifiedAnalysis.suggestedPersona,
+      needsAdminFeatures: unifiedAnalysis.needsAdminFeatures,
+      adminCommands: unifiedAnalysis.adminCommands,
+      needsMultimodal: unifiedAnalysis.needsMultimodal,
+      attachmentAnalysis: unifiedAnalysis.attachmentAnalysis,
+      needsConversationManagement: unifiedAnalysis.needsConversationManagement,
+      conversationActions: unifiedAnalysis.conversationActions,
+      needsMemoryOperation: unifiedAnalysis.needsMemoryOperation,
+      memoryActions: unifiedAnalysis.memoryActions,
+      needsMCPTools: unifiedAnalysis.needsMCPTools,
+      mcpRequirements: unifiedAnalysis.mcpRequirements,
+      
+      // Analysis metadata (direct mapping)
+      confidence: unifiedAnalysis.confidence,
+      processingRecommendations: unifiedAnalysis.processingRecommendations,
+      sentiment: unifiedAnalysis.sentiment,
+      language: unifiedAnalysis.language,
+      topics: unifiedAnalysis.topics,
+      mentions: unifiedAnalysis.mentions
+    };
   }
 
   /**
@@ -124,7 +232,7 @@ export class IntelligenceContextService {
         prompt: enhancedPrompt,
         systemPrompt,
         hasAttachments: message.attachments.size > 0,
-        complexity: analysis.complexityLevel
+        complexity: analysis.complexity
       };
 
     } catch (error) {
@@ -279,7 +387,7 @@ export class IntelligenceContextService {
     let systemPrompt = persona.systemPrompt;
 
     if (capabilityNames.length > 0) {
-      systemPrompt += `\n\n[SYSTEM] You are operating with ${analysis.complexityLevel} complexity level. Active capabilities: ${capabilityNames.join(', ')}.`;
+      systemPrompt += `\n\n[SYSTEM] You are operating with ${analysis.complexity} complexity level. Active capabilities: ${capabilityNames.join(', ')}.`;
     }
 
     systemPrompt += `

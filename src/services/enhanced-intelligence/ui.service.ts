@@ -168,7 +168,7 @@ export class EnhancedUIService {
   /**
    * Create action row for completed response
    */
-  private createResponseActionRow(): ActionRowBuilder<ButtonBuilder> {
+  public createResponseActionRow(): ActionRowBuilder<ButtonBuilder> {
     return new ActionRowBuilder<ButtonBuilder>()
       .addComponents(
         new ButtonBuilder()

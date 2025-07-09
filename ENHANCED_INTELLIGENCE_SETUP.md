@@ -128,7 +128,7 @@ Bot: [Advanced image analysis + contextual insights]
 ### Test Contextual Intelligence
 
 ```
-User: [after opting in] help me understand quantum computing
+User: /chat help me understand quantum computing
 Bot: [Automatically triggers contextual help with research capabilities]
 ```
 
