@@ -154,19 +154,26 @@ export class MCPSecurityManager {
     context: MCPToolExecutionContext;
   }> {
     const customId = interaction.customId;
-    const parts = customId.split('_');
+    let parsedId;
     
-    if (parts.length < 6 || parts[0] !== 'mcp' || parts[1] !== 'consent') {
-      throw new Error('Invalid consent button interaction');
+    try {
+      parsedId = JSON.parse(customId);
+    } catch (error) {
+      throw new Error('Invalid consent button interaction: malformed customId');
     }
 
-    const action = parts[2] === 'allow' ? (parts[3] === 'once' ? 'allow_once' : 'always_allow') :
-                   parts[2] === 'deny' ? 'deny' :
-                   parts[2] === 'always' && parts[3] === 'deny' ? 'always_deny' : 'deny';
+    if (!parsedId || parsedId.type !== 'mcp_consent' || !parsedId.action || !parsedId.userId || !parsedId.serverName || !parsedId.toolName) {
+      throw new Error('Invalid consent button interaction: missing required fields');
+    }
+
+    const action = parsedId.action === 'allow_once' ? 'allow_once' :
+                   parsedId.action === 'always_allow' ? 'always_allow' :
+                   parsedId.action === 'deny' ? 'deny' :
+                   parsedId.action === 'always_deny' ? 'always_deny' : 'deny';
     
-    const userId = parts[parts.length - 3];
-    const serverName = parts[parts.length - 2];
-    const toolName = parts[parts.length - 1];
+    const userId = parsedId.userId;
+    const serverName = parsedId.serverName;
+    const toolName = parsedId.toolName;
 
     const consent: MCPConsentDecision = {
       userId,
