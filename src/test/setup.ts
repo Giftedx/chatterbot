@@ -26,6 +26,16 @@ global.console = {
 // Mock fetch globally with proper typing
 (global as any).fetch = jest.fn();
 
+// Mock Prisma Client - commented out for now due to type issues
+// Will be re-enabled once Prisma client is properly generated
+/*
+jest.mock('@prisma/client', () => ({
+  PrismaClient: jest.fn().mockImplementation(() => ({
+    // Mock implementation
+  })),
+}));
+*/
+
 // Clean up after each test
 afterEach(() => {
   jest.clearAllMocks();
