@@ -60,10 +60,10 @@ constructor(mcpManager?: MCPManager) {
 }
 ```
 
-### **Unified Intelligence Service Compatibility**
+### **Core Intelligence Service Compatibility**
 ```typescript
-// Seamless integration with existing UnifiedIntelligenceService
-const unifiedService = new UnifiedIntelligenceService(agenticService, mcpManager);
+// Seamless integration with existing CoreIntelligenceService
+const coreService = new CoreIntelligenceService(config);
 // Personalization automatically leverages MCP capabilities
 ```
 

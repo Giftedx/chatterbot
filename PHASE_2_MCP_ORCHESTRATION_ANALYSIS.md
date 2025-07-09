@@ -18,7 +18,7 @@ Similar to Phase 1's message analysis consolidation, we have **multiple overlapp
 
 3. **MCPIntegrationOrchestratorService** (`src/services/mcp-integration-orchestrator.service.ts`)
    - 552 lines implementing phased MCP integration
-   - Used by UnifiedIntelligenceService
+   - Used by CoreIntelligenceService
    - Implements the 5-phase deployment strategy
 
 4. **MCPToolRegistrationService** (`src/services/enhanced-intelligence/mcp-tool-registration.service.ts`)
@@ -61,7 +61,7 @@ Add missing capabilities from other services:
 - Production deployment features from MCPProductionIntegrationService
 
 ### Step 2: Update Service Dependencies
-- **UnifiedIntelligenceService**: Replace `MCPIntegrationOrchestratorService` usage
+- **CoreIntelligenceService**: Replace `MCPIntegrationOrchestratorService` usage
 - **EnhancedInvisibleIntelligenceService**: Replace `EnhancedMCPToolsService` usage
 - Add adapter methods for interface compatibility
 

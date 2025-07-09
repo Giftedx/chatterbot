@@ -3,10 +3,14 @@
  * 
  * Handles execution of detected capabilities including MCP tools,
  * persona switching, memory operations, and conversation management.
+ * 
+ * Updated to work with unified architecture pattern.
  */
 
 import { Message } from 'discord.js';
 import { IntelligenceAnalysis, AttachmentAnalysis } from './analysis.service.js';
+import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
+import { UnifiedMCPOrchestratorService, MCPOrchestrationResult } from '../core/mcp-orchestrator.service.js';
 import { setActivePersona } from '../persona-manager.js';
 import { UserMemoryService } from '../../memory/user-memory.service.js';
 import { ConversationSummaryService } from '../../conversation/conversation-summary.service.js';
@@ -75,13 +79,139 @@ export interface CapabilityExecutionResult {
 export class IntelligenceCapabilityService {
   private readonly userMemoryService: UserMemoryService;
   private readonly summaryService: ConversationSummaryService;
+  // Removed unused unifiedMCPOrchestrator property
   
   // Store MCP results temporarily for each interaction  
   private readonly mcpResultsCache = new Map<string, Map<string, MCPResultValue>>();
 
-  constructor() {
+  constructor(unifiedMCPOrchestrator?: UnifiedMCPOrchestratorService) {
     this.userMemoryService = new UserMemoryService();
     this.summaryService = new ConversationSummaryService();
+    this.unifiedMCPOrchestrator = unifiedMCPOrchestrator;
+  }
+
+  /**
+   * Adapter method to convert UnifiedMessageAnalysis to IntelligenceAnalysis
+   */
+  public adaptUnifiedAnalysis(unifiedAnalysis: UnifiedMessageAnalysis): IntelligenceAnalysis {
+    return {
+      // Core message analysis (direct mapping)
+      hasAttachments: unifiedAnalysis.hasAttachments,
+      hasUrls: unifiedAnalysis.hasUrls,
+      attachmentTypes: unifiedAnalysis.attachmentTypes,
+      urls: unifiedAnalysis.urls,
+      complexity: unifiedAnalysis.complexity,
+      intents: unifiedAnalysis.intents,
+      requiredTools: unifiedAnalysis.requiredTools,
+      
+      // Intelligence-specific analysis (direct mapping)
+      needsPersonaSwitch: unifiedAnalysis.needsPersonaSwitch,
+      suggestedPersona: unifiedAnalysis.suggestedPersona,
+      needsAdminFeatures: unifiedAnalysis.needsAdminFeatures,
+      adminCommands: unifiedAnalysis.adminCommands,
+      needsMultimodal: unifiedAnalysis.needsMultimodal,
+      attachmentAnalysis: unifiedAnalysis.attachmentAnalysis,
+      needsConversationManagement: unifiedAnalysis.needsConversationManagement,
+      conversationActions: unifiedAnalysis.conversationActions,
+      needsMemoryOperation: unifiedAnalysis.needsMemoryOperation,
+      memoryActions: unifiedAnalysis.memoryActions,
+      needsMCPTools: unifiedAnalysis.needsMCPTools,
+      mcpRequirements: unifiedAnalysis.mcpRequirements,
+      
+      // Analysis metadata (direct mapping)
+      confidence: unifiedAnalysis.confidence,
+      processingRecommendations: unifiedAnalysis.processingRecommendations,
+      sentiment: unifiedAnalysis.sentiment,
+      language: unifiedAnalysis.language,
+      topics: unifiedAnalysis.topics,
+      mentions: unifiedAnalysis.mentions
+    };
+  }
+
+  /**
+   * Execute capabilities using unified MCP orchestrator when available
+   */
+  public async executeCapabilitiesWithUnified(
+    unifiedAnalysis: UnifiedMessageAnalysis, 
+    message: Message,
+    mcpResult?: MCPOrchestrationResult
+  ): Promise<CapabilityExecutionResult> {
+    const analysis = this.adaptUnifiedAnalysis(unifiedAnalysis);
+    const result: CapabilityExecutionResult = {};
+
+    try {
+      // Use unified MCP results if available, otherwise fall back to legacy execution
+      if (mcpResult && mcpResult.success) {
+        result.mcpResults = this.convertMCPOrchestrationResults(mcpResult);
+      } else if (analysis.needsMCPTools) {
+        result.mcpResults = await this.executeMCPTools(analysis, message);
+      }
+
+      // Execute other capabilities as before
+      if (analysis.needsPersonaSwitch && analysis.suggestedPersona) {
+        result.personaSwitched = await this.executePersonaSwitch(message, analysis.suggestedPersona);
+      }
+
+      if (analysis.needsMultimodal && analysis.attachmentAnalysis.length > 0) {
+        result.multimodalProcessed = await this.executeMultimodalProcessing(analysis.attachmentAnalysis);
+      }
+
+      if (analysis.needsConversationManagement) {
+        result.conversationManaged = await this.executeConversationManagement(analysis.conversationActions, message);
+      }
+
+      if (analysis.needsMemoryOperation) {
+        result.memoryUpdated = await this.executeMemoryOperations(analysis.memoryActions, message);
+      }
+
+      logger.info('Capability execution complete (unified)', {
+        operation: 'capability-execution-unified',
+        metadata: {
+          mcpTools: !!result.mcpResults,
+          persona: result.personaSwitched,
+          multimodal: result.multimodalProcessed,
+          conversation: result.conversationManaged,
+          memory: result.memoryUpdated,
+          usedUnifiedMCP: !!mcpResult
+        }
+      });
+
+      return result;
+
+    } catch (error) {
+      logger.error('Capability execution failed (unified)', {
+        operation: 'capability-execution-unified',
+        metadata: { error: String(error) }
+      });
+
+      return result;
+    }
+  }
+
+  /**
+   * Convert unified MCP orchestration results to legacy format for compatibility
+   */
+  private convertMCPOrchestrationResults(mcpResult: MCPOrchestrationResult): Map<string, MCPResultValue> {
+    const results = new Map<string, MCPResultValue>();
+
+    for (const [toolId, toolResult] of mcpResult.results.entries()) {
+      if (toolResult.success && toolResult.data) {
+        // Map unified results to legacy format
+        if (toolId.includes('search')) {
+          results.set('webSearch', toolResult.data as WebSearchResult);
+        } else if (toolId.includes('extraction')) {
+          results.set('contentExtraction', toolResult.data as ContentExtractionResult);
+        } else if (toolId.includes('osrs')) {
+          results.set('osrsData', toolResult.data as OSRSDataResult);
+        } else {
+          results.set(toolId, { data: toolResult.data } as MCPResultValue);
+        }
+      } else if (toolResult.error) {
+        results.set(`${toolId}Error`, { error: toolResult.error });
+      }
+    }
+
+    return results;
   }
 
   /**

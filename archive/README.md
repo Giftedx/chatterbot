@@ -45,7 +45,7 @@ Windows Zone.Identifier files that were automatically downloaded with various as
 
 ### Legacy Source Code
 The original command-based architecture was replaced with a unified intelligence service that:
-- Provides simpler user experience (single `/optin` command)
+- Provides simpler user experience (single `/chat` command)
 - Offers more sophisticated AI-driven feature selection
 - Maintains better separation of concerns through modular services
 - Delivers better performance and maintainability

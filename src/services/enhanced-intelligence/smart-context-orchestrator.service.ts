@@ -127,6 +127,18 @@ export class SmartContextOrchestratorService {
         }
       }
 
+      // Phase 3.5: Complexity-Based Context Enhancement
+      if (analysis.complexity === 'complex' && contextSources.length < 3) {
+        const complexityContext = await this.buildComplexityBasedContext(
+          message.content, analysis
+        );
+        if (complexityContext) {
+          enhancedPrompt += `\n\n[COMPLEXITY ANALYSIS]\n${complexityContext.content}`;
+          contextSources.push(...complexityContext.sources);
+          confidence += 0.15;
+        }
+      }
+
       // Phase 4: Cross-Reference and Synthesis
       if (strategy.crossReferenceMemory && contextSources.length > 1) {
         const synthesizedContext = await this.synthesizeContext(
@@ -320,6 +332,47 @@ export class SmartContextOrchestratorService {
     } catch (error) {
       logger.warn('Deep knowledge context building failed', {
         operation: 'deep-knowledge-context',
+        metadata: { error: String(error) }
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Build complexity-based context for complex messages
+   */
+  private async buildComplexityBasedContext(
+    content: string,
+    analysis: UnifiedMessageAnalysis
+  ): Promise<{ content: string; sources: string[]; sourceCount: number } | null> {
+    try {
+      const sources: string[] = [];
+      let contextContent = '';
+
+      // Add complexity analysis context
+      if (analysis.complexity === 'complex') {
+        const topics = analysis.topics || [];
+        contextContent += `This message requires advanced analysis due to: ${topics.join(', ')}\n`;
+        sources.push('complexity-analysis');
+
+        // Add topic-specific context for complex topics
+        if (topics.some(topic => ['quantum', 'computing', 'physics', 'science'].includes(topic.toLowerCase()))) {
+          contextContent += 'Scientific/technical topic detected - using advanced reasoning patterns.\n';
+          sources.push('scientific-reasoning');
+        }
+
+        // Add MCP tools context if needed
+        if (analysis.needsMCPTools) {
+          contextContent += `MCP tools recommended: ${analysis.mcpRequirements.join(', ')}\n`;
+          sources.push('mcp-analysis');
+        }
+      }
+
+      return contextContent ? { content: contextContent.trim(), sources, sourceCount: sources.length } : null;
+
+    } catch (error) {
+      logger.warn('Complexity-based context building failed', {
+        operation: 'complexity-context',
         metadata: { error: String(error) }
       });
       return null;

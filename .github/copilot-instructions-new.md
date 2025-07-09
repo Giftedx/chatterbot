@@ -3,13 +3,13 @@
 ## Current Project Status
 - **Last Updated**: 2024-12-28
 - **Build Status**: ✅ WORKING - Successfully refactored to unified command architecture
-- **Bot Status**: ✅ OPERATIONAL - Single /optin command with AI-driven feature selection
+- **Bot Status**: ✅ OPERATIONAL - Single /chat command with AI-driven feature selection
 - **Architecture**: Unified Intelligence Service with automatic capability detection
 
 ## Major Recent Changes
 - **COMPLETED**: Removed all individual commands (/gemini, /persona, /stats, /moderation, /memory)
-- **COMPLETED**: Implemented single `/optin` command that uses AI to automatically select features
-- **COMPLETED**: Created UnifiedIntelligenceService with automatic:
+- **COMPLETED**: Implemented single `/chat` command that uses AI to automatically select features
+- **COMPLETED**: Created CoreIntelligenceService with automatic:
   - Persona selection based on context
   - Moderation checking for safety
   - Admin feature detection for stats/configuration
@@ -18,7 +18,7 @@
 - **COMPLETED**: Simplified main bot entry point to just the unified service
 
 ## Current Command Structure
-- **Single Command**: `/optin <prompt> [attachment]`
+- **Single Command**: `/chat <prompt> [attachment]`
 - **AI-Driven Features**: All functionality automatically selected by AI during response generation:
   - Persona switching based on conversation context
   - Automatic moderation without explicit commands
@@ -29,8 +29,8 @@
 ## Key Files and Architecture
 
 ### Core Architecture
-- `src/index.ts` - Main bot entry point (simplified, only handles /optin)
-- `src/services/unified-intelligence.service.ts` - Central service handling all functionality
+- `src/index.ts` - Main bot entry point (simplified, only handles /chat)
+- `src/services/core-intelligence.service.ts` - Central service handling all functionality
 - `src/services/gemini.service.ts` - Google Gemini AI integration  
 - `src/services/context-manager.ts` - Conversation history management
 - `src/services/persona-manager.ts` - Dynamic persona management
@@ -87,7 +87,7 @@ npm run build  # TypeScript compilation check
 6. **Multimodal Support**: Handles text, images, and mixed content seamlessly
 
 ## Working Features
-- ✅ Single /optin command with comprehensive functionality
+- ✅ Single /chat command with comprehensive functionality
 - ✅ AI-driven automatic feature selection during response generation  
 - ✅ Streaming responses with stop/regenerate buttons
 - ✅ Dynamic persona switching based on context
@@ -108,7 +108,7 @@ npm run build  # TypeScript compilation check
 - Follow singleton pattern for services
 
 ### Adding New Capabilities
-1. Extend the `UnifiedIntelligenceService` class
+1. Extend the `CoreIntelligenceService` class
 2. Add capability detection logic in `analyzeUserIntent()`
 3. Implement processing in `processWithUnifiedIntelligence()`
 4. Update the AI prompt to recognize new intent patterns

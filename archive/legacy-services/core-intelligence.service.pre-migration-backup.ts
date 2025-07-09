@@ -15,9 +15,6 @@ import { URL } from 'url';
 import { MCPManager } from './mcp-manager.service';
 import { UnifiedMCPOrchestratorService, MCPOrchestrationResult, MCPToolResult } from './core/mcp-orchestrator.service';
 
-// Unified Core Services
-import { UnifiedAnalyticsService } from './core/unified-analytics.service.js';
-
 // Agentic and Gemini
 import { AgenticIntelligenceService, AgenticQuery, AgenticResponse } from './agentic-intelligence.service';
 import { GeminiService } from './gemini.service';
@@ -49,6 +46,7 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 
 // Utilities and Others
 import { logger } from '../utils/logger';
+import { logInteraction } from './analytics';
 import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager';
 import { ModerationService } from '../moderation/moderation-service';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components';
@@ -56,15 +54,10 @@ import { urlToGenerativePart } from '../utils/image-helper';
 // import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
 
 // Local MCPResultValue types for context aggregation (ideally imported or shared)
-type WebSearchResult = { query: string; results: Array<{ title: string; description: string; url: string; snippet: string; }>; metadata: Record<string, unknown>; };
-type ContentExtractionResult = { urls: Array<{ url: string; title: string; content: string; metadata: Record<string, unknown>; }>; };
-type OSRSDataResult = { query: string; data: string; metadata: Record<string, unknown>; };
-type MCPResultValue = WebSearchResult | ContentExtractionResult | OSRSDataResult | { error: string };
-
-type LocalWebSearchResult = { query: string; results: Array<{ title: string; description: string; url: string; snippet: string; }>; metadata: Record<string, unknown>; };
-type LocalContentExtractionResult = { urls: Array<{ url: string; title: string; content: string; metadata: Record<string, unknown>; }>; };
-type LocalOSRSDataResult = { query: string; data: string; metadata: Record<string, unknown>; };
-type LocalMCPResultValue = LocalWebSearchResult | LocalContentExtractionResult | LocalOSRSDataResult | { error: string } | { data: Record<string, unknown> };
+type LocalWebSearchResult = { query: string; results: Array<{ title: string; description: string; url: string; snippet: string; }>; metadata: any; };
+type LocalContentExtractionResult = { urls: Array<{ url: string; title: string; content: string; metadata: any; }>; };
+type LocalOSRSDataResult = { query: string; data: string; metadata: any; };
+type LocalMCPResultValue = LocalWebSearchResult | LocalContentExtractionResult | LocalOSRSDataResult | { error: string } | { data: any };
 
 
 interface CommonAttachment {
@@ -80,12 +73,6 @@ export interface CoreIntelligenceConfig {
     enableEnhancedUI: boolean;
     enableResponseCache: boolean;
     mcpManager?: MCPManager;
-    // Optional dependency injection for testing
-    dependencies?: {
-        mcpOrchestrator?: UnifiedMCPOrchestratorService;
-        analyticsService?: UnifiedAnalyticsService;
-        messageAnalysisService?: typeof unifiedMessageAnalysisService;
-    };
 }
 
 export class CoreIntelligenceService {
@@ -95,7 +82,6 @@ export class CoreIntelligenceService {
     private lastPromptCache = new Map<string, { prompt: string; attachments: CommonAttachment[]; channelId: string }>();
 
     private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
-    private readonly analyticsService: UnifiedAnalyticsService;
     private readonly agenticIntelligence: AgenticIntelligenceService;
     private readonly geminiService: GeminiService;
     private readonly moderationService: ModerationService;
@@ -117,18 +103,14 @@ export class CoreIntelligenceService {
     constructor(config: CoreIntelligenceConfig) {
         this.config = config;
         this.agenticIntelligence = AgenticIntelligenceService.getInstance();
-        
-        // Use dependency injection for testing, otherwise create new instances
-        this.mcpOrchestrator = config.dependencies?.mcpOrchestrator ?? new UnifiedMCPOrchestratorService(config.mcpManager);
-        this.analyticsService = config.dependencies?.analyticsService ?? new UnifiedAnalyticsService();
-        this.messageAnalysisService = config.dependencies?.messageAnalysisService ?? unifiedMessageAnalysisService;
-        
+        this.mcpOrchestrator = new UnifiedMCPOrchestratorService(config.mcpManager);
         this.geminiService = new GeminiService();
         this.moderationService = new ModerationService();
         this.permissionService = intelligencePermissionService;
         this.contextService = intelligenceContextService;
         this.adminService = intelligenceAdminService;
         this.capabilityService = intelligenceCapabilityService;
+        this.messageAnalysisService = unifiedMessageAnalysisService;
         this.userMemoryService = new UserMemoryService();
 
         if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
@@ -143,21 +125,7 @@ export class CoreIntelligenceService {
         }
 
         this.loadOptedInUsers().catch(err => logger.error('Failed to load opted-in users', err));
-        
-        // Initialize MCP Orchestrator with comprehensive null safety
-        if (this.mcpOrchestrator && typeof this.mcpOrchestrator.initialize === 'function') {
-            try {
-                const initResult = this.mcpOrchestrator.initialize();
-                if (initResult && typeof initResult.catch === 'function') {
-                    initResult.catch(err => logger.error('MCP Orchestrator failed to init in CoreIntelligenceService', err));
-                }
-            } catch (err) {
-                logger.error('Error calling MCP Orchestrator initialize', err);
-            }
-        } else {
-            logger.warn('MCP Orchestrator not available or missing initialize method');
-        }
-        
+        this.mcpOrchestrator.initialize().catch(err => logger.error('MCP Orchestrator failed to init in CoreIntelligenceService', err));
         logger.info('CoreIntelligenceService initialized', { config: this.config });
     }
 
@@ -165,23 +133,14 @@ export class CoreIntelligenceService {
      * Analytics wrapper to match expected interface
      */
     private recordAnalyticsInteraction(data: any): void {
-        // Use the unified analytics service
+        // Simple wrapper around the existing analytics function
         if (data.isSuccess !== undefined) {
-            try {
-                const logResult = this.analyticsService.logInteraction({
-                    guildId: data.guildId || null,
-                    userId: data.userId || 'unknown',
-                    command: data.step || 'core-intelligence',
-                    isSuccess: data.isSuccess
-                });
-                
-                // Only call .catch() if logResult is a Promise
-                if (logResult && typeof logResult.catch === 'function') {
-                    logResult.catch((err: Error) => logger.warn('Analytics logging failed', { error: err.message }));
-                }
-            } catch (err) {
-                logger.warn('Analytics logging failed', { error: err instanceof Error ? err.message : 'Unknown error' });
-            }
+            logInteraction({
+                guildId: data.guildId || null,
+                userId: data.userId || 'unknown',
+                command: data.step || 'core-intelligence',
+                isSuccess: data.isSuccess
+            }).catch(err => logger.warn('Analytics logging failed', err));
         }
     }
 
@@ -205,7 +164,7 @@ export class CoreIntelligenceService {
             }
         } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle interaction:', { interactionId: interaction.id, error });
-            if (interaction && typeof interaction.isRepliable === 'function' && interaction.isRepliable()) {
+            if (interaction.isRepliable()) {
                 const errorMessage = 'An error occurred while processing your request.';
                 if (interaction.deferred || interaction.replied) {
                     await interaction.followUp({ content: errorMessage, ephemeral: true }).catch(e => logger.error('[CoreIntelSvc] Failed to send error followUp', e));
@@ -258,7 +217,7 @@ export class CoreIntelligenceService {
         commonAttachments: CommonAttachment[], uiContext: ChatInputCommandInteraction | Message
     ): Promise<any> {
         const startTime = Date.now();
-        const analyticsData = { guildId: guildId || undefined, userId, commandOrEvent: uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate', promptLength: promptText.length, attachmentCount: commonAttachments.length, startTime };
+        const analyticsData: Record<string, any> = { guildId, userId, commandOrEvent: uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate', promptLength: promptText.length, attachmentCount: commonAttachments.length, startTime };
 
         try {
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'start_processing', isSuccess: true, duration: 0 });
@@ -278,17 +237,6 @@ export class CoreIntelligenceService {
             let mcpOrchestrationResult = await this._executeMcpPipeline(messageForPipeline, unifiedAnalysis, capabilities, analyticsData);
             if (!mcpOrchestrationResult.success) {
                 logger.warn(`[CoreIntelSvc] MCP Pipeline indicated failure or partial success. Tools executed: ${mcpOrchestrationResult.toolsExecuted.join(', ')}. Fallbacks: ${mcpOrchestrationResult.fallbacksUsed.join(', ')}`, analyticsData);
-            }
-
-            // Execute capabilities using unified orchestration results
-            logger.debug(`[CoreIntelSvc] Stage 4.5: Capability Execution`, { userId: messageForPipeline.author.id });
-            try {
-                const capabilityResult = await this.capabilityService.executeCapabilitiesWithUnified(unifiedAnalysis, messageForPipeline, mcpOrchestrationResult);
-                this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_executed', isSuccess: true, duration: Date.now() - analyticsData.startTime });
-                logger.info(`[CoreIntelSvc] Capabilities executed: MCP(${!!capabilityResult.mcpResults}), Persona(${!!capabilityResult.personaSwitched}), Multimodal(${!!capabilityResult.multimodalProcessed})`, { analyticsData });
-            } catch (error: any) {
-                logger.warn(`[CoreIntelSvc] Capability execution encountered an error: ${error.message}. Continuing with processing.`, { error, ...analyticsData });
-                this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             }
 
             const history = await getHistory(channelId);
@@ -333,19 +281,19 @@ export class CoreIntelligenceService {
             createdTimestamp: interaction.createdTimestamp, editedTimestamp: null,
             toString: () => promptText,
             fetchReference: async () => { logger.warn('[CoreIntelSvc] Mocked fetchReference called.'); throw new Error("Not implemented on mock."); },
-        } as unknown as Message;
+        } as Message;
     }
 
     private async _performModeration(promptText: string, attachments: CommonAttachment[], userId: string, channelId: string, guildId: string | null, messageId: string, analyticsData: any): Promise<{ blocked: boolean, reason?: string, error?: string }> {
         try {
-            const textModerationResult = await this.moderationService.moderateText(promptText, { guildId: guildId || '', userId, channelId, messageId });
+            const textModerationResult = await this.moderationService.moderateText(promptText, { guildId, userId, channelId, messageId });
             if (textModerationResult.action === 'block') {
                 this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_text', isSuccess: false, error: 'Text content blocked', duration: Date.now() - analyticsData.startTime });
                 return { blocked: true, reason: textModerationResult.verdict.reason || 'Content flagged as unsafe' };
             }
             for (const att of attachments) {
                 if (att.contentType?.startsWith('image/')) {
-                    const imageModerationResult = await this.moderationService.moderateImage(att.url, att.contentType, { guildId: guildId || '', userId, channelId, messageId });
+                    const imageModerationResult = await this.moderationService.moderateImage(att.url, att.contentType, { guildId, userId, channelId, messageId });
                     if (imageModerationResult.action === 'block') {
                         this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_image', isSuccess: false, error: 'Image blocked', duration: Date.now() - analyticsData.startTime });
                         return { blocked: true, reason: imageModerationResult.verdict.reason || 'Image flagged as unsafe' };
@@ -364,7 +312,7 @@ export class CoreIntelligenceService {
     private async _fetchUserCapabilities(userId: string, channelId: string, guildId: string | null, analyticsData: any): Promise<UserCapabilities> {
         logger.debug(`[CoreIntelSvc] Stage 2: Get User Capabilities`, { userId });
         try {
-            const capabilities = await this.permissionService.getUserCapabilities(userId, { guildId: guildId || undefined, channelId, userId });
+            const capabilities = await this.permissionService.getUserCapabilities(userId, { guildId, channelId, userId });
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_fetched', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return capabilities;
         } catch (error: any) {
@@ -409,8 +357,19 @@ export class CoreIntelligenceService {
     private async _aggregateAgenticContext(messageForAnalysis: Message, unifiedAnalysis: UnifiedMessageAnalysis, capabilities: UserCapabilities, mcpOrchestrationResult: MCPOrchestrationResult, history: ChatMessage[], analyticsData: any): Promise<EnhancedContext> {
         logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, { userId: messageForAnalysis.author.id });
         try {
-            // Use the contextService.buildEnhancedContextWithUnified for proper unified MCP integration
-            const agenticContextData = await this.contextService.buildEnhancedContextWithUnified(messageForAnalysis, unifiedAnalysis, capabilities, mcpOrchestrationResult);
+            const adaptedAnalysisForContext = this.contextService.adaptAnalysisInterface(unifiedAnalysis);
+            const adaptedMcpResultsForContext = new Map<string, LocalMCPResultValue>();
+            if (mcpOrchestrationResult && mcpOrchestrationResult.results) {
+                for (const [toolId, toolResult] of mcpOrchestrationResult.results.entries()) {
+                    if (toolResult.success && toolResult.data) {
+                        if (toolId.includes('search') && (toolResult.data as any).results) adaptedMcpResultsForContext.set('webSearch', toolResult.data as LocalWebSearchResult);
+                        else if (toolId.includes('extraction') && (toolResult.data as any).urls) adaptedMcpResultsForContext.set('contentExtraction', toolResult.data as LocalContentExtractionResult);
+                        else if (toolId.includes('osrs') && (toolResult.data as any).data) adaptedMcpResultsForContext.set('osrsData', toolResult.data as LocalOSRSDataResult);
+                        else { adaptedMcpResultsForContext.set(toolId, { data: toolResult.data }); logger.debug(`[CoreIntelSvc] Passing raw data for toolId: ${toolId} to buildEnhancedContext`);}
+                    } else if (!toolResult.success && toolResult.error) adaptedMcpResultsForContext.set(toolId, { error: toolResult.error });
+                }
+            }
+            const agenticContextData = await this.contextService.buildEnhancedContext(messageForAnalysis, adaptedAnalysisForContext, capabilities, adaptedMcpResultsForContext );
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'context_aggregated', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return agenticContextData;
         } catch (error: any) {
@@ -430,13 +389,7 @@ export class CoreIntelligenceService {
             if (this.config.enablePersonalization && this.smartRecommendations) {
                 logger.debug(`[CoreIntelSvc] Stage 6: Personalization - Pre-Response`, analyticsData);
                 // Assuming richPromptFromContext was enhancedContext.prompt
-                const toolRecs = await this.smartRecommendations.getContextualToolRecommendations({ 
-                    userId, 
-                    guildId: guildId || undefined, 
-                    currentMessage: enhancedContext.prompt,
-                    activeTools: unifiedAnalysis.requiredTools,
-                    userExpertise: unifiedAnalysis.complexity 
-                });
+                const toolRecs = await this.smartRecommendations.getContextualToolRecommendations({ userId, guildId, currentMessage: enhancedContext.prompt, analysis: unifiedAnalysis });
                 logger.debug(`[CoreIntelSvc] Personalized Tool Recommendations: ${toolRecs.length} recommendations.`);
                 this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_preresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             }
@@ -445,50 +398,54 @@ export class CoreIntelligenceService {
             const agenticQuery: AgenticQuery = {
                 query: enhancedContext.prompt,
                 userId, channelId,
-                context: { 
-                    previousMessages: history, 
-                    userRole: capabilities.hasAdminCommands ? 'admin' : 'user', 
-                    userPermissions: Object.keys(capabilities).filter(k => capabilities[k as keyof UserCapabilities] === true) 
-                },
-                options: { guildId: guildId || 'default', includeCitations: this.config.enableAgenticFeatures }
-                // Note: AgenticQuery doesn't support attachments - they would need to be passed separately
+                context: { previousMessages: history, userRole: capabilities.hasAdminCommands ? 'admin' : 'user', userPermissions: Object.keys(capabilities).filter(k => (capabilities as any)[k]), },
+                options: { guildId: guildId || 'default', includeCitations: this.config.enableAgenticFeatures, },
+                attachments: commonAttachments.map(a => ({ url: a.url, mimeType: a.contentType || 'application/octet-stream' }))
+                // TODO: Pass systemPrompt from enhancedContext to AgenticQuery if supported by AgenticIntelligenceService or GeminiService
             };
 
             let agenticResponse: AgenticResponse;
             let fullResponseText: string;
 
-            // Streaming not currently available in AgenticIntelligenceService
-            logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
-            agenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
-            fullResponseText = agenticResponse.response;
+            if (this.config.enableEnhancedUI && this.enhancedUiService && uiContext instanceof ChatInputCommandInteraction && this.agenticIntelligence.processQueryStream) {
+                logger.debug(`[CoreIntelSvc] Streaming response for interaction.`, analyticsData);
+                const abortController = new AbortController();
+                const streamKey = `${userId}-${channelId}`;
+                this.activeStreams.set(streamKey, { abortController, isStreaming: true });
+                try {
+                    const responseStream = this.agenticIntelligence.processQueryStream({ ...agenticQuery, abortSignal: abortController.signal });
+                    fullResponseText = await this.enhancedUiService.sendStreamedResponse(uiContext, responseStream, { stopButtonId: STOP_BUTTON_ID, regenerateButtonId: REGENERATE_BUTTON_ID });
+                } finally { this.activeStreams.delete(streamKey); }
+                agenticResponse = { response: fullResponseText, confidence: 0.9, citations: { hasCitations: false, sourceSummary: '' }, knowledgeGrounded: false, escalation: { shouldEscalate: false}, metadata: {processingTime: Date.now() - analyticsData.startTime } };
+            } else {
+                logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
+                agenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
+                fullResponseText = agenticResponse.response;
+            }
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
             return { agenticResponse, fullResponseText };
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : undefined;
-            logger.error(`[CoreIntelSvc] Critical Error in _generateAgenticResponse: ${errorMessage}`, { error, stack: errorStack, ...analyticsData });
-            this.recordAnalyticsInteraction({ ...analyticsData, step: 'agentic_response_error', isSuccess: false, error: errorMessage, duration: Date.now() - analyticsData.startTime });
+        } catch (error: any) {
+            logger.error(`[CoreIntelSvc] Critical Error in _generateAgenticResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'agentic_response_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             throw new Error(`Critical: Failed to generate agentic response for user ${userId}.`);
         }
     }
 
-    private async _applyPostResponsePersonalization(userId: string, guildId: string | null, responseText: string, analyticsData: Record<string, unknown> & { startTime: number }): Promise<string> {
+    private async _applyPostResponsePersonalization(userId: string, guildId: string | null, responseText: string, analyticsData: any): Promise<string> {
         if (!this.config.enablePersonalization || !this.personalizationEngine) return responseText;
         try {
             logger.debug(`[CoreIntelSvc] Stage 8: Personalization - Post-Response`, { userId });
-            const adapted = await this.personalizationEngine.adaptResponse(userId, responseText, guildId || undefined);
+            const adapted = await this.personalizationEngine.adaptResponse(userId, responseText, guildId);
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return adapted.personalizedResponse;
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : undefined;
-            logger.warn(`[CoreIntelSvc] Error in _applyPostResponsePersonalization: ${errorMessage}. Proceeding with non-personalized response.`, { error, stack: errorStack, ...analyticsData });
-            this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse_error', isSuccess: false, error: errorMessage, duration: Date.now() - analyticsData.startTime });
+        } catch (error: any) {
+            logger.warn(`[CoreIntelSvc] Error in _applyPostResponsePersonalization: ${error.message}. Proceeding with non-personalized response.`, { error, stack: error.stack, ...analyticsData });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             return responseText;
         }
     }
 
-    private async _updateStateAndAnalytics(data: { userId: string, channelId: string, promptText: string, attachments: CommonAttachment[], fullResponseText: string, unifiedAnalysis: UnifiedMessageAnalysis, mcpOrchestrationResult: MCPOrchestrationResult, analyticsData: Record<string, unknown> & { startTime: number }, success: boolean }): Promise<void> {
+    private async _updateStateAndAnalytics(data: { userId: string, channelId: string, promptText: string, attachments: CommonAttachment[], fullResponseText: string, unifiedAnalysis: UnifiedMessageAnalysis, mcpOrchestrationResult: MCPOrchestrationResult, analyticsData: any, success: boolean }): Promise<void> {
         const { userId, channelId, promptText, attachments, fullResponseText, unifiedAnalysis, mcpOrchestrationResult, analyticsData, success } = data;
         logger.debug(`[CoreIntelSvc] Stage 9: Update History, Cache, Memory`, { userId });
         try {
@@ -504,7 +461,7 @@ export class CoreIntelligenceService {
                 const analysisForMemory: EnhancedMessageAnalysis = {
                     hasAttachments: attachments.length > 0,
                     hasUrls: unifiedAnalysis.urls?.length > 0,
-                    attachmentTypes: attachments.map((att: CommonAttachment) => att.contentType?.split('/')[0] || 'unknown'), // e.g., 'image', 'application'
+                    attachmentTypes: attachments.map((att: any) => att.contentType?.split('/')[0] || 'unknown'), // e.g., 'image', 'application'
                     urls: unifiedAnalysis.urls || [],
                     complexity: unifiedAnalysis.complexity === 'advanced' ? 'complex' : unifiedAnalysis.complexity,
                     intents: unifiedAnalysis.intents || [],
@@ -525,7 +482,7 @@ export class CoreIntelligenceService {
                 const processingContextForMemory: EnhancedProcessingContext = {
                     userId,
                     channelId,
-                    guildId: typeof analyticsData.guildId === 'string' ? analyticsData.guildId : null, // from analyticsData which has guildId
+                    guildId: analyticsData.guildId, // from analyticsData which has guildId
                     analysis: analysisForMemory,
                     results: resultsForMemory,
                     errors: mcpOrchestrationResult.fallbacksUsed || [],
@@ -533,14 +490,12 @@ export class CoreIntelligenceService {
                 await this.enhancedMemoryService.storeConversationMemory(processingContextForMemory, promptText, fullResponseText);
             }
             if (this.config.enablePersonalization && this.behaviorAnalytics && success) {
-                await this.behaviorAnalytics.recordBehaviorMetric({ userId, metricType: 'session_length', value: 1, timestamp: new Date() });
+                await this.behaviorAnalytics.recordBehaviorMetric({ userId, metricType: 'successful_interaction', value: 1, timestamp: new Date() });
             }
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'final_updates_complete', isSuccess: success, duration: Date.now() - analyticsData.startTime });
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            const errorStack = error instanceof Error ? error.stack : undefined;
-            logger.error(`[CoreIntelSvc] Error in _updateStateAndAnalytics: ${errorMessage}`, { error, stack: errorStack, ...analyticsData });
-            this.recordAnalyticsInteraction({ ...analyticsData, step: 'state_update_error', isSuccess: false, error: errorMessage, duration: Date.now() - analyticsData.startTime });
+        } catch (error: any) {
+            logger.error(`[CoreIntelSvc] Error in _updateStateAndAnalytics: ${error.message}`, { error, stack: error.stack, ...analyticsData });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'state_update_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
         }
     }
 
@@ -557,19 +512,9 @@ export class CoreIntelligenceService {
                 await interaction.reply({ content: 'No recent prompt found for this channel to regenerate.', ephemeral: true }); return;
             }
             await interaction.update({ content: `${interaction.message.content}\n\n🔄 Regenerating...`, components: [] });
-            
-            // Create a mock interaction-like object for regeneration
-            const mockInteraction = {
-                channelId: cachedPrompt.channelId,
-                guildId: interaction.guildId,
-                user: interaction.user
-            } as ChatInputCommandInteraction;
-            
-            const regeneratedResponseOptions = await this._processPromptAndGenerateResponse(cachedPrompt.prompt, userId, cachedPrompt.channelId, interaction.guildId, cachedPrompt.attachments, mockInteraction);
-            
-            if (interaction.channel && 'send' in interaction.channel) {
-                await interaction.channel.send(regeneratedResponseOptions);
-            }
+            const regeneratedResponseOptions = await this._processPromptAndGenerateResponse(cachedPrompt.prompt, userId, cachedPrompt.channelId, interaction.guildId, cachedPrompt.attachments, interaction);
+            if (interaction.isRepliable()) await interaction.followUp(regeneratedResponseOptions);
+            else await interaction.channel?.send(regeneratedResponseOptions);
         }
     }
 
