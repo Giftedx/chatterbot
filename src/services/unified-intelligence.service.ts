@@ -24,7 +24,7 @@ import { logger } from '../utils/logger.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
 import { AgenticIntelligenceService, AgenticQuery } from './agentic-intelligence.service.js';
 import { MCPManager } from './mcp-manager.service.js';
-import { mcpIntegrationOrchestrator, MCPIntegrationOrchestratorService } from './mcp-integration-orchestrator.service.js';
+import { unifiedMCPOrchestrator, UnifiedMCPOrchestratorService } from './core/mcp-orchestrator.service.js';
 
 // Modularized Intelligence Services
 import {
@@ -51,7 +51,7 @@ export class UnifiedIntelligenceService {
   private readonly geminiService: GeminiService;
   private readonly agenticIntelligenceService: AgenticIntelligenceService;
   private readonly mcpManager?: MCPManager;
-  private readonly mcpOrchestrator: MCPIntegrationOrchestratorService;
+  private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
   
   // Track users who have opted into intelligent conversation
   private optedInUsers = new Set<string>();
@@ -66,7 +66,7 @@ export class UnifiedIntelligenceService {
     this.geminiService = new GeminiService();
     this.agenticIntelligenceService = agenticService ?? AgenticIntelligenceService.getInstance();
     this.mcpManager = mcpManager;
-    this.mcpOrchestrator = new MCPIntegrationOrchestratorService(mcpManager);
+    this.mcpOrchestrator = new UnifiedMCPOrchestratorService(mcpManager);
     this.loadOptedInUsers();
     
     // Initialize MCP orchestrator
@@ -420,7 +420,7 @@ export class UnifiedIntelligenceService {
       }
 
       // Step 5: Execute MCP orchestration for enhanced capabilities
-      const mcpResult = await this.mcpOrchestrator.orchestrateIntelligentResponse(
+      const mcpResult = await this.mcpOrchestrator.orchestrateIntelligentResponseAsIntegration(
         message,
         analysis,
         capabilities

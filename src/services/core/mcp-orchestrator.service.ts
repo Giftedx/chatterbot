@@ -11,6 +11,7 @@ import { MCPManager } from '../mcp-manager.service.js';
 import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
 import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
+import { DirectMCPExecutor } from '../enhanced-intelligence/direct-mcp-executor.service.js';
 
 export interface MCPToolResult {
   success: boolean;
@@ -21,6 +22,32 @@ export interface MCPToolResult {
   fallbackMode?: boolean;
   executionTime?: number;
   confidence?: number;
+}
+
+// Enhanced intelligence types for processWithAllTools support
+export interface AttachmentInfo {
+  name: string;
+  url: string;
+  contentType?: string;
+}
+
+export interface ProcessingContext {
+  userId: string;
+  channelId: string;
+  guildId: string | null;
+  analysis: MessageAnalysis;
+  results: Map<string, unknown>;
+  errors: string[];
+}
+
+export interface MessageAnalysis {
+  hasAttachments: boolean;
+  hasUrls: boolean;
+  attachmentTypes: string[];
+  urls: string[];
+  complexity: 'simple' | 'moderate' | 'complex';
+  intents: string[];
+  requiredTools: string[];
 }
 
 export interface MCPToolDefinition {
@@ -97,9 +124,11 @@ export class UnifiedMCPOrchestratorService {
   }>();
   private isInitialized = false;
   private lastHealthCheck = new Date();
+  private directExecutor: DirectMCPExecutor;
 
   constructor(mcpManager?: MCPManager) {
     this.mcpManager = mcpManager;
+    this.directExecutor = new DirectMCPExecutor();
     this.initializePhases();
     this.registerAllTools();
     
@@ -235,6 +264,296 @@ export class UnifiedMCPOrchestratorService {
         recommendations: ['Fallback to basic intelligence capabilities']
       };
     }
+  }
+
+  /**
+   * Process message using all available MCP tools based on analysis
+   * Consolidated from EnhancedMCPToolsService for backward compatibility
+   */
+  async processWithAllTools(
+    content: string, 
+    attachments: AttachmentInfo[], 
+    context: ProcessingContext
+  ): Promise<void> {
+    const { requiredTools } = context.analysis;
+    
+    // Process in parallel where possible, sequential where dependencies exist
+    const parallelTasks: Promise<void>[] = [];
+    
+    // Memory retrieval (always first)
+    if (requiredTools.includes('memory')) {
+      const memoryResult = await this.searchUserMemory(context.userId, content);
+      context.results.set('memory', memoryResult);
+    }
+    
+    // Multimodal processing
+    if (requiredTools.includes('multimodal') && attachments.length > 0) {
+      parallelTasks.push(this.processMultimodalContent(attachments, context));
+    }
+    
+    // Web intelligence
+    if (requiredTools.includes('web-search')) {
+      parallelTasks.push(this.processWebIntelligence(content, context));
+    }
+    
+    // URL processing
+    if (requiredTools.includes('url-processing') && context.analysis.urls.length > 0) {
+      parallelTasks.push(this.processUrls(context.analysis.urls, context));
+    }
+    
+    // Execute parallel tasks
+    await Promise.allSettled(parallelTasks);
+    
+    // Sequential processing for dependent tasks
+    if (requiredTools.includes('complex-reasoning')) {
+      await this.performComplexReasoning(content, context);
+    }
+    
+    if (requiredTools.includes('browser-automation')) {
+      await this.performBrowserAutomation(content, context);
+    }
+  }
+
+  /**
+   * Search user's persistent memory using real MCP memory tools
+   */
+  private async searchUserMemory(userId: string, query: string): Promise<MCPToolResult> {
+    try {
+      // Use the direct executor to execute real memory search
+      const result = await this.directExecutor.executeMemorySearch(query);
+      
+      logger.info('Memory search completed', {
+        operation: 'memory-search',
+        metadata: { userId, query: query.substring(0, 50) }
+      });
+      
+      return {
+        success: result.success,
+        data: {
+          userId: userId,
+          ...(result.data as Record<string, unknown> || {})
+        },
+        toolUsed: 'memory_search'
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Memory search failed: ${error}`,
+        toolUsed: 'memory_search'
+      };
+    }
+  }
+
+  /**
+   * Process web intelligence using real web search tools
+   */
+  private async processWebIntelligence(content: string, context: ProcessingContext): Promise<void> {
+    try {
+      // Use the direct executor to execute real web search
+      const result = await this.directExecutor.executeWebSearch(content, 5);
+      
+      logger.info('Web search completed', {
+        operation: 'web-search',
+        metadata: { query: content.substring(0, 50) }
+      });
+      
+      context.results.set('web-search', {
+        success: result.success,
+        data: result.data,
+        toolUsed: 'web_search_fallback'
+      });
+    } catch (error) {
+      context.results.set('web-search', {
+        success: false,
+        error: `Web search failed: ${error}`,
+        toolUsed: 'web_search_fallback'
+      });
+    }
+  }
+
+  /**
+   * Process URLs using content extraction
+   */
+  private async processUrls(urls: string[], context: ProcessingContext): Promise<void> {
+    try {
+      // Use the direct executor to execute real content extraction
+      const result = await this.directExecutor.executeContentExtraction(urls);
+      
+      logger.info('Content extraction completed', {
+        operation: 'content-extraction',
+        metadata: { urlCount: urls.length }
+      });
+      
+      context.results.set('url-processing', {
+        success: result.success,
+        data: result.data,
+        toolUsed: 'content_extraction'
+      });
+    } catch (error) {
+      context.results.set('url-processing', {
+        success: false,
+        error: `URL processing failed: ${error}`,
+        toolUsed: 'content_extraction'
+      });
+    }
+  }
+
+  /**
+   * Perform complex reasoning using sequential thinking
+   */
+  private async performComplexReasoning(content: string, context: ProcessingContext): Promise<void> {
+    try {
+      // Use the direct executor to execute real sequential thinking
+      const result = await this.directExecutor.executeSequentialThinking(content);
+      
+      logger.info('Complex reasoning completed', {
+        operation: 'sequential-thinking',
+        metadata: { content: content.substring(0, 50) }
+      });
+      
+      context.results.set('complex-reasoning', {
+        success: result.success,
+        data: result.data,
+        toolUsed: 'sequential_thinking'
+      });
+    } catch (error) {
+      context.results.set('complex-reasoning', {
+        success: false,
+        error: `Complex reasoning failed: ${error}`,
+        toolUsed: 'sequential_thinking'
+      });
+    }
+  }
+
+  /**
+   * Perform browser automation for interactive tasks
+   */
+  private async performBrowserAutomation(content: string, context: ProcessingContext): Promise<void> {
+    try {
+      // Extract URL from content or use a default
+      const urlMatch = content.match(/https?:\/\/[^\s]+/);
+      const targetUrl = urlMatch ? urlMatch[0] : 'https://example.com';
+      
+      // Use the direct executor to execute real browser automation
+      const result = await this.directExecutor.executeBrowserAutomation(targetUrl);
+      
+      logger.info('Browser automation completed', {
+        operation: 'browser-automation',
+        metadata: { targetUrl }
+      });
+      
+      context.results.set('browser-automation', {
+        success: result.success,
+        data: result.data,
+        toolUsed: 'browser_automation'
+      });
+    } catch (error) {
+      context.results.set('browser-automation', {
+        success: false,
+        error: `Browser automation failed: ${error}`,
+        toolUsed: 'browser_automation'
+      });
+    }
+  }
+
+  /**
+   * Process multimodal content (images, audio, documents)
+   */
+  private async processMultimodalContent(
+    attachments: AttachmentInfo[], 
+    context: ProcessingContext
+  ): Promise<void> {
+    try {
+      const results = [];
+      
+      for (const attachment of attachments) {
+        if (attachment.contentType?.startsWith('image/')) {
+          const imageResult = await this.processImage(attachment);
+          results.push(imageResult);
+        } else if (attachment.contentType?.startsWith('audio/')) {
+          const audioResult = await this.processAudio(attachment);
+          results.push(audioResult);
+        } else if (attachment.contentType?.includes('pdf') || attachment.contentType?.includes('document')) {
+          const docResult = await this.processDocument(attachment);
+          results.push(docResult);
+        }
+      }
+      
+      context.results.set('multimodal', {
+        success: true,
+        data: { results },
+        toolUsed: 'multimodal-analysis'
+      });
+    } catch (error) {
+      context.results.set('multimodal', {
+        success: false,
+        error: `Multimodal processing failed: ${error}`,
+        toolUsed: 'multimodal-analysis'
+      });
+    }
+  }
+
+  /**
+   * Process individual image attachment
+   */
+  private async processImage(attachment: AttachmentInfo): Promise<{
+    type: string;
+    url: string;
+    analysis: string;
+    objects: unknown[];
+    text: string;
+    sentiment: string;
+  }> {
+    return {
+      type: 'image',
+      url: attachment.url,
+      analysis: 'Image analysis would be performed here',
+      objects: [],
+      text: '',
+      sentiment: 'neutral'
+    };
+  }
+
+  /**
+   * Process individual audio attachment
+   */
+  private async processAudio(attachment: AttachmentInfo): Promise<{
+    type: string;
+    url: string;
+    transcription: string;
+    duration: number;
+    language: string;
+    sentiment: string;
+  }> {
+    return {
+      type: 'audio',
+      url: attachment.url,
+      transcription: 'Audio transcription would appear here',
+      duration: 0,
+      language: 'en',
+      sentiment: 'neutral'
+    };
+  }
+
+  /**
+   * Process individual document attachment
+   */
+  private async processDocument(attachment: AttachmentInfo): Promise<{
+    type: string;
+    url: string;
+    text: string;
+    summary: string;
+    keyPoints: unknown[];
+    metadata: Record<string, unknown>;
+  }> {
+    return {
+      type: 'document',
+      url: attachment.url,
+      text: 'Extracted document text would appear here',
+      summary: 'Document summary would be generated',
+      keyPoints: [],
+      metadata: {}
+    };
   }
 
   /**
@@ -832,11 +1151,11 @@ export class UnifiedMCPOrchestratorService {
   private getHighestPhaseExecuted(executed: string[]): number {
     let highestPhase = 0;
     
-    for (const [phase, config] of this.phases.entries()) {
+    Array.from(this.phases.entries()).forEach(([phase, config]) => {
       if (config.tools.some(tool => executed.includes(tool))) {
         highestPhase = Math.max(highestPhase, phase);
       }
-    }
+    });
     
     return highestPhase;
   }
@@ -888,6 +1207,227 @@ export class UnifiedMCPOrchestratorService {
       activePhases: Array.from(this.phases.values()).filter(p => p.enabled).length,
       lastHealthCheck: this.lastHealthCheck
     };
+  }
+
+  // ========== ADAPTER METHODS FOR BACKWARD COMPATIBILITY ==========
+  // These methods provide compatibility with services being consolidated
+
+  /**
+   * Adapter method for MCPIntegrationOrchestratorService compatibility
+   * Maps orchestrateIntelligentResponse to MCPIntegrationResult format
+   */
+  async orchestrateIntelligentResponseAsIntegration(
+    message: Message,
+    analysis: any, // IntelligenceAnalysis from legacy services
+    capabilities: UserCapabilities
+  ): Promise<{
+    success: boolean;
+    phase: number;
+    toolsExecuted: string[];
+    results: Map<string, unknown>;
+    fallbacksUsed: string[];
+    executionTime: number;
+    confidence: number;
+  }> {
+    // Convert legacy analysis to unified format
+    const unifiedAnalysis: UnifiedMessageAnalysis = {
+      complexity: analysis.complexityLevel || 'simple',
+      confidence: analysis.confidence || 0.8,
+      intents: analysis.intents || [],
+      mcpRequirements: analysis.requiredCapabilities || [],
+      sentiment: analysis.sentiment || 'neutral',
+      language: analysis.language || 'en',
+      topics: analysis.topics || [],
+      mentions: [],
+      urls: analysis.urls || [],
+      attachmentAnalysis: [{
+        type: analysis.attachmentTypes?.[0] as 'image' | 'audio' | 'document' | 'video' | 'unknown' || 'unknown',
+        analysisNeeded: analysis.hasAttachments || false,
+        suggestedService: 'multimodal-analysis',
+        processingPriority: 'medium' as 'high' | 'medium' | 'low'
+      }]
+    };
+
+    const result = await this.orchestrateIntelligentResponse(message, unifiedAnalysis, capabilities);
+    
+    // Convert results to legacy format
+    return {
+      success: result.success,
+      phase: result.phase,
+      toolsExecuted: result.toolsExecuted,
+      results: result.results,
+      fallbacksUsed: result.fallbacksUsed,
+      executionTime: result.executionTime,
+      confidence: result.confidence
+    };
+  }
+
+  /**
+   * Get production integration status
+   * Adapter for MCPProductionIntegrationService compatibility
+   */
+  getProductionIntegrationStatus(): {
+    isProductionMCPEnabled: boolean;
+    availableTools: string[];
+    mcpServerStatus: string;
+  } {
+    return {
+      isProductionMCPEnabled: !!this.mcpManager,
+      availableTools: Array.from(this.tools.keys()),
+      mcpServerStatus: this.isInitialized ? 'connected' : 'disconnected'
+    };
+  }
+
+  /**
+   * Execute production tool with fallback
+   * Adapter for MCPProductionIntegrationService compatibility
+   */
+  async executeProductionTool(toolName: string, params: Record<string, unknown>): Promise<MCPToolResult> {
+    const tool = this.tools.get(toolName);
+    if (!tool) {
+      return {
+        success: false,
+        error: `Tool ${toolName} not found`,
+        toolUsed: toolName,
+        fallbackMode: true
+      };
+    }
+
+    try {
+      return await tool.executorFunction(params);
+    } catch (error) {
+      return {
+        success: false,
+        error: String(error),
+        toolUsed: toolName,
+        fallbackMode: true
+      };
+    }
+  }
+
+  /**
+   * Get tool recommendations based on content
+   * Consolidated from MCPToolRegistrationService
+   */
+  getToolRecommendations(content: string, context: { 
+    userId: string; 
+    priority: 'low' | 'medium' | 'high' | 'critical';
+  }): Array<{
+    id: string;
+    name: string;
+    confidence: number;
+    reasoning: string;
+  }> {
+    const recommendations = [];
+    
+    // Analyze content for tool recommendations
+    const lowerContent = content.toLowerCase();
+    
+    // Memory search recommendation
+    if (lowerContent.includes('remember') || lowerContent.includes('recall') || lowerContent.includes('previous')) {
+      recommendations.push({
+        id: 'memory-search',
+        name: 'Memory Search',
+        confidence: 0.9,
+        reasoning: 'Content suggests need for memory retrieval'
+      });
+    }
+    
+    // Web search recommendation
+    if (lowerContent.includes('search') || lowerContent.includes('find') || lowerContent.includes('current') || lowerContent.includes('latest')) {
+      recommendations.push({
+        id: 'web-search',
+        name: 'Web Search',
+        confidence: 0.8,
+        reasoning: 'Content suggests need for current information'
+      });
+    }
+    
+    // URL processing recommendation
+    if (content.match(/https?:\/\/[^\s]+/)) {
+      recommendations.push({
+        id: 'content-extraction',
+        name: 'Content Extraction',
+        confidence: 0.95,
+        reasoning: 'Content contains URLs that need processing'
+      });
+    }
+    
+    // Complex reasoning recommendation
+    if (content.length > 200 || lowerContent.includes('analyze') || lowerContent.includes('explain') || lowerContent.includes('complex')) {
+      recommendations.push({
+        id: 'sequential-thinking',
+        name: 'Sequential Thinking',
+        confidence: 0.7,
+        reasoning: 'Content appears complex and may benefit from structured reasoning'
+      });
+    }
+    
+    return recommendations.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  /**
+   * Register tool from external registration service
+   * Adapter for MCPToolRegistrationService compatibility
+   */
+  registerExternalTool(tool: MCPToolDefinition): void {
+    this.tools.set(tool.id, tool);
+    this.executionMetrics.set(tool.id, {
+      executions: 0,
+      successes: 0,
+      totalTime: 0,
+      lastExecution: new Date()
+    });
+
+    logger.info('External tool registered', {
+      operation: 'tool-registration',
+      metadata: { toolId: tool.id, category: tool.category }
+    });
+  }
+
+  /**
+   * Get registry status
+   * Adapter for MCPToolRegistrationService compatibility  
+   */
+  getRegistryStatus(): {
+    totalTools: number;
+    toolsByCategory: Record<string, number>;
+    healthyTools: number;
+    lastUpdate: Date;
+  } {
+    const toolsByCategory: Record<string, number> = {};
+    
+    Array.from(this.tools.values()).forEach(tool => {
+      toolsByCategory[tool.category] = (toolsByCategory[tool.category] || 0) + 1;
+    });
+    
+    return {
+      totalTools: this.tools.size,
+      toolsByCategory,
+      healthyTools: this.getHealthyToolCount(),
+      lastUpdate: this.lastHealthCheck
+    };
+  }
+
+  /**
+   * Clean up resources
+   * Consolidated cleanup from all services
+   */
+  public cleanup(): void {
+    logger.info('Unified MCP Orchestrator cleanup initiated', {
+      operation: 'cleanup',
+      metadata: { toolCount: this.tools.size }
+    });
+    
+    // Clear all tool registrations
+    this.tools.clear();
+    this.executionMetrics.clear();
+    this.phases.clear();
+    
+    // Mark as uninitialized
+    this.isInitialized = false;
+    
+    logger.info('Unified MCP Orchestrator cleanup completed');
   }
 }
 
