@@ -10,6 +10,7 @@
 export { UnifiedMessageAnalysisService, unifiedMessageAnalysisService } from './message-analysis.service.js';
 export { UnifiedMCPOrchestratorService, unifiedMCPOrchestrator } from './mcp-orchestrator.service.js';
 export { UnifiedCacheService, unifiedCacheService } from './cache.service.js';
+export { UnifiedAnalyticsService, unifiedAnalyticsService } from './unified-analytics.service.js';
 
 // Re-export types for easier consumption
 export type { 
@@ -31,3 +32,11 @@ export type {
   CacheOptions,
   CacheStats
 } from './cache.service.js';
+
+export type {
+  InteractionLog,
+  DetailedStats,
+  UsageMetrics,
+  DashboardConfig,
+  AnalyticsOptions
+} from './unified-analytics.service.js';

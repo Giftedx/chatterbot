@@ -29,6 +29,7 @@ import {
     intelligenceAdminService,
     intelligenceCapabilityService
 } from './intelligence';
+
 import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentInfo } from './core/message-analysis.service';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
