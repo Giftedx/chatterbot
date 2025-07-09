@@ -87,6 +87,10 @@ describe('MCP Registry System', () => {
     });
 
     test('should analyze capability requirements correctly', () => {
+      // First check if we have tools registered
+      const registryStatus = mcpRegistry.getRegistryStatus();
+      console.log('Registry status:', registryStatus);
+      
       const testCases = [
         { input: 'search for cats', expectedCapabilities: ['web-search', 'search'] },
         { input: 'remember my name is John', expectedCapabilities: ['memory', 'context'] },
@@ -95,25 +99,36 @@ describe('MCP Registry System', () => {
       ];
 
       for (const testCase of testCases) {
+        console.log(`\n📝 Testing "${testCase.input}"`);
+        console.log(`Expected capabilities: ${testCase.expectedCapabilities.join(', ')}`);
+        
         const recommendations = mcpToolRegistration.getToolRecommendations(
           testCase.input,
           { userId: 'test-user', channelId: 'test-channel' }
         );
 
-        // Verify at least some relevant tools were found
-        expect(recommendations.length).toBeGreaterThan(0);
+        console.log(`Recommendations count: ${recommendations.length}`);
         
-        const hasRelevantCapability = recommendations.some(tool => 
-          testCase.expectedCapabilities.some(cap => 
-            tool.capabilities.some(toolCap => 
-              toolCap.includes(cap) || cap.includes(toolCap)
+        if (recommendations.length > 0) {
+          console.log(`Recommendations:`, recommendations.map(t => ({ id: t.id, capabilities: t.capabilities })));
+          
+          // Verify at least some relevant tools were found
+          expect(recommendations.length).toBeGreaterThan(0);
+          
+          const hasRelevantCapability = recommendations.some(tool => 
+            testCase.expectedCapabilities.some(cap => 
+              tool.capabilities.some(toolCap => 
+                toolCap.includes(cap) || cap.includes(toolCap)
+              )
             )
-          )
-        );
+          );
 
-        expect(hasRelevantCapability).toBe(true);
-        
-        console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
+          console.log(`Has relevant capability: ${hasRelevantCapability}`);
+          expect(hasRelevantCapability).toBe(true);
+        } else {
+          console.log(`No recommendations found!`);
+          expect(recommendations.length).toBeGreaterThan(0); // This will fail and show the problem
+        }
       }
     });
 
