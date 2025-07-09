@@ -18,7 +18,6 @@ import { EnhancedMemoryService } from './memory.service.js';
 import { EnhancedUIService } from './ui.service.js';
 import { EnhancedResponseService } from './response.service.js';
 import { EnhancedCacheService } from './cache.service.js';
-import { mcpToolRegistration } from './mcp-tool-registration.service.js';
 import { mcpRegistry } from './mcp-registry.service.js';
 
 // Core unified services
@@ -444,10 +443,9 @@ export class EnhancedInvisibleIntelligenceService {
     context: ProcessingContext
   ): Promise<void> {
     try {
-      // Get tool recommendations from registry
-      const recommendations = mcpToolRegistration.getToolRecommendations(content, {
+      // Get tool recommendations from unified orchestrator
+      const recommendations = this.mcpToolsService.getToolRecommendations(content, {
         userId: context.userId,
-        channelId: context.channelId,
         priority: this.determinePriority(content, attachments)
       });
 
