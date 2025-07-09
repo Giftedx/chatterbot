@@ -596,6 +596,11 @@ export class EnhancedInvisibleIntelligenceService {
    * Get capabilities for a specific tool (fallback implementation)
    */
   private getCapabilitiesForTool(toolId: string): string[] {
+    // Utility function to convert camelCase to kebab-case
+    const toKebabCase = (str: string): string => str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+
+    // Normalize toolId to kebab-case
+    const normalizedToolId = toKebabCase(toolId);
     // Simple mapping based on common tool IDs
     const toolCapabilities: Record<string, string[]> = {
       'web-search': ['web-search', 'research'],
