@@ -193,7 +193,7 @@ export class ContextSearchService {
       });
 
       // Convert to search results
-      const results: ThreadSearchResult[] = threadTopics.map(tt => ({
+      const results: ThreadSearchResult[] = threadTopics.map((tt: any) => ({
         thread: {
           ...tt.thread,
           guildId: tt.thread.guildId || undefined

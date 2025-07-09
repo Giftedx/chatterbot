@@ -135,7 +135,7 @@ export class ConversationThreadService {
         tokenCount: thread.tokenCount,
         createdAt: thread.createdAt,
         lastActivity: thread.lastActivity,
-        messages: thread.messages.map(msg => ({
+        messages: thread.messages.map((msg: any) => ({
           id: msg.id,
           threadId: msg.threadId || undefined,
           channelId: msg.channelId,
@@ -459,21 +459,21 @@ export class ConversationThreadService {
       if (!thread) return null;
 
       const messages = thread.messages;
-      const userMessages = messages.filter(m => m.role === 'user');
-      const assistantMessages = messages.filter(m => m.role === 'assistant');
+      const userMessages = messages.filter((m: any) => m.role === 'user');
+      const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
 
       // Calculate participation patterns
       const participationPattern = {
         userMessageCount: userMessages.length,
         assistantMessageCount: assistantMessages.length,
         averageUserMessageLength: userMessages.length > 0 
-          ? userMessages.reduce((sum, m) => sum + m.content.length, 0) / userMessages.length
+          ? userMessages.reduce((sum: any, m: any) => sum + m.content.length, 0) / userMessages.length
           : 0,
         averageResponseTime: this.calculateAverageResponseTime(messages)
       };
 
       // Analyze topic evolution
-      const topicEvolution = thread.topics.map(tt => ({
+      const topicEvolution = thread.topics.map((tt: any) => ({
         topic: tt.topic.displayName,
         timeFirst: tt.firstSeen,
         timeLast: tt.lastSeen,
@@ -504,7 +504,7 @@ export class ConversationThreadService {
         totalMessages: messages.length,
         userMessages: userMessages.length,
         assistantMessages: assistantMessages.length,
-        averageImportance: messages.length > 0 ? messages.reduce((sum, m) => sum + m.importance, 0) / messages.length : 0,
+        averageImportance: messages.length > 0 ? messages.reduce((sum: any, m: any) => sum + m.importance, 0) / messages.length : 0,
         durationHours: sessionDuration / (1000 * 60 * 60),
         topicCount: thread.topics.length,
         keyPointCount: 0,
@@ -655,7 +655,7 @@ export class ConversationThreadService {
 
       // Simple extractive summary - in production, use AI service
       const keyMessages = thread.messages
-        .filter(m => m.importance > 0.6)
+        .filter((m: any) => m.importance > 0.6)
         .slice(0, 5);
 
       const summary = keyMessages.length > 0
