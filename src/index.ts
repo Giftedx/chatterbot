@@ -5,7 +5,7 @@ import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard
 import { healthCheck } from './health.js';
 import { agenticCommands } from './commands/agentic-commands.js';
 import { logger } from './utils/logger.js';
-import { mcpManager } from './services/mcp-manager.service.js';
+import { mcpManager } from './services/mcp-manager-v2.service.js';
 // Import AgenticIntelligenceService if its direct command handling is to be preserved outside CoreIntelligenceService
 // import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 
