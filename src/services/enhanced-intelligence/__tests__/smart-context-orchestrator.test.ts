@@ -7,7 +7,7 @@ import { SmartContextOrchestratorService } from '../smart-context-orchestrator.s
 import { MCPManager } from '../../mcp-manager.service.js';
 import { PersonalizationEngine } from '../personalization-engine.service.js';
 import { DirectMCPExecutor } from '../direct-mcp-executor.service.js';
-import { IntelligenceAnalysis } from '../../intelligence/analysis.service.js';
+import { UnifiedMessageAnalysis } from '../../core/message-analysis.service.js';
 import { UserCapabilities } from '../../intelligence/permission.service.js';
 
 // Mock dependencies
@@ -52,7 +52,6 @@ describe('SmartContextOrchestratorService', () => {
     mockPersonalizationEngine = {
       adaptResponse: jest.fn(),
       recordInteraction: jest.fn(),
-      adaptResponse: jest.fn(),
       extractUserPatterns: jest.fn(),
       updateUserPreferences: jest.fn()
     } as unknown as jest.Mocked<PersonalizationEngine>;
@@ -83,7 +82,17 @@ describe('SmartContextOrchestratorService', () => {
       client: {}
     } as any;
 
-    const mockAnalysis: IntelligenceAnalysis = {
+    const mockAnalysis: UnifiedMessageAnalysis = {
+      // Core analysis (required)
+      hasAttachments: false,
+      hasUrls: false,
+      attachmentTypes: [],
+      urls: [],
+      complexity: 'moderate',
+      intents: [],
+      requiredTools: ['webSearch'],
+      
+      // Enhanced analysis capabilities
       needsPersonaSwitch: false,
       needsAdminFeatures: false,
       adminCommands: [],
@@ -95,8 +104,10 @@ describe('SmartContextOrchestratorService', () => {
       memoryActions: ['search'],
       needsMCPTools: true,
       mcpRequirements: ['webSearch'],
-      complexityLevel: 'moderate',
-      confidence: 0.8
+      
+      // Analysis metadata
+      confidence: 0.8,
+      processingRecommendations: []
     };
 
     const mockCapabilities: UserCapabilities = {
@@ -117,13 +128,16 @@ describe('SmartContextOrchestratorService', () => {
 
       // Mock personalization result
       mockPersonalizationEngine.adaptResponse.mockResolvedValue({
-        adaptedResponse: 'AI developments with focus on user\'s tech interests',
-        patterns: [
-          { category: 'technical', strength: 0.8, context: 'AI discussions' },
-          { category: 'research', strength: 0.7, context: 'Technology trends' }
+        originalResponse: 'Standard AI developments response',
+        personalizedResponse: 'AI developments with focus on user\'s tech interests',
+        adaptations: [
+          {
+            type: 'style',
+            reason: 'User shows strong technical interest',
+            basedOnPattern: 'technical-preference'
+          }
         ],
-        confidence: 0.85,
-        reasoning: 'User shows strong technical interest'
+        confidenceScore: 0.85
       });
 
       // Mock web search result
@@ -215,13 +229,16 @@ describe('SmartContextOrchestratorService', () => {
 
     test('should adapt context to user expertise level', async () => {
       mockPersonalizationEngine.adaptResponse.mockResolvedValue({
-        adaptedResponse: 'Technical AI response',
-        patterns: [
-          { category: 'technical', strength: 0.9, context: 'Advanced programming' },
-          { category: 'professional', strength: 0.8, context: 'Software development' }
+        originalResponse: 'Standard AI response',
+        personalizedResponse: 'Technical AI response',
+        adaptations: [
+          {
+            type: 'style',
+            reason: 'User demonstrates expert-level technical knowledge',
+            basedOnPattern: 'technical-expertise'
+          }
         ],
-        confidence: 0.9,
-        reasoning: 'User demonstrates expert-level technical knowledge'
+        confidenceScore: 0.9
       });
 
       const result = await orchestrator.buildSuperSmartContext(
@@ -257,7 +274,7 @@ describe('SmartContextOrchestratorService', () => {
 
       const result = await orchestrator.buildSuperSmartContext(
         urlMessage,
-        { ...mockAnalysis, complexityLevel: 'complex' },
+        { ...mockAnalysis, complexity: 'complex' },
         mockCapabilities
       );
 
@@ -308,15 +325,21 @@ describe('SmartContextOrchestratorService', () => {
       });
 
       mockPersonalizationEngine.adaptResponse.mockResolvedValue({
-        adaptedResponse: 'personalized',
-        patterns: [{ category: 'technical', strength: 0.9 }],
-        confidence: 0.9,
-        reasoning: 'expert user'
+        originalResponse: 'Standard response',
+        personalizedResponse: 'personalized',
+        adaptations: [
+          {
+            type: 'style',
+            reason: 'expert user',
+            basedOnPattern: 'technical-expertise'
+          }
+        ],
+        confidenceScore: 0.9
       });
 
       const result = await orchestrator.buildSuperSmartContext(
         { ...mockMessage, content: 'https://example.com/article Complex AI question?' },
-        { ...mockAnalysis, complexityLevel: 'complex' },
+        { ...mockAnalysis, complexity: 'complex' },
         mockCapabilities,
         {
           prioritizeRealTime: true,
@@ -371,37 +394,64 @@ describe('SmartContextOrchestratorService', () => {
         author: { id: 'user123' }
       } as any;
 
-      const simpleAnalysis: IntelligenceAnalysis = {
-        complexity: 1,
-        complexityLevel: 'simple',
-        needsMCPTools: false,
-        needsMemoryOperation: false,
-        needsMultimodal: false,
-        needsAdminFeatures: false,
+      const simpleAnalysis: UnifiedMessageAnalysis = {
+        // Core analysis (required)
+        hasAttachments: false,
+        hasUrls: false,
+        attachmentTypes: [],
+        urls: [],
+        complexity: 'simple',
+        intents: ['greeting'],
+        requiredTools: [],
+        
+        // Enhanced analysis capabilities
         needsPersonaSwitch: false,
+        needsAdminFeatures: false,
+        adminCommands: [],
+        needsMultimodal: false,
+        attachmentAnalysis: [],
         needsConversationManagement: false,
-        detectedIntents: ['greeting'],
-        suggestedTools: [],
-        estimatedProcessingTime: 1000,
-        requiresStreaming: false
+        conversationActions: [],
+        needsMemoryOperation: false,
+        memoryActions: [],
+        needsMCPTools: false,
+        mcpRequirements: [],
+        
+        // Analysis metadata
+        confidence: 0.9,
+        processingRecommendations: []
       };
 
-      const complexAnalysis: IntelligenceAnalysis = {
-        complexity: 5,
-        complexityLevel: 'complex',
-        needsMCPTools: true,
-        needsMemoryOperation: true,
-        needsMultimodal: false,
-        needsAdminFeatures: false,
+      const complexAnalysis: UnifiedMessageAnalysis = {
+        // Core analysis (required)
+        hasAttachments: false,
+        hasUrls: false,
+        attachmentTypes: [],
+        urls: [],
+        complexity: 'complex',
+        intents: ['research', 'analysis'],
+        requiredTools: ['webSearch', 'memory'],
+        
+        // Enhanced analysis capabilities
         needsPersonaSwitch: false,
+        needsAdminFeatures: false,
+        adminCommands: [],
+        needsMultimodal: false,
+        attachmentAnalysis: [],
         needsConversationManagement: false,
-        detectedIntents: ['research', 'analysis', 'technical'],
-        suggestedTools: ['web-search', 'memory-search', 'sequential-thinking'],
-        estimatedProcessingTime: 15000,
-        requiresStreaming: true
+        conversationActions: [],
+        needsMemoryOperation: true,
+        memoryActions: ['search'],
+        needsMCPTools: true,
+        mcpRequirements: ['webSearch'],
+        
+        // Analysis metadata
+        confidence: 0.7,
+        processingRecommendations: ['use-streaming', 'enable-citations']
       };
 
       const mockCapabilities: UserCapabilities = {
+        hasBasicAI: true,
         hasMultimodal: true,
         hasAdvancedAI: true,
         hasAnalytics: false,

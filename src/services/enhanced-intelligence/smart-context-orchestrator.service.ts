@@ -10,7 +10,7 @@ import { Message } from 'discord.js';
 import { MCPManager } from '../mcp-manager.service.js';
 import { PersonalizationEngine } from './personalization-engine.service.js';
 import { DirectMCPExecutor } from './direct-mcp-executor.service.js';
-import { IntelligenceAnalysis } from '../intelligence/analysis.service.js';
+import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
 import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
 
@@ -62,7 +62,7 @@ export class SmartContextOrchestratorService {
    */
   public async buildSuperSmartContext(
     message: Message,
-    analysis: IntelligenceAnalysis,
+    analysis: UnifiedMessageAnalysis,
     capabilities: UserCapabilities,
     strategy: ContextOrchestrationStrategy = this.getDefaultStrategy()
   ): Promise<SmartContextResult> {
@@ -183,7 +183,7 @@ export class SmartContextOrchestratorService {
    */
   private async buildPersonalizedContext(
     message: Message,
-    _analysis: IntelligenceAnalysis,
+    _analysis: UnifiedMessageAnalysis,
     _capabilities: UserCapabilities,
     _strategy: ContextOrchestrationStrategy
   ): Promise<{ prompt: string; sources: string[]; memoryEntries: number; personalizationFactors: number } | null> {
@@ -221,10 +221,10 @@ export class SmartContextOrchestratorService {
         message.guildId || undefined
       );
 
-      if (personalizationResult.adaptedResponse !== message.content) {
-        prompt += `\n\n[PERSONALIZATION INSIGHTS]\n${personalizationResult.adaptedResponse}`;
+      if (personalizationResult.personalizedResponse !== message.content) {
+        prompt += `\n\n[PERSONALIZATION INSIGHTS]\n${personalizationResult.personalizedResponse}`;
         sources.push('personalization-engine');
-        personalizationFactors += personalizationResult.patterns.length;
+        personalizationFactors += personalizationResult.adaptations.length;
       }
 
       return sources.length > 0 ? { prompt, sources, memoryEntries, personalizationFactors } : null;
@@ -243,7 +243,7 @@ export class SmartContextOrchestratorService {
    */
   private async buildRealTimeContext(
     content: string,
-    _analysis: IntelligenceAnalysis,
+    _analysis: UnifiedMessageAnalysis,
     _strategy: ContextOrchestrationStrategy
   ): Promise<{ content: string; sources: string[]; sourceCount: number } | null> {
     try {
@@ -289,7 +289,7 @@ export class SmartContextOrchestratorService {
    */
   private async buildDeepKnowledgeContext(
     content: string,
-    _analysis: IntelligenceAnalysis,
+    _analysis: UnifiedMessageAnalysis,
     _strategy: ContextOrchestrationStrategy
   ): Promise<{ content: string; sources: string[]; sourceCount: number } | null> {
     try {
@@ -334,7 +334,7 @@ export class SmartContextOrchestratorService {
   private async synthesizeContext(
     prompt: string,
     sources: string[],
-    _analysis: IntelligenceAnalysis
+    _analysis: UnifiedMessageAnalysis
   ): Promise<{ enhancedPrompt: string } | null> {
     try {
       // Use sequential thinking to synthesize context if available
@@ -369,7 +369,7 @@ export class SmartContextOrchestratorService {
   private async adaptContextToUserExpertise(
     prompt: string,
     userId: string,
-    _analysis: IntelligenceAnalysis
+    _analysis: UnifiedMessageAnalysis
   ): Promise<{ prompt: string } | null> {
     try {
       // Get user expertise level from personalization engine
@@ -378,8 +378,8 @@ export class SmartContextOrchestratorService {
         'expertise level assessment'
       );
 
-      if (userInsights.patterns.length > 0) {
-        const expertiseLevel = this.inferExpertiseLevel(userInsights.patterns);
+      if (userInsights.adaptations.length > 0) {
+        const expertiseLevel = this.inferExpertiseLevel(userInsights.adaptations);
         const adaptedPrompt = `${prompt}\n\n[USER EXPERTISE CONTEXT]\nUser expertise level: ${expertiseLevel}. Adapt response complexity accordingly.`;
         
         return { prompt: adaptedPrompt };
@@ -422,8 +422,8 @@ export class SmartContextOrchestratorService {
     );
   }
 
-  private needsDeepResearch(content: string, analysis: IntelligenceAnalysis): boolean {
-    return analysis.complexityLevel === 'complex' || 
+  private needsDeepResearch(content: string, analysis: UnifiedMessageAnalysis): boolean {
+    return analysis.complexity === 'complex' || 
            analysis.needsMemoryOperation ||
            this.extractUrls(content).length > 0;
   }
@@ -465,14 +465,14 @@ export class SmartContextOrchestratorService {
     return 'surface';
   }
 
-  private inferExpertiseLevel(patterns: { category?: string }[]): string {
-    // Simple expertise inference based on conversation patterns
-    const technicalTerms = patterns.filter(p => 
-      p.category === 'technical' || p.category === 'professional'
+  private inferExpertiseLevel(adaptations: { type: string; reason: string; basedOnPattern: string }[]): string {
+    // Simple expertise inference based on adaptation patterns
+    const technicalAdaptations = adaptations.filter(a => 
+      a.basedOnPattern.includes('technical') || a.basedOnPattern.includes('expert')
     ).length;
     
-    if (technicalTerms >= 3) return 'expert';
-    if (technicalTerms >= 2) return 'intermediate';
+    if (technicalAdaptations >= 3) return 'expert';
+    if (technicalAdaptations >= 2) return 'intermediate';
     return 'beginner';
   }
 }
