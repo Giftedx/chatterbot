@@ -101,6 +101,24 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
+  // Handle MCP consent button interactions
+  if (interaction.isButton() && interaction.customId.startsWith('mcp_consent_')) {
+    try {
+      // Initialize MCP integration service if not done
+      if (mcpManagerInstance) {
+        const { MCPIntegrationService } = await import('./services/mcp-integration.service.js');
+        const mcpIntegration = new MCPIntegrationService(mcpManagerInstance);
+        await mcpIntegration.handleConsentInteraction(interaction);
+      }
+    } catch (error) {
+      logger.error('Error handling MCP consent interaction:', { error: String(error) });
+      if (!interaction.replied) {
+        await interaction.reply({ content: 'An error occurred processing your consent decision.', ephemeral: true });
+      }
+    }
+    return;
+  }
+
   // Agentic commands can be handled separately if they are not integrated into CoreIntelligenceService's command map.
   // For full consolidation, CoreIntelligenceService's handleInteraction would internally route agentic commands too.
   // This example keeps agentic command handling separate for now if they have distinct logic not fitting CoreIntelligenceService.
