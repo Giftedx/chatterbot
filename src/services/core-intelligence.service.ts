@@ -29,7 +29,7 @@ import {
     intelligenceAdminService,
     intelligenceCapabilityService
 } from './intelligence';
-import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentAnalysisData } from './core/message-analysis.service';
+import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentAnalysis } from './core/message-analysis.service';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
 import { EnhancedMemoryService } from './enhanced-intelligence/memory.service';

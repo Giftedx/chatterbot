@@ -224,7 +224,7 @@ export class DocumentDatabaseService {
         failed: 0
       };
 
-      statusCounts.forEach(({ processingStatus: status, _count }) => {
+      statusCounts.forEach(({ processingStatus: status, _count }: any) => {
         if (status) {
           processingStatus[status as ProcessingStatus] = _count;
         }
@@ -253,7 +253,7 @@ export class DocumentDatabaseService {
       let totalProcessingTime = 0;
       let processedCount = 0;
 
-      documentsWithMetadata.forEach(doc => {
+      documentsWithMetadata.forEach((doc: any) => {
         if (doc.documentMetadata) {
           const metadata = doc.documentMetadata as any;
           
@@ -351,12 +351,12 @@ export class DocumentDatabaseService {
 
       // Calculate similarity scores (simplified implementation)
       const similarDocs = otherDocs
-        .map(doc => ({
+        .map((doc: any) => ({
           ...doc,
           similarity: this.calculateDocumentSimilarity(referenceDoc, doc)
         }))
-        .filter(doc => doc.similarity > 0.1)
-        .sort((a, b) => b.similarity - a.similarity)
+        .filter((doc: any) => doc.similarity > 0.1)
+        .sort((a: any, b: any) => b.similarity - a.similarity)
         .slice(0, limit);
 
       logger.info('Similar documents found', {
@@ -365,7 +365,7 @@ export class DocumentDatabaseService {
           fileId,
           userId,
           similarDocCount: similarDocs.length,
-          avgSimilarity: similarDocs.reduce((sum, doc) => sum + doc.similarity, 0) / similarDocs.length
+          avgSimilarity: similarDocs.reduce((sum: any, doc: any) => sum + doc.similarity, 0) / similarDocs.length
         }
       });
 
@@ -473,7 +473,7 @@ export class DocumentDatabaseService {
         take: limit
       });
 
-      const historyWithProcessingTime = history.map(item => ({
+      const historyWithProcessingTime = history.map((item: any) => ({
         ...item,
         processingTime: item.processedAt && item.createdAt 
           ? item.processedAt.getTime() - item.createdAt.getTime()

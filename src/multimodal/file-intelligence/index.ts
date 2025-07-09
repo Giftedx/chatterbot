@@ -155,7 +155,7 @@ export class FileIntelligenceService {
       });
 
       // Calculate relevance scores and rank results
-      const rankedFiles = files.map(file => {
+      const rankedFiles = files.map((file: any) => {
         const relevanceScore = this.calculateRelevanceScore(file as any, query);
         const matchType = this.determineMatchType(file as any, query);
         
@@ -168,7 +168,7 @@ export class FileIntelligenceService {
 
       // Sort by relevance and return top results
       return rankedFiles
-        .sort((a, b) => b.relevanceScore - a.relevanceScore)
+        .sort((a: any, b: any) => b.relevanceScore - a.relevanceScore)
         .slice(0, limit);
 
     } catch (error) {
