@@ -10,13 +10,19 @@ This Discord bot implements a sophisticated AI system with layered intelligence 
 - **Message-based interaction** - after optin, bot responds to all user messages naturally with contextual capability selection
 
 ### Intelligence Modes (orchestrated in `src/index.ts`)
-- **Basic Mode**: Direct Gemini API (emergency fallback only)
+- **Basic Mode**: Direct Gemini API (emergency fallback only) 
 - **Unified Intelligence**: `UnifiedIntelligenceService` - modular AI with permission-gated features via `src/services/intelligence/`
 - **Enhanced Intelligence**: `EnhancedInvisibleIntelligenceService` - adds real MCP tools (web search, content extraction, sequential thinking)
 - **Agentic Intelligence**: `AgenticIntelligenceService` - adds knowledge base, confidence scoring, auto-escalation, and self-improvement
 
 ### Key Architecture Principle
 **Never add new slash commands**. All capabilities integrate into the intelligent conversation flow through automatic context analysis and permission-based feature activation.
+
+### Current Status (Phase 2 Complete)
+- ✅ **329+ tests passing** with comprehensive coverage
+- ✅ **TypeScript build works** but `npm run build` hangs - use `tsx` for development and production
+- ✅ **All intelligence modes operational** with graceful degradation
+- ✅ **MCP integration architecture ready** for external API enhancement
 
 ## 2. Critical Development Patterns
 
@@ -79,17 +85,54 @@ Advanced user pattern learning with phase-aware MCP integration:
 - **Phase 4 (Advanced)**: sequential_thinking, playwright - Advanced processing
 - **Phase 5 (Specialized)**: code_execution - Sandboxed execution
 
+### Current Architecture Patterns
+
+#### Message Processing Flow (in `src/index.ts`)
+The main entry point implements a sophisticated routing system:
+```typescript
+// 1. Route to agentic intelligence if enabled
+if (ENABLE_AGENTIC_INTELLIGENCE) {
+  await handleAgenticMessage(message);
+} else {
+  // 2. Route to enhanced or unified intelligence
+  if (enhancedIntelligenceService && 'handleIntelligentMessage' in enhancedIntelligenceService) {
+    await enhancedIntelligenceService.handleIntelligentMessage(message);
+  } else {
+    await unifiedIntelligenceService.handleIntelligentMessage(message);
+  }
+}
+```
+
+#### Intelligence Service Pattern
+Each intelligence service follows a consistent interface:
+- `createSlashCommand()` - builds the `/optin` command with service-specific capabilities
+- `handleIntelligentMessage(message)` - processes natural conversations from opted-in users
+- `shouldProcessMessage(message)` - validates permissions and context
+- Graceful degradation when external dependencies fail
+
+#### MCP Manager Integration (Enhanced Mode)
+```typescript
+// MCP Manager initializes during bot startup and provides tools to services
+await mcpManager.initialize();
+const status = mcpManager.getStatus();
+console.log(`✅ MCP Manager initialized: ${status.connectedServers}/${status.totalServers} servers connected`);
+
+// Services check for MCP availability and fallback gracefully
+unifiedIntelligenceService = new UnifiedIntelligenceService(undefined, mcpManager);
+```
+
 ## 3. Development Workflow & Commands
 
 ### Essential Commands
 - **Development**: `npm run dev` (uses `tsx` - THE ONLY reliable way to run TypeScript)
-- **Testing**: `npm test` (391 tests, ~97% pass rate with property-based tests)
-- **Production**: `npm start` (runs compiled JS - works perfectly)
+- **Testing**: `npm test` (329+ tests, ~97% pass rate with property-based tests)
+- **Production**: `npm start` (runs compiled JS - works perfectly when build succeeds)
 - **Database**: `npx prisma db push` for schema changes, `npx prisma studio` to view data
 
-### Critical Build Issue
-- **TypeScript Build**: `npm run build` hangs indefinitely - use `tsx` for development and production
-- **Workaround**: Bot runs perfectly with `tsx` in all environments, compilation not needed
+### Critical Build Issue & Workaround
+- **TypeScript Build**: `npm run build` hangs indefinitely - known issue, not blocking production
+- **Development & Production Workaround**: Use `tsx` directly - bot runs perfectly with `tsx` in all environments
+- **Docker Support**: Available but use `tsx` for reliability
 - **Tests**: Property-based tests take 15-30s (comprehensive coverage with fast-check)
 
 ### Test Architecture (`src/test/setup.ts`)
@@ -182,7 +225,7 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 - **Performance testing**: Validates streaming, rate limiting, and batch processing
 - **ESM mocking strategy**: Dependency injection over global mocking for reliability
 
-### Test Categories & Coverage (391 tests, ~97% pass)
+### Test Categories & Coverage (329+ tests, ~97% pass)
 - **Unit tests**: Individual service functionality and business logic
 - **Integration tests**: Cross-component communication and workflow validation
 - **Property tests**: Edge case discovery through generative testing
@@ -290,3 +333,35 @@ await PerformanceMonitor.monitor('operation-name', async () => {
 ```
 
 This is a **production-ready Discord AI bot** with sophisticated architecture designed for scalability, reliability, and extensibility. The modular design allows adding new intelligence capabilities without disrupting existing functionality.
+
+## 10. Key File Locations & Project Structure
+
+### Core Architecture Files
+- `src/index.ts` - Main bot entry point with intelligence routing
+- `src/services/unified-intelligence.service.ts` - Core conversation handler
+- `src/services/enhanced-intelligence/index.ts` - Advanced MCP-enabled service
+- `src/services/agentic-intelligence.service.ts` - Knowledge base and escalation
+- `src/services/mcp-manager.service.ts` - External tool orchestration
+
+### Modular Intelligence Services (`src/services/intelligence/`)
+- `permission.service.ts` - RBAC and user capability validation
+- `analysis.service.ts` - Message intent and complexity analysis
+- `capability.service.ts` - Feature execution and tool selection
+- `admin.service.ts` - Administrative features and persona management
+- `context.service.ts` - Enhanced context building and memory integration
+
+### External Integration
+- `src/mcp/index.ts` - Type-safe wrappers for external MCP tools
+- `src/commands/agentic-commands.js` - Agentic-specific slash commands
+- `src/test/setup.ts` - Global test configuration with ESM mocking
+
+### Configuration & Environment
+- `env.example` - Complete environment variable template
+- `package.json` - ESM module setup with tsx workflow
+- `tsconfig.json` - TypeScript configuration for production ESM
+- `jest.config` (in package.json) - ESM-compatible test setup
+
+### Database & Persistence
+- `prisma/schema.prisma` - User memory, analytics, moderation schema
+- `src/memory/user-memory.service.ts` - Advanced memory management
+- `src/db/` - Database utilities and migration helpers
