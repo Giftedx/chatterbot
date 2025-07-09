@@ -284,7 +284,7 @@ describe('SmartContextOrchestratorService', () => {
 
       expect(result.contextSources).toContain('content-extraction:https://example.com/ai-article');
       expect(result.contextMetadata.documentSources).toBeGreaterThan(0);
-      expect(result.knowledgeDepth).toBe('surface');
+      expect(result.knowledgeDepth).toBe('comprehensive');
     });
 
     test('should provide graceful fallback when MCP tools fail', async () => {

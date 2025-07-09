@@ -100,6 +100,11 @@ export class MockPrismaClient {
         this.moderationConfigs.set(id, created);
         return created;
       }
+    },
+    deleteMany: async (query: any) => {
+      const count = this.moderationConfigs.size;
+      this.moderationConfigs.clear();
+      return { count };
     }
   };
 
@@ -127,14 +132,21 @@ export class MockPrismaClient {
       this.userMemories.set(id, memory);
       return memory;
     },
+    findFirst: async (query: any) => {
+      return Array.from(this.userMemories.values()).find(m => 
+        m.userId === query.where.userId && 
+        m.guildId === (query.where.guildId || '')
+      ) || null;
+    },
     findUnique: async (query: any) => {
       return Array.from(this.userMemories.values()).find(m => 
         m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
       ) || null;
     },
     upsert: async (query: any) => {
+      const whereClause = query.where.userId_guildId;
       const existing = Array.from(this.userMemories.values()).find(m => 
-        m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
+        m.userId === whereClause.userId && m.guildId === whereClause.guildId
       );
       if (existing) {
         const updated = { ...existing, ...query.update, lastUpdated: new Date() };
@@ -146,6 +158,41 @@ export class MockPrismaClient {
         this.userMemories.set(id, created);
         return created;
       }
+    },
+    deleteMany: async (query: any) => {
+      const where = query?.where;
+      let count = 0;
+      
+      if (where?.userId?.startsWith) {
+        // Handle startsWith query
+        const prefix = where.userId.startsWith;
+        const toDelete = Array.from(this.userMemories.entries()).filter(([_, memory]) => 
+          memory.userId.startsWith(prefix)
+        );
+        toDelete.forEach(([id, _]) => {
+          this.userMemories.delete(id);
+          count++;
+        });
+      } else {
+        // Delete all if no specific where clause
+        count = this.userMemories.size;
+        this.userMemories.clear();
+      }
+      
+      return { count };
+    },
+    delete: async (query: any) => {
+      const whereClause = query.where.userId_guildId;
+      const toDelete = Array.from(this.userMemories.entries()).find(([_, memory]) => 
+        memory.userId === whereClause.userId && memory.guildId === whereClause.guildId
+      );
+      
+      if (toDelete) {
+        this.userMemories.delete(toDelete[0]);
+        return toDelete[1];
+      }
+      
+      return null;
     }
   };
 
