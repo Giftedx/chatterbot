@@ -100,29 +100,29 @@ export class ModerationIncidentService {
 
       // Calculate statistics
       const totalIncidents = incidents.length;
-      const incidentsToday = incidents.filter(i => i.createdAt >= today).length;
+      const incidentsToday = incidents.filter((i: any) => i.createdAt >= today).length;
 
-      const incidentsByType = incidents.reduce((acc, incident) => {
+      const incidentsByType = incidents.reduce((acc: any, incident: any) => {
         acc[incident.type] = (acc[incident.type] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      const incidentsBySeverity = incidents.reduce((acc, incident) => {
+      const incidentsBySeverity = incidents.reduce((acc: any, incident: any) => {
         acc[incident.severity] = (acc[incident.severity] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      const userCounts = incidents.reduce((acc, incident) => {
+      const userCounts = incidents.reduce((acc: any, incident: any) => {
         acc[incident.userId] = (acc[incident.userId] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
       const topUsers = Object.entries(userCounts)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, 10)
-        .map(([userId, count]) => ({ userId, count }));
+        .map(([userId, count]) => ({ userId, count: count as number }));
 
-      const recentIncidents: ModerationIncident[] = incidents.slice(0, 20).map(incident => ({
+      const recentIncidents: ModerationIncident[] = incidents.slice(0, 20).map((incident: any) => ({
         id: incident.id,
         guildId: incident.guildId,
         userId: incident.userId,
@@ -165,7 +165,7 @@ export class ModerationIncidentService {
         take: limit
       });
 
-      const incidents = dbIncidents.map(incident => ({
+      const incidents = dbIncidents.map((incident: any) => ({
         id: incident.id,
         guildId: incident.guildId,
         userId: incident.userId,
@@ -237,7 +237,7 @@ export class ModerationIncidentService {
         orderBy: { createdAt: 'desc' }
       });
 
-      const incidents = dbIncidents.map(incident => ({
+      const incidents = dbIncidents.map((incident: any) => ({
         id: incident.id,
         guildId: incident.guildId,
         userId: incident.userId,
