@@ -65,6 +65,20 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 }
 ```
 
+### Personalization Engine Pattern (`src/services/enhanced-intelligence/personalization-engine.service.ts`)
+Advanced user pattern learning with phase-aware MCP integration:
+- **5-Phase MCP Deployment**: Memory → Web Search → Databases → Advanced Reasoning → Code Execution  
+- **User Pattern Analysis**: Tracks tool usage, preferences, satisfaction scores
+- **Intelligent Recommendations**: Contextual tool suggestions based on user behavior
+- **Graceful Degradation**: Works without MCP servers, enhanced with them
+
+### 5-Phase MCP Deployment Strategy (implemented in PersonalizationEngine)
+- **Phase 1 (Critical)**: memory, discord - Foundation capabilities
+- **Phase 2 (High Priority)**: brave_search, firecrawl, filesystem - Enhanced knowledge  
+- **Phase 3 (Medium Priority)**: postgres, sqlite, github - Specialized data
+- **Phase 4 (Advanced)**: sequential_thinking, playwright - Advanced processing
+- **Phase 5 (Specialized)**: code_execution - Sandboxed execution
+
 ## 3. Development Workflow & Commands
 
 ### Essential Commands
@@ -144,12 +158,14 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 2. **Graceful Degradation**: Services provide intelligent fallbacks when MCP tools unavailable
 3. **Typed Interfaces**: All MCP interactions use TypeScript interfaces for safety
 4. **Error Boundaries**: MCP failures don't crash the bot - fallback responses provided
+5. **Phase-Aware Recommendations**: PersonalizationEngine suggests tools based on deployment status
 
 ### Adding New MCP Tools
 1. Add typed wrapper in `src/mcp/index.ts` with safety checks
 2. Integrate via `capability.service.ts` with permission gating
-3. Add comprehensive tests in `enhanced-intelligence/__tests__/` with mock fallbacks
-4. Document fallback behavior for when external tools unavailable
+3. Add to PersonalizationEngine's `getAvailableMCPTools()` mapping
+4. Add comprehensive tests in `enhanced-intelligence/__tests__/` with mock fallbacks
+5. Document fallback behavior for when external tools unavailable
 
 ## 6. Test Architecture & Quality Assurance
 
@@ -181,3 +197,96 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 - **Validate cross-service integration** to catch architectural issues
 
 The test suite serves as the **definitive source of truth** for component interaction patterns and expected behaviors.
+
+## 7. Enhanced Intelligence Service Architecture
+
+### Message Processing Flow (`src/services/enhanced-intelligence/index.ts`)
+```typescript
+// 1. Immediate interaction acknowledgment (prevents timeout)
+await interaction.deferReply({ ephemeral: false });
+
+// 2. Context creation with analysis
+const context: ProcessingContext = {
+  userId, channelId, guildId,
+  analysis: this.analysisService.analyzeMessage(content, attachments),
+  results: new Map(), errors: []
+};
+
+// 3. MCP tool processing with timeout protection
+await Promise.race([
+  this.mcpToolsService.processWithAllTools(content, attachments, context),
+  timeoutPromise(25000)
+]);
+
+// 4. Enhanced response generation with personalization
+const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+const finalResponse = await this.adaptPersonalizedResponse(userId, baseResponse, guildId);
+
+// 5. Memory storage and analytics
+await this.memoryService.storeConversationMemory(context, content, finalResponse);
+```
+
+### Modular Service Dependencies
+- `EnhancedMessageAnalysisService` - Message complexity and intent analysis
+- `EnhancedMCPToolsService` - MCP tool orchestration and execution
+- `EnhancedMemoryService` - Conversation history and context management
+- `EnhancedUIService` - Discord interaction and response streaming
+- `EnhancedResponseService` - AI response generation and enhancement
+- `PersonalizationEngine` - User pattern learning and adaptive responses
+
+### Intelligent Tool Selection (`mcpRegistry` and `mcpToolRegistration`)
+```typescript
+// Get tool recommendations based on content analysis
+const recommendations = mcpToolRegistration.getToolRecommendations(content, {
+  userId: context.userId,
+  priority: this.determinePriority(content, attachments)
+});
+
+// Execute top 2 tools with fallback to traditional processing
+for (const tool of recommendations.slice(0, 2)) {
+  const result = await mcpRegistry.executeTool(tool.id, params, executionContext);
+  context.results.set(tool.id, result);
+}
+```
+
+## 8. Database & Memory Management
+
+### Prisma ORM Setup
+- **Development**: SQLite with `prisma/dev.db`
+- **Production**: PostgreSQL ready with environment variables
+- **Schema**: `prisma/schema.prisma` - User memories, analytics, moderation
+- **Commands**: `npx prisma db push`, `npx prisma studio`, `npx prisma migrate dev`
+
+### Memory Architecture (`src/memory/user-memory.service.ts`)
+```typescript
+// User memory storage with preferences and conversation history
+interface UserMemoryData {
+  preferences: { responseLength: string; communicationStyle: string; topics: string[] };
+  conversationHistory: Array<{ timestamp: Date; content: string; response: string }>;
+  personalContext: Record<string, unknown>;
+}
+```
+
+## 9. Performance & Production Considerations
+
+### Graceful Degradation Strategy
+1. **MCP Tools**: Always have fallback responses when external services fail
+2. **Gemini API**: Rate limiting with exponential backoff and retry logic
+3. **Discord API**: Interaction timeout protection and error recovery
+4. **Database**: In-memory fallbacks for non-critical features
+
+### Production Deployment
+- **Docker**: Use `npm run docker:build` and `docker-compose.yml`
+- **Environment**: Set `NODE_ENV=production` and required API keys
+- **Health Checks**: Built-in health check server on configurable port
+- **Graceful Shutdown**: Handles SIGTERM/SIGINT with proper cleanup
+
+### Performance Monitoring
+```typescript
+// Performance tracking throughout the codebase
+await PerformanceMonitor.monitor('operation-name', async () => {
+  // Operation logic
+}, { userId, context });
+```
+
+This is a **production-ready Discord AI bot** with sophisticated architecture designed for scalability, reliability, and extensibility. The modular design allows adding new intelligence capabilities without disrupting existing functionality.
