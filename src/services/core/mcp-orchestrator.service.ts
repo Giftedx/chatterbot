@@ -1241,11 +1241,10 @@ export class UnifiedMCPOrchestratorService {
       mentions: [],
       urls: analysis.urls || [],
       attachmentAnalysis: [{
-        type: analysis.attachmentTypes?.[0] || 'unknown',
-        size: 0,
-        name: '',
-        isValid: true,
-        confidence: 0.8
+        type: analysis.attachmentTypes?.[0] as 'image' | 'audio' | 'document' | 'video' | 'unknown' || 'unknown',
+        analysisNeeded: analysis.hasAttachments || false,
+        suggestedService: 'multimodal-analysis',
+        processingPriority: 'medium' as 'high' | 'medium' | 'low'
       }]
     };
 

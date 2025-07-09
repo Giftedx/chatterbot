@@ -13,7 +13,7 @@ import { logInteraction } from '../analytics.js';
 import { UserMemoryService } from '../../memory/user-memory.service.js';
 
 // Import modular services
-import { EnhancedMCPToolsService } from './mcp-tools.service.js';
+import { UnifiedMCPOrchestratorService } from '../core/mcp-orchestrator.service.js';
 import { EnhancedMemoryService } from './memory.service.js';
 import { EnhancedUIService } from './ui.service.js';
 import { EnhancedResponseService } from './response.service.js';
@@ -41,7 +41,7 @@ import type { MCPManager } from '../mcp-manager.service.js';
 export class EnhancedInvisibleIntelligenceService {
   
   // Modular services
-  private mcpToolsService: EnhancedMCPToolsService;
+  private mcpToolsService: UnifiedMCPOrchestratorService;
   private memoryService: EnhancedMemoryService;
   private uiService: EnhancedUIService;
   private responseService: EnhancedResponseService;
@@ -56,7 +56,7 @@ export class EnhancedInvisibleIntelligenceService {
   // private crossSessionLearning: CrossSessionLearningEngine;
 
   constructor(mcpManager?: MCPManager) {
-    this.mcpToolsService = new EnhancedMCPToolsService();
+    this.mcpToolsService = new UnifiedMCPOrchestratorService(mcpManager);
     this.memoryService = new EnhancedMemoryService();
     this.uiService = new EnhancedUIService();
     this.responseService = new EnhancedResponseService();
@@ -70,6 +70,11 @@ export class EnhancedInvisibleIntelligenceService {
       // TODO: Fix interface compatibility for CrossSessionLearningEngine
       // this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
       this.personalizationEngine = new PersonalizationEngine(mcpManager);
+      
+      // Initialize MCP tools service
+      this.mcpToolsService.initialize().catch(error => {
+        console.warn('⚠️ MCP Tools Service initialization failed:', error);
+      });
       
       console.log('🧠 Enhanced Intelligence Service initialized with personalization capabilities and MCP integration');
     } catch (personalizationError) {
