@@ -29,7 +29,7 @@ import {
     intelligenceAdminService,
     intelligenceCapabilityService
 } from './intelligence';
-import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentAnalysisData } from './core/message-analysis.service';
+import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentAnalysis } from './core/message-analysis.service';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
 import { EnhancedMemoryService } from './enhanced-intelligence/memory.service';
@@ -45,6 +45,7 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 
 // Utilities and Others
 import { logger } from '../utils/logger';
+import { logInteraction } from './analytics';
 import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager';
 import { ModerationService } from '../moderation/moderation-service';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components';
@@ -125,6 +126,21 @@ export class CoreIntelligenceService {
         this.loadOptedInUsers().catch(err => logger.error('Failed to load opted-in users', err));
         this.mcpOrchestrator.initialize().catch(err => logger.error('MCP Orchestrator failed to init in CoreIntelligenceService', err));
         logger.info('CoreIntelligenceService initialized', { config: this.config });
+    }
+
+    /**
+     * Analytics wrapper to match expected interface
+     */
+    private recordAnalyticsInteraction(data: any): void {
+        // Simple wrapper around the existing analytics function
+        if (data.isSuccess !== undefined) {
+            logInteraction({
+                guildId: data.guildId || null,
+                userId: data.userId || 'unknown',
+                command: data.step || 'core-intelligence',
+                isSuccess: data.isSuccess
+            }).catch(err => logger.warn('Analytics logging failed', err));
+        }
     }
 
     public buildCommands(): SlashCommandBuilder[] {
