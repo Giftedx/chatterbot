@@ -5,7 +5,7 @@
  * and applies the merge intervals algorithm to provide consolidation recommendations.
  */
 
-import { ServiceInterval, mergeIntervalsService } from '../utils/merge-intervals.service.ts';
+import { ServiceInterval, mergeIntervalsService } from '../utils/merge-intervals.service.js';
 
 // Define current service intervals based on codebase analysis
 const currentServices: ServiceInterval[] = [
