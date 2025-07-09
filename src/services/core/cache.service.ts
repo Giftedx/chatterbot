@@ -394,7 +394,17 @@ export class UnifiedCacheService {
    */
   private estimateSize(data: unknown): number {
     try {
-      return JSON.stringify(data).length;
+      if (typeof data === 'string') {
+        return data.length;
+      } else if (typeof data === 'number') {
+        return 8; // Approximate size of a number in bytes
+      } else if (Array.isArray(data)) {
+        return data.length * 10; // Estimate 10 bytes per element
+      } else if (typeof data === 'object' && data !== null) {
+        return Object.keys(data).length * 20; // Estimate 20 bytes per key-value pair
+      } else {
+        return 100; // Default estimate for other types
+      }
     } catch {
       return 1000; // Default estimate for non-serializable data
     }
