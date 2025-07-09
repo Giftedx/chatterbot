@@ -159,7 +159,7 @@ export class AudioDatabaseService {
       });
 
       // Convert to search results with relevance scoring
-      const searchResults: AudioSearchResult[] = files.map(file => {
+      const searchResults: AudioSearchResult[] = files.map((file: any) => {
         const relevanceScore = this.calculateRelevanceScore(file, query);
         
         return {
@@ -295,7 +295,7 @@ export class AudioDatabaseService {
       });
 
       const totalFiles = files.length;
-      const processedFiles = files.filter(f => f.processingStatus === 'completed').length;
+      const processedFiles = files.filter((f: any) => f.processingStatus === 'completed').length;
 
       let totalDuration = 0;
       let qualitySum = 0;
