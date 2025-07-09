@@ -34,7 +34,8 @@ import {
   intelligenceAdminService,
   intelligenceContextService,
   type UserCapabilities,
-  type EnhancedContext
+  type EnhancedContext,
+  type MCPResultValue
 } from './intelligence/index.js';
 
 /**

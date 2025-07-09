@@ -50,7 +50,7 @@ describe('SmartContextOrchestratorService', () => {
 
     // Create mock PersonalizationEngine
     mockPersonalizationEngine = {
-      generatePersonalizedResponse: jest.fn(),
+      adaptResponse: jest.fn(),
       recordInteraction: jest.fn(),
       adaptResponse: jest.fn(),
       extractUserPatterns: jest.fn(),
@@ -116,7 +116,7 @@ describe('SmartContextOrchestratorService', () => {
       });
 
       // Mock personalization result
-      mockPersonalizationEngine.generatePersonalizedResponse.mockResolvedValue({
+      mockPersonalizationEngine.adaptResponse.mockResolvedValue({
         adaptedResponse: 'AI developments with focus on user\'s tech interests',
         patterns: [
           { category: 'technical', strength: 0.8, context: 'AI discussions' },
@@ -214,7 +214,7 @@ describe('SmartContextOrchestratorService', () => {
     });
 
     test('should adapt context to user expertise level', async () => {
-      mockPersonalizationEngine.generatePersonalizedResponse.mockResolvedValue({
+      mockPersonalizationEngine.adaptResponse.mockResolvedValue({
         adaptedResponse: 'Technical AI response',
         patterns: [
           { category: 'technical', strength: 0.9, context: 'Advanced programming' },
@@ -307,7 +307,7 @@ describe('SmartContextOrchestratorService', () => {
         requiresExternalMCP: false
       });
 
-      mockPersonalizationEngine.generatePersonalizedResponse.mockResolvedValue({
+      mockPersonalizationEngine.adaptResponse.mockResolvedValue({
         adaptedResponse: 'personalized',
         patterns: [{ category: 'technical', strength: 0.9 }],
         confidence: 0.9,

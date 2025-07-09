@@ -215,9 +215,9 @@ export class SmartContextOrchestratorService {
       }
 
       // Get personalization insights
-      const personalizationResult = await this.personalizationEngine.generatePersonalizedResponse(
-        message.content,
+      const personalizationResult = await this.personalizationEngine.adaptResponse(
         message.author.id,
+        message.content,
         message.guildId || undefined
       );
 
@@ -373,9 +373,9 @@ export class SmartContextOrchestratorService {
   ): Promise<{ prompt: string } | null> {
     try {
       // Get user expertise level from personalization engine
-      const userInsights = await this.personalizationEngine.generatePersonalizedResponse(
-        'expertise level assessment',
-        userId
+      const userInsights = await this.personalizationEngine.adaptResponse(
+        userId,
+        'expertise level assessment'
       );
 
       if (userInsights.patterns.length > 0) {
