@@ -140,14 +140,33 @@ export class MockPrismaClient {
       this.userMemories.set(id, memory);
       return memory;
     },
+    findFirst: async (query: any) => {
+      return Array.from(this.userMemories.values()).find(m => 
+        m.userId === query.where.userId && m.guildId === query.where.guildId
+      ) || null;
+    },
     findUnique: async (query: any) => {
       return Array.from(this.userMemories.values()).find(m => 
         m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
       ) || null;
     },
+    findMany: async (query: any) => {
+      let memories = Array.from(this.userMemories.values());
+      if (query?.where?.userId) {
+        memories = memories.filter(m => m.userId === query.where.userId);
+      }
+      if (query?.where?.guildId) {
+        memories = memories.filter(m => m.guildId === query.where.guildId);
+      }
+      if (query?.where?.userId?.startsWith) {
+        memories = memories.filter(m => m.userId.startsWith(query.where.userId.startsWith));
+      }
+      return memories;
+    },
     upsert: async (query: any) => {
+      const whereClause = query.where.userId_guildId;
       const existing = Array.from(this.userMemories.values()).find(m => 
-        m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
+        m.userId === whereClause?.userId && m.guildId === whereClause?.guildId
       );
       if (existing) {
         const updated = { ...existing, ...query.update, lastUpdated: new Date() };
@@ -159,6 +178,52 @@ export class MockPrismaClient {
         this.userMemories.set(id, created);
         return created;
       }
+    },
+    update: async (query: any) => {
+      const whereClause = query.where.userId_guildId;
+      const existing = Array.from(this.userMemories.values()).find(m => 
+        m.userId === whereClause?.userId && m.guildId === whereClause?.guildId
+      );
+      if (existing) {
+        const updated = { ...existing, ...query.data, lastUpdated: new Date() };
+        this.userMemories.set(existing.id, updated);
+        return updated;
+      }
+      throw new Error('Record not found');
+    },
+    deleteMany: async (query: any) => {
+      let count = 0;
+      const toDelete = [];
+      
+      for (const [id, memory] of this.userMemories.entries()) {
+        let shouldDelete = true;
+        
+        if (query?.where?.userId?.startsWith) {
+          shouldDelete = memory.userId.startsWith(query.where.userId.startsWith);
+        } else if (query?.where?.userId) {
+          shouldDelete = memory.userId === query.where.userId;
+        } else if (query?.where?.guildId) {
+          shouldDelete = memory.guildId === query.where.guildId;
+        }
+        
+        if (shouldDelete) {
+          toDelete.push(id);
+          count++;
+        }
+      }
+      
+      toDelete.forEach(id => this.userMemories.delete(id));
+      return { count };
+    },
+    delete: async (query: any) => {
+      const existing = Array.from(this.userMemories.values()).find(m => 
+        m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
+      );
+      if (existing) {
+        this.userMemories.delete(existing.id);
+        return existing;
+      }
+      return null;
     }
   };
 
