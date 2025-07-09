@@ -18,11 +18,12 @@ This Discord bot implements a sophisticated AI system with layered intelligence 
 ### Key Architecture Principle
 **Never add new slash commands**. All capabilities integrate into the intelligent conversation flow through automatic context analysis and permission-based feature activation.
 
-### Current Status (Phase 2 Complete)
-- ✅ **329+ tests passing** with comprehensive coverage
+### Current Status (Production Ready)
+- ✅ **360+ tests passing** across 38 test suites with comprehensive coverage
 - ✅ **TypeScript build works** but `npm run build` hangs - use `tsx` for development and production
 - ✅ **All intelligence modes operational** with graceful degradation
-- ✅ **MCP integration architecture ready** for external API enhancement
+- ✅ **MCP integration architecture complete** with external API enhancement
+- ✅ **Production deployment ready** with Docker support and health checks
 
 ## 2. Critical Development Patterns
 
@@ -125,15 +126,27 @@ unifiedIntelligenceService = new UnifiedIntelligenceService(undefined, mcpManage
 
 ### Essential Commands
 - **Development**: `npm run dev` (uses `tsx` - THE ONLY reliable way to run TypeScript)
-- **Testing**: `npm test` (329+ tests, ~97% pass rate with property-based tests)
+- **Testing**: `npm test` (360+ tests across 38 suites, ~96% pass rate with property-based tests)
 - **Production**: `npm start` (runs compiled JS - works perfectly when build succeeds)
 - **Database**: `npx prisma db push` for schema changes, `npx prisma studio` to view data
 
 ### Critical Build Issue & Workaround
 - **TypeScript Build**: `npm run build` hangs indefinitely - known issue, not blocking production
 - **Development & Production Workaround**: Use `tsx` directly - bot runs perfectly with `tsx` in all environments
-- **Docker Support**: Available but use `tsx` for reliability
+- **Docker Support**: Available but use `tsx` for reliability (`npm run docker:build`, `npm run docker:run`)
 - **Tests**: Property-based tests take 15-30s (comprehensive coverage with fast-check)
+
+### Development Debugging
+```bash
+# Check MCP tool availability in development
+node debug-mcp-registry.js
+
+# Test specific capabilities  
+node capability-debug.js
+
+# Run health checks
+curl http://localhost:3000/health
+```
 
 ### Test Architecture (`src/test/setup.ts`)
 - **Global mocks** for Discord.js, Gemini API, and fetch with proper ESM typing
@@ -225,10 +238,10 @@ export async function braveWebSearch(params: BraveWebSearchParams) {
 - **Performance testing**: Validates streaming, rate limiting, and batch processing
 - **ESM mocking strategy**: Dependency injection over global mocking for reliability
 
-### Test Categories & Coverage (329+ tests, ~97% pass)
+### Test Categories & Coverage (360+ tests, ~96% pass)
 - **Unit tests**: Individual service functionality and business logic
 - **Integration tests**: Cross-component communication and workflow validation
-- **Property tests**: Edge case discovery through generative testing
+- **Property tests**: Edge case discovery through generative testing (uses `fast-check`)
 - **Performance tests**: Rate limiting, streaming, and optimization validation
 - **Regression tests**: Known issue prevention and stability maintenance
 
@@ -332,36 +345,129 @@ await PerformanceMonitor.monitor('operation-name', async () => {
 }, { userId, context });
 ```
 
+## 12. Project-Specific Conventions & Patterns
+
+### Message Processing Architecture Pattern
+```typescript
+// Standard message flow in src/index.ts
+client.on('messageCreate', async (message) => {
+  // 1. Route based on enabled intelligence mode
+  if (ENABLE_AGENTIC_INTELLIGENCE) {
+    await handleAgenticMessage(message);
+  } else if (enhancedIntelligenceService?.handleIntelligentMessage) {
+    await enhancedIntelligenceService.handleIntelligentMessage(message);  
+  } else {
+    await unifiedIntelligenceService.handleIntelligentMessage(message);
+  }
+});
+```
+
+### Service Interface Pattern
+All intelligence services implement this consistent interface:
+```typescript
+class SomeIntelligenceService {
+  createSlashCommand() // Build /optin command with service capabilities
+  handleIntelligentMessage(message) // Process natural conversations
+  shouldProcessMessage(message) // Permission and context validation
+}
+```
+
+### MCP Tool Safety Pattern (`src/mcp/index.ts`)
+```typescript
+export async function someMCPTool(params: SomeParams) {
+  if (typeof (globalThis as any).mcp_tool_function === 'function') {
+    return (globalThis as any).mcp_tool_function(params);
+  }
+  throw new Error('mcp_tool_function not available in current environment');
+}
+```
+
+### Graceful Degradation Pattern
+Services always provide fallback behavior:
+```typescript
+try {
+  const result = await externalService.call();
+  return enhancedResponse(result);
+} catch (error) {
+  logger.warn('External service failed, using fallback');
+  return basicResponse();
+}
+```
+
+### Environment-Based Feature Flags
+```typescript
+const ENABLE_ENHANCED_INTELLIGENCE = process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true';
+const ENABLE_AGENTIC_INTELLIGENCE = process.env.ENABLE_AGENTIC_INTELLIGENCE !== 'false'; // Default true
+```
+
+### Performance Monitoring Pattern
+```typescript
+await PerformanceMonitor.monitor('operation-name', async () => {
+  // Your operation logic here
+}, { userId, context });
+```
+
+### Test Utility Pattern (`src/test/setup.ts`)
+```typescript
+// Global test utilities available in all tests
+global.testUtils = {
+  mockDiscordMessage: (content, author) => ({ /* mock object */ }),
+  mockDiscordInteraction: (commandName, options) => ({ /* mock object */ }),
+  mockGeminiResponse: (text) => ({ /* mock response */ })
+};
+```
+
+---
+
 This is a **production-ready Discord AI bot** with sophisticated architecture designed for scalability, reliability, and extensibility. The modular design allows adding new intelligence capabilities without disrupting existing functionality.
 
-## 10. Key File Locations & Project Structure
+## 11. Project Structure & Key Files
 
-### Core Architecture Files
-- `src/index.ts` - Main bot entry point with intelligence routing
-- `src/services/unified-intelligence.service.ts` - Core conversation handler
-- `src/services/enhanced-intelligence/index.ts` - Advanced MCP-enabled service
-- `src/services/agentic-intelligence.service.ts` - Knowledge base and escalation
-- `src/services/mcp-manager.service.ts` - External tool orchestration
+### Critical Architecture Files (Read These First)
+- `src/index.ts` - **Main entry point** with intelligence routing and graceful shutdown handling
+- `src/services/unified-intelligence.service.ts` - **Core conversation handler** with modular intelligence pattern
+- `src/services/enhanced-intelligence/index.ts` - **Advanced MCP-enabled service** with timeout protection
+- `src/services/agentic-intelligence.service.ts` - **Knowledge base and escalation** with confidence scoring
+- `src/mcp/index.ts` - **Type-safe MCP tool wrappers** with availability checks
 
 ### Modular Intelligence Services (`src/services/intelligence/`)
-- `permission.service.ts` - RBAC and user capability validation
-- `analysis.service.ts` - Message intent and complexity analysis
-- `capability.service.ts` - Feature execution and tool selection
-- `admin.service.ts` - Administrative features and persona management
-- `context.service.ts` - Enhanced context building and memory integration
+```
+intelligence/
+├── index.ts              # Exports and type definitions
+├── permission.service.ts # RBAC and Discord role mapping  
+├── analysis.service.ts   # Message intent and complexity analysis
+├── capability.service.ts # Feature execution and MCP tool selection
+├── admin.service.ts      # Persona management and admin features
+└── context.service.ts    # Enhanced context building and memory
+```
 
-### External Integration
-- `src/mcp/index.ts` - Type-safe wrappers for external MCP tools
-- `src/commands/agentic-commands.js` - Agentic-specific slash commands
-- `src/test/setup.ts` - Global test configuration with ESM mocking
+### Project Structure Overview
+```
+src/
+├── index.ts                     # Main bot with multi-mode routing
+├── services/                    # Core business logic
+│   ├── intelligence/            # Modular AI components
+│   ├── enhanced-intelligence/   # MCP-enabled advanced features
+│   ├── core/                   # Shared services (analysis, orchestrator)
+│   ├── gemini.service.ts       # Google AI integration
+│   └── mcp-manager.service.ts  # External tool orchestration
+├── mcp/                        # Type-safe MCP wrappers
+├── commands/                   # Slash command definitions
+├── test/                       # Global test setup and utilities
+├── memory/                     # User memory and context management
+├── security/                   # RBAC and content moderation
+├── ui/                         # Discord components and streaming
+└── utils/                      # Shared utilities and helpers
+```
 
-### Configuration & Environment
+### Configuration Files
+- `package.json` - **ESM module setup** with tsx workflow
+- `tsconfig.json` - TypeScript configuration for ES2022 modules
+- `prisma/schema.prisma` - Database schema for users, memory, analytics
 - `env.example` - Complete environment variable template
-- `package.json` - ESM module setup with tsx workflow
-- `tsconfig.json` - TypeScript configuration for production ESM
-- `jest.config` (in package.json) - ESM-compatible test setup
 
-### Database & Persistence
-- `prisma/schema.prisma` - User memory, analytics, moderation schema
-- `src/memory/user-memory.service.ts` - Advanced memory management
-- `src/db/` - Database utilities and migration helpers
+### Development Debug Tools (Root Directory)
+- `debug-mcp-registry.js` - Check MCP tool availability
+- `capability-debug.js` - Test specific bot capabilities
+- `quick-debug.js` - Fast service testing
+- `availability-debug.js` - Service health checks

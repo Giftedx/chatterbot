@@ -457,12 +457,16 @@ export class EnhancedInvisibleIntelligenceService {
       for (const tool of recommendations.slice(0, 2)) { // Execute top 2 tools
         try {
           const params = this.buildToolParams(content, attachments, tool.id);
+          
+          // Use a simple fallback for required capabilities based on tool id
+          const requiredCapabilities = this.getCapabilitiesForTool(tool.id);
+          
           const executionContext = {
             userId: context.userId,
             channelId: context.channelId,
             messageContent: content,
             priority: this.determinePriority(content, attachments),
-            requiredCapabilities: tool.capabilities,
+            requiredCapabilities: requiredCapabilities,
             fallbackAllowed: true,
             timeoutMs: 15000
           };
@@ -586,6 +590,29 @@ export class EnhancedInvisibleIntelligenceService {
       cache: this.cacheService.getStats(),
       service: 'Enhanced Intelligence v2.0'
     };
+  }
+
+  /**
+   * Get capabilities for a specific tool (fallback implementation)
+   */
+  private getCapabilitiesForTool(toolId: string): string[] {
+    // Utility function to convert camelCase to kebab-case
+    const toKebabCase = (str: string): string => str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+
+    // Normalize toolId to kebab-case
+    const normalizedToolId = toKebabCase(toolId);
+    // Simple mapping based on common tool IDs
+    const toolCapabilities: Record<string, string[]> = {
+      'web-search': ['web-search', 'research'],
+      'memory': ['memory', 'context'],
+      'content-extraction': ['firecrawl', 'content'],
+      'sequential-thinking': ['reasoning', 'analysis'],
+      'playwright': ['browser', 'automation'],
+      'discord': ['discord', 'messaging'],
+      'filesystem': ['files', 'storage']
+    };
+    
+    return toolCapabilities[toolId] || [toolId];
   }
 
   /**

@@ -1231,21 +1231,43 @@ export class UnifiedMCPOrchestratorService {
   }> {
     // Convert legacy analysis to unified format
     const unifiedAnalysis: UnifiedMessageAnalysis = {
+      // Core analysis
+      hasAttachments: analysis.hasAttachments || false,
+      hasUrls: analysis.hasUrls || false,
+      attachmentTypes: analysis.attachmentTypes || [],
+      urls: analysis.urls || [],
       complexity: analysis.complexityLevel || 'simple',
-      confidence: analysis.confidence || 0.8,
       intents: analysis.intents || [],
+      requiredTools: analysis.requiredCapabilities || [],
+      
+      // Enhanced analysis capabilities  
+      needsPersonaSwitch: false,
+      suggestedPersona: undefined,
+      needsAdminFeatures: false,
+      adminCommands: [],
+      needsMultimodal: analysis.hasAttachments || false,
+      attachmentAnalysis: analysis.hasAttachments ? [{
+        type: analysis.attachmentTypes?.[0] as 'image' | 'audio' | 'document' | 'video' | 'unknown' || 'unknown',
+        analysisNeeded: true,
+        suggestedService: 'multimodal-analysis',
+        processingPriority: 'medium' as 'high' | 'medium' | 'low'
+      }] : [],
+      needsConversationManagement: false,
+      conversationActions: [],
+      needsMemoryOperation: false,
+      memoryActions: [],
+      needsMCPTools: (analysis.requiredCapabilities || []).length > 0,
       mcpRequirements: analysis.requiredCapabilities || [],
+      
+      // Analysis metadata
+      confidence: analysis.confidence || 0.8,
+      processingRecommendations: [],
+      
+      // Additional analysis properties
       sentiment: analysis.sentiment || 'neutral',
       language: analysis.language || 'en',
       topics: analysis.topics || [],
-      mentions: [],
-      urls: analysis.urls || [],
-      attachmentAnalysis: [{
-        type: analysis.attachmentTypes?.[0] as 'image' | 'audio' | 'document' | 'video' | 'unknown' || 'unknown',
-        analysisNeeded: analysis.hasAttachments || false,
-        suggestedService: 'multimodal-analysis',
-        processingPriority: 'medium' as 'high' | 'medium' | 'low'
-      }]
+      mentions: []
     };
 
     const result = await this.orchestrateIntelligentResponse(message, unifiedAnalysis, capabilities);
