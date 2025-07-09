@@ -689,7 +689,7 @@ export class UnifiedMCPOrchestratorService {
     executed: string[],
     fallbacks: string[]
   ): Promise<void> {
-    const needsWebSearch = context.requiredCapabilities.includes('webSearch');
+    const needsWebSearch = context.requiredCapabilities.includes('web-search');
     const needsContentExtraction = context.requiredCapabilities.includes('firecrawl');
 
     if (needsWebSearch && this.tools.has('web-search')) {
