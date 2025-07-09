@@ -89,8 +89,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Unified Service Failure Scenarios', () => {
     test('should handle MCP orchestrator service failure gracefully', async () => {
       // Mock MCP orchestrator to fail
-      const mockMCPOrchestrator = require('../core/mcp-orchestrator.service.js');
-      mockMCPOrchestrator.mcpOrchestratorService.processMessage = jest.fn()
+      mockMCPOrchestrator.orchestrateIntelligentResponse = jest.fn()
         .mockRejectedValue(new Error('MCP orchestrator failed'));
 
       const mockMessage: MockMessage = {
@@ -231,10 +230,25 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
   describe('Gemini API Failure Scenarios', () => {
     test('should handle Gemini API timeout gracefully', async () => {
-      // Mock Gemini service to timeout
-      const mockGemini = require('../gemini.service.js');
-      mockGemini.geminiService.generateResponse = jest.fn()
-        .mockRejectedValue(new Error('Request timeout'));
+      // Create service with mocked dependencies that include a failing Gemini service
+      const mockGeminiService = {
+        generateResponse: jest.fn().mockRejectedValue(new Error('Request timeout'))
+      };
+      
+      const testService = new CoreIntelligenceService({
+        enableAgenticFeatures: true,
+        enablePersonalization: false,
+        enableEnhancedMemory: false,
+        enableEnhancedUI: false,
+        enableResponseCache: false,
+        dependencies: {
+          mcpOrchestrator: mockMCPOrchestrator,
+          analyticsService: mockAnalyticsService
+        }
+      });
+
+      // Replace the internal gemini service
+      (testService as any).geminiService = mockGeminiService;
 
       const mockMessage: MockMessage = {
         id: 'gemini-timeout-test',
