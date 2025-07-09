@@ -224,7 +224,9 @@ export class DocumentDatabaseService {
         failed: 0
       };
 
-      statusCounts.forEach(({ processingStatus: status, _count }: any) => {
+
+      statusCounts.forEach(({ processingStatus: status, _count }: { processingStatus: any, _count: any }) => {
+
         if (status) {
           processingStatus[status as ProcessingStatus] = _count;
         }

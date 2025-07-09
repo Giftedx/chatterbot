@@ -102,17 +102,23 @@ export class ModerationIncidentService {
       const totalIncidents = incidents.length;
       const incidentsToday = incidents.filter((i: any) => i.createdAt >= today).length;
 
-      const incidentsByType = incidents.reduce((acc: any, incident: any) => {
+
+      const incidentsByType = incidents.reduce((acc: Record<string, number>, incident: any) => {
+
         acc[incident.type] = (acc[incident.type] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      const incidentsBySeverity = incidents.reduce((acc: any, incident: any) => {
+
+      const incidentsBySeverity = incidents.reduce((acc: Record<string, number>, incident: any) => {
+
         acc[incident.severity] = (acc[incident.severity] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
-      const userCounts = incidents.reduce((acc: any, incident: any) => {
+
+      const userCounts = incidents.reduce((acc: Record<string, number>, incident: any) => {
+
         acc[incident.userId] = (acc[incident.userId] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);

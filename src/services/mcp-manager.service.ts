@@ -2,52 +2,166 @@
  * MCP Manager Service
  * Centralized management of all Model Context Protocol server connections
  * Implements the architectural patterns outlined in the MCP integration plan
+ * Now using real MCP SDK instead of placeholder implementations
  */
 
 import { MCPServerConfig, getEnabledServers, validateServerConfig } from '../config/mcp-servers.config.js';
 import { logger } from '../utils/logger.js';
 
-// Import MCP client types - using placeholder types until SDK is available
-interface MCPClient {
-  name: string;
-  version: string;
-  capabilities?: Record<string, unknown>;
-  connect(transport: MCPTransport): Promise<void>;
-  callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<unknown>;
-  close(): Promise<void>;
-}
+// Import real MCP SDK types and classes
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import type { 
+  Implementation, 
+  ServerCapabilities, 
+  CallToolRequest,
+  ListToolsRequest
+} from '@modelcontextprotocol/sdk/types.js';
 
-interface MCPTransport {
-  command: string;
-  args: string[];
-  env?: Record<string, string | undefined>;
-}
-
-interface MCPClientInfo {
-  name: string;
-  version: string;
-}
-
-// Placeholder MCP Client implementation until SDK is available
-class PlaceholderMCPClient implements MCPClient {
-  public name: string;
-  public version: string;
-  public capabilities?: Record<string, unknown>;
+// Real MCP Client wrapper for consistency with existing interface
+export class MCPClientWrapper {
+  private client: Client;
+  private transport: StdioClientTransport | null = null;
+  private serverConfig: MCPServerConfig;
   private connected = false;
-  private serverConfig?: MCPServerConfig;
 
-  constructor(info: MCPClientInfo, serverConfig: MCPServerConfig) {
-    this.name = info.name;
-    this.version = info.version;
+  constructor(clientInfo: Implementation, serverConfig: MCPServerConfig) {
+    this.client = new Client(clientInfo, {
+      capabilities: {
+        // Define client capabilities
+        tools: {},
+        resources: { subscribe: true },
+        prompts: {},
+        logging: {}
+      }
+    });
     this.serverConfig = serverConfig;
   }
 
-  async connect(transport: MCPTransport): Promise<void> {
-    logger.info('MCP Client connecting', {
-      operation: 'mcp-connect',
-      metadata: { 
-        name: this.name,
-        command: transport.command,
+  async connect(): Promise<void> {
+    if (this.connected) {
+      return;
+    }
+
+    try {
+      // Create stdio transport for local MCP servers
+      this.transport = new StdioClientTransport({
+        command: this.serverConfig.command,
+        args: this.serverConfig.args,
+        env: this.filterEnv(this.serverConfig.env)
+      });
+
+      // Connect to the MCP server
+      await this.client.connect(this.transport);
+      this.connected = true;
+
+      logger.info('MCP Client connected successfully', {
+        operation: 'mcp-connect',
+        metadata: { 
+          serverName: this.serverConfig.description,
+          command: this.serverConfig.command,
+          capabilities: this.client.getServerCapabilities()
+        }
+      });
+
+    } catch (error) {
+      logger.error('MCP Client connection failed', {
+        operation: 'mcp-connect',
+        metadata: { 
+          serverConfig: this.serverConfig,
+          error: String(error)
+        }
+      });
+      throw error;
+    }
+  }
+
+  async callTool(params: { name: string; arguments?: Record<string, unknown> }): Promise<unknown> {
+    if (!this.connected) {
+      throw new Error('MCP Client not connected');
+    }
+
+    try {
+      const callParams: CallToolRequest['params'] = {
+        name: params.name,
+        arguments: params.arguments || {}
+      };
+
+      const result = await this.client.callTool(callParams);
+      return result;
+
+    } catch (error) {
+      logger.error('MCP Tool call failed', {
+        operation: 'mcp-tool-call',
+        metadata: { 
+          toolName: params.name,
+          error: String(error)
+        }
+      });
+      throw error;
+    }
+  }
+
+  async listTools(): Promise<any> {
+    if (!this.connected) {
+      throw new Error('MCP Client not connected');
+    }
+
+    try {
+      const listParams: ListToolsRequest['params'] = {};
+      const result = await this.client.listTools(listParams);
+      return result;
+
+    } catch (error) {
+      logger.error('MCP List tools failed', {
+        operation: 'mcp-list-tools',
+        metadata: { error: String(error) }
+      });
+      throw error;
+    }
+  }
+
+  getServerCapabilities(): ServerCapabilities | undefined {
+    return this.client.getServerCapabilities();
+  }
+
+  getServerVersion(): Implementation | undefined {
+    return this.client.getServerVersion();
+  }
+
+  async close(): Promise<void> {
+    if (this.transport && this.connected) {
+      try {
+        await this.transport.close();
+        this.connected = false;
+        
+        logger.info('MCP Client disconnected', {
+          operation: 'mcp-disconnect',
+          metadata: { serverConfig: this.serverConfig.description }
+        });
+      } catch (error) {
+        logger.warn('Error closing MCP client', {
+          operation: 'mcp-disconnect',
+          metadata: { error: String(error) }
+        });
+      }
+    }
+  }
+
+  isConnected(): boolean {
+    return this.connected;
+  }
+
+  private filterEnv(env: Record<string, string | undefined>): Record<string, string> {
+    const filtered: Record<string, string> = {};
+    for (const [key, value] of Object.entries(env)) {
+      if (value !== undefined && value !== null) {
+        filtered[key] = value;
+      }
+    }
+    return filtered;
+  }
+}
         args: transport.args
       }
     });

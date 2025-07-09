@@ -29,7 +29,8 @@ import {
     intelligenceAdminService,
     intelligenceCapabilityService
 } from './intelligence';
-import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentAnalysis } from './core/message-analysis.service';
+
+import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentInfo } from './core/message-analysis.service';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
 import { EnhancedMemoryService } from './enhanced-intelligence/memory.service';
@@ -45,6 +46,7 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 
 // Utilities and Others
 import { logger } from '../utils/logger';
+import { logInteraction } from './analytics';
 import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager';
 import { ModerationService } from '../moderation/moderation-service';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components';
@@ -127,6 +129,21 @@ export class CoreIntelligenceService {
         logger.info('CoreIntelligenceService initialized', { config: this.config });
     }
 
+    /**
+     * Analytics wrapper to match expected interface
+     */
+    private recordAnalyticsInteraction(data: any): void {
+        // Simple wrapper around the existing analytics function
+        if (data.isSuccess !== undefined) {
+            logInteraction({
+                guildId: data.guildId || null,
+                userId: data.userId || 'unknown',
+                command: data.step || 'core-intelligence',
+                isSuccess: data.isSuccess
+            }).catch(err => logger.warn('Analytics logging failed', err));
+        }
+    }
+
     public buildCommands(): SlashCommandBuilder[] {
         const commands: SlashCommandBuilder[] = [];
         const chatCommand = new SlashCommandBuilder()
@@ -203,7 +220,7 @@ export class CoreIntelligenceService {
         const analyticsData: Record<string, any> = { guildId, userId, commandOrEvent: uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate', promptLength: promptText.length, attachmentCount: commonAttachments.length, startTime };
 
         try {
-            recordAnalyticsInteraction({ ...analyticsData, step: 'start_processing', isSuccess: true, duration: 0 });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'start_processing', isSuccess: true, duration: 0 });
 
             const messageForPipeline = this._createMessageForPipeline(uiContext, promptText, userId, commonAttachments);
 
@@ -243,7 +260,7 @@ export class CoreIntelligenceService {
 
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'critical_error_caught', isSuccess: false, error: error.message, duration: Date.now() - startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'critical_error_caught', isSuccess: false, error: error.message, duration: Date.now() - startTime });
             return { content: "🤖 Sorry, I encountered a critical internal error. Please try again later." };
         } finally {
             logger.info(`[CoreIntelSvc] Processing pipeline finished.`, { ...analyticsData, success: !(analyticsData as any).error, duration: Date.now() - startTime });
@@ -271,23 +288,23 @@ export class CoreIntelligenceService {
         try {
             const textModerationResult = await this.moderationService.moderateText(promptText, { guildId, userId, channelId, messageId });
             if (textModerationResult.action === 'block') {
-                recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_text', isSuccess: false, error: 'Text content blocked', duration: Date.now() - analyticsData.startTime });
+                this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_text', isSuccess: false, error: 'Text content blocked', duration: Date.now() - analyticsData.startTime });
                 return { blocked: true, reason: textModerationResult.verdict.reason || 'Content flagged as unsafe' };
             }
             for (const att of attachments) {
                 if (att.contentType?.startsWith('image/')) {
                     const imageModerationResult = await this.moderationService.moderateImage(att.url, att.contentType, { guildId, userId, channelId, messageId });
                     if (imageModerationResult.action === 'block') {
-                        recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_image', isSuccess: false, error: 'Image blocked', duration: Date.now() - analyticsData.startTime });
+                        this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_block_image', isSuccess: false, error: 'Image blocked', duration: Date.now() - analyticsData.startTime });
                         return { blocked: true, reason: imageModerationResult.verdict.reason || 'Image flagged as unsafe' };
                     }
                 }
             }
-            recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_passed', isSuccess: true, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_passed', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return { blocked: false };
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Error in _performModeration: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'moderation_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             return { blocked: false, error: "Moderation check failed." };
         }
     }
@@ -296,11 +313,11 @@ export class CoreIntelligenceService {
         logger.debug(`[CoreIntelSvc] Stage 2: Get User Capabilities`, { userId });
         try {
             const capabilities = await this.permissionService.getUserCapabilities(userId, { guildId, channelId, userId });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_fetched', isSuccess: true, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_fetched', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return capabilities;
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _fetchUserCapabilities: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             throw new Error(`Critical: Failed to fetch user capabilities for ${userId}.`);
         }
     }
@@ -308,13 +325,17 @@ export class CoreIntelligenceService {
     private async _analyzeInput(messageForPipeline: Message, commonAttachments: CommonAttachment[], capabilities: UserCapabilities, analyticsData: any): Promise<UnifiedMessageAnalysis> {
         logger.debug(`[CoreIntelSvc] Stage 3: Message Analysis`, { userId: messageForPipeline.author.id });
         try {
-            const analysisAttachmentsData: AttachmentAnalysisData[] = commonAttachments.map(a => ({ name: a.name || new URL(a.url).pathname.split('/').pop() || 'attachment', url: a.url, contentType: a.contentType || 'application/octet-stream' }));
-            const unifiedAnalysis = await this.messageAnalysisService.analyzeMessage(messageForPipeline, analysisAttachmentsData, capabilities);
-            recordAnalyticsInteraction({ ...analyticsData, step: 'message_analyzed', isSuccess: true, duration: Date.now() - (analyticsData.startTime || Date.now()) });
+            const analysisAttachmentsData: AttachmentInfo[] = commonAttachments.map((a: any) => ({ 
+                name: a.name || new URL(a.url).pathname.split('/').pop() || 'attachment', 
+                url: a.url, 
+                contentType: a.contentType || undefined 
+            }));
+            const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(messageForPipeline, analysisAttachmentsData, capabilities);
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'message_analyzed', isSuccess: true, duration: Date.now() - (analyticsData.startTime || Date.now()) });
             return unifiedAnalysis;
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _analyzeInput: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'analysis_error', isSuccess: false, error: error.message, duration: Date.now() - (analyticsData.startTime || Date.now()) });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'analysis_error', isSuccess: false, error: error.message, duration: Date.now() - (analyticsData.startTime || Date.now()) });
             throw new Error(`Critical: Failed to analyze input for user ${messageForPipeline.author.id}.`);
         }
     }
@@ -324,11 +345,11 @@ export class CoreIntelligenceService {
         try {
             const mcpResult = await this.mcpOrchestrator.orchestrateIntelligentResponse(messageForAnalysis, unifiedAnalysis, capabilities);
             logger.info(`[CoreIntelSvc] MCP Orchestration completed. Success: ${mcpResult.success}, Tools: ${mcpResult.toolsExecuted.join(',') || 'None'}`, { analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'mcp_orchestrated', isSuccess: mcpResult.success, mcpToolsExecuted: mcpResult.toolsExecuted.join(','), duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'mcp_orchestrated', isSuccess: mcpResult.success, mcpToolsExecuted: mcpResult.toolsExecuted.join(','), duration: Date.now() - analyticsData.startTime });
             return mcpResult;
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Error in _executeMcpPipeline: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'mcp_pipeline_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'mcp_pipeline_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             return { success: false, phase: 0, toolsExecuted: [], results: new Map(), fallbacksUsed: ['pipeline_error'], executionTime: 0, confidence: 0, recommendations: ["MCP pipeline encountered an unexpected error."] };
         }
     }
@@ -349,11 +370,11 @@ export class CoreIntelligenceService {
                 }
             }
             const agenticContextData = await this.contextService.buildEnhancedContext(messageForAnalysis, adaptedAnalysisForContext, capabilities, adaptedMcpResultsForContext );
-            recordAnalyticsInteraction({ ...analyticsData, step: 'context_aggregated', isSuccess: true, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'context_aggregated', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return agenticContextData;
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _aggregateAgenticContext: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'context_aggregation_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'context_aggregation_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             throw new Error(`Critical: Failed to aggregate agentic context for user ${messageForAnalysis.author.id}.`);
         }
     }
@@ -370,7 +391,7 @@ export class CoreIntelligenceService {
                 // Assuming richPromptFromContext was enhancedContext.prompt
                 const toolRecs = await this.smartRecommendations.getContextualToolRecommendations({ userId, guildId, currentMessage: enhancedContext.prompt, analysis: unifiedAnalysis });
                 logger.debug(`[CoreIntelSvc] Personalized Tool Recommendations: ${toolRecs.length} recommendations.`);
-                recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_preresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
+                this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_preresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             }
 
             logger.debug(`[CoreIntelSvc] Stage 7: Response Generation`, analyticsData);
@@ -401,11 +422,11 @@ export class CoreIntelligenceService {
                 agenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
                 fullResponseText = agenticResponse.response;
             }
-            recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
             return { agenticResponse, fullResponseText };
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _generateAgenticResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'agentic_response_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'agentic_response_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             throw new Error(`Critical: Failed to generate agentic response for user ${userId}.`);
         }
     }
@@ -415,11 +436,11 @@ export class CoreIntelligenceService {
         try {
             logger.debug(`[CoreIntelSvc] Stage 8: Personalization - Post-Response`, { userId });
             const adapted = await this.personalizationEngine.adaptResponse(userId, responseText, guildId);
-            recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse', isSuccess: true, duration: Date.now() - analyticsData.startTime });
             return adapted.personalizedResponse;
         } catch (error: any) {
             logger.warn(`[CoreIntelSvc] Error in _applyPostResponsePersonalization: ${error.message}. Proceeding with non-personalized response.`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'personalization_postresponse_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             return responseText;
         }
     }
@@ -438,9 +459,9 @@ export class CoreIntelligenceService {
             if (this.config.enableEnhancedMemory && this.enhancedMemoryService) {
                 // Construct ProcessingContext for EnhancedMemoryService
                 const analysisForMemory: EnhancedMessageAnalysis = {
-                    hasAttachments: commonAttachments.length > 0,
+                    hasAttachments: attachments.length > 0,
                     hasUrls: unifiedAnalysis.urls?.length > 0,
-                    attachmentTypes: commonAttachments.map(att => att.contentType?.split('/')[0] || 'unknown'), // e.g., 'image', 'application'
+                    attachmentTypes: attachments.map((att: any) => att.contentType?.split('/')[0] || 'unknown'), // e.g., 'image', 'application'
                     urls: unifiedAnalysis.urls || [],
                     complexity: unifiedAnalysis.complexity === 'advanced' ? 'complex' : unifiedAnalysis.complexity,
                     intents: unifiedAnalysis.intents || [],
@@ -471,10 +492,10 @@ export class CoreIntelligenceService {
             if (this.config.enablePersonalization && this.behaviorAnalytics && success) {
                 await this.behaviorAnalytics.recordBehaviorMetric({ userId, metricType: 'successful_interaction', value: 1, timestamp: new Date() });
             }
-            recordAnalyticsInteraction({ ...analyticsData, step: 'final_updates_complete', isSuccess: success, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'final_updates_complete', isSuccess: success, duration: Date.now() - analyticsData.startTime });
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Error in _updateStateAndAnalytics: ${error.message}`, { error, stack: error.stack, ...analyticsData });
-            recordAnalyticsInteraction({ ...analyticsData, step: 'state_update_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+            this.recordAnalyticsInteraction({ ...analyticsData, step: 'state_update_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
         }
     }
 
