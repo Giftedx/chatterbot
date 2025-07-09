@@ -49,6 +49,12 @@ export interface UnifiedMessageAnalysis {
   // Analysis metadata
   confidence: number;
   processingRecommendations: string[];
+  
+  // Additional analysis properties
+  sentiment?: string;
+  language?: string;
+  topics?: string[];
+  mentions?: string[];
 }
 
 /**
