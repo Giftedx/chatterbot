@@ -9,6 +9,8 @@ import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+const MAX_TEXT_CONTENT_LENGTH = 1000;
+
 export class DirectMCPExecutor {
   private braveApiKey?: string;
   private firecrawlApiKey?: string;
@@ -315,7 +317,7 @@ export class DirectMCPExecutor {
               allowedAttributes: {},
               exclusiveFilter: () => false,
             });
-            textContent = textContent.replace(/\s+/g, ' ').trim().substring(0, 1000);
+            textContent = textContent.replace(/\s+/g, ' ').trim().substring(0, MAX_TEXT_CONTENT_LENGTH);
             return {
               url,
               title,
