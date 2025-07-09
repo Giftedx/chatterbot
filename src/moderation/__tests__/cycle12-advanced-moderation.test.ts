@@ -101,6 +101,12 @@ describe('Advanced Moderation System - Cycle 12', () => {
     });
 
     it('should integrate with OpenAI API when available', async () => {
+      // Mock environment variable BEFORE creating the instance
+      process.env.OPENAI_API_KEY = 'test-key';
+      
+      // Create new instance with the environment variable set
+      const textModerationWithAPI = new AdvancedTextModeration();
+      
       // Mock OpenAI API response - flagged content should be blocked
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -113,10 +119,7 @@ describe('Advanced Moderation System - Cycle 12', () => {
         })
       } as Response);
 
-      // Mock environment variable
-      process.env.OPENAI_API_KEY = 'test-key';
-
-      const result = await textModeration.checkTextSafety('Borderline unsafe content', {
+      const result = await textModerationWithAPI.checkTextSafety('Borderline unsafe content', {
         useMLAPI: true,
         strictnessLevel: 'medium'
       });
@@ -125,18 +128,28 @@ describe('Advanced Moderation System - Cycle 12', () => {
       expect(result.safe).toBe(false);
       expect(result.reason).toContain('AI detected unsafe content');
       expect(result.categories).toContain('hate');
+      
+      // Clean up
+      delete process.env.OPENAI_API_KEY;
     });
 
     it('should fail open when API is unavailable', async () => {
+      // Set up API key and create instance that will actually call OpenAI
+      process.env.OPENAI_API_KEY = 'test-key';
+      const textModerationWithAPI = new AdvancedTextModeration();
+      
       mockFetch.mockRejectedValueOnce(new Error('API Error'));
       
-      const result = await textModeration.checkTextSafety('Some content', {
+      const result = await textModerationWithAPI.checkTextSafety('Some content', {
         useMLAPI: true,
         strictnessLevel: 'medium'
       });
 
       expect(result.safe).toBe(true);
       expect(result.reason).toContain('service unavailable');
+      
+      // Clean up
+      delete process.env.OPENAI_API_KEY;
     });
   });
 
@@ -488,13 +501,19 @@ describe('Advanced Moderation System - Cycle 12', () => {
     });
 
     it('should handle external API failures', async () => {
+      // Set up API key so the service will actually try to call OpenAI
+      process.env.OPENAI_API_KEY = 'test-key';
+      const textModerationWithAPI = new AdvancedTextModeration();
+      
       mockFetch.mockRejectedValueOnce(new Error('Network Error'));
       
-      const textModeration = new AdvancedTextModeration();
-      const result = await textModeration.checkTextSafety('test content', { useMLAPI: true });
+      const result = await textModerationWithAPI.checkTextSafety('test content', { useMLAPI: true });
 
       expect(result.safe).toBe(true); // Fail open for text
       expect(result.reason).toContain('service unavailable');
+      
+      // Clean up
+      delete process.env.OPENAI_API_KEY;
     });
   });
 
