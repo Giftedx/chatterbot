@@ -77,8 +77,7 @@ export class MergeIntervalsService {
     const mergedCount = merged.length;
     
     // Calculate duplicate lines saved
-    const duplicateLines = services.reduce((total, service) => total + service.codeLines, 0) -
-                          merged.reduce((total, service) => total + service.codeLines, 0);
+    const duplicateLines = this.calculateDuplicateLines(services);
 
     const recommendations = this.generateConsolidationRecommendations(services, merged);
 
