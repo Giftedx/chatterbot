@@ -13,7 +13,6 @@ import { logInteraction } from '../analytics.js';
 import { UserMemoryService } from '../../memory/user-memory.service.js';
 
 // Import modular services
-import { EnhancedMessageAnalysisService } from './message-analysis.service.js';
 import { EnhancedMCPToolsService } from './mcp-tools.service.js';
 import { EnhancedMemoryService } from './memory.service.js';
 import { EnhancedUIService } from './ui.service.js';
@@ -21,6 +20,12 @@ import { EnhancedResponseService } from './response.service.js';
 import { EnhancedCacheService } from './cache.service.js';
 import { mcpToolRegistration } from './mcp-tool-registration.service.js';
 import { mcpRegistry } from './mcp-registry.service.js';
+
+// Core unified services
+import { unifiedMessageAnalysisService, type UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
+
+// Enhanced intelligence types for compatibility
+import type { MessageAnalysis } from './types.js';
 
 // Import personalization intelligence services
 import { PersonalizationEngine } from './personalization-engine.service.js';
@@ -36,7 +41,6 @@ import type { MCPManager } from '../mcp-manager.service.js';
 export class EnhancedInvisibleIntelligenceService {
   
   // Modular services
-  private analysisService: EnhancedMessageAnalysisService;
   private mcpToolsService: EnhancedMCPToolsService;
   private memoryService: EnhancedMemoryService;
   private uiService: EnhancedUIService;
@@ -52,7 +56,6 @@ export class EnhancedInvisibleIntelligenceService {
   // private crossSessionLearning: CrossSessionLearningEngine;
 
   constructor(mcpManager?: MCPManager) {
-    this.analysisService = new EnhancedMessageAnalysisService();
     this.mcpToolsService = new EnhancedMCPToolsService();
     this.memoryService = new EnhancedMemoryService();
     this.uiService = new EnhancedUIService();
@@ -74,6 +77,21 @@ export class EnhancedInvisibleIntelligenceService {
       // Initialize with fallback implementations if needed
       console.log('📝 Enhanced Intelligence Service initialized with API integrations');
     }
+  }
+
+  /**
+   * Adapter function to convert UnifiedMessageAnalysis to MessageAnalysis for enhanced intelligence compatibility
+   */
+  private adaptAnalysisInterface(unifiedAnalysis: UnifiedMessageAnalysis): MessageAnalysis {
+    return {
+      hasAttachments: unifiedAnalysis.hasAttachments,
+      hasUrls: unifiedAnalysis.hasUrls,
+      attachmentTypes: unifiedAnalysis.attachmentTypes,
+      urls: unifiedAnalysis.urls,
+      complexity: unifiedAnalysis.complexity === 'advanced' ? 'complex' : unifiedAnalysis.complexity,
+      intents: unifiedAnalysis.intents,
+      requiredTools: unifiedAnalysis.requiredTools
+    };
   }
 
   /**
@@ -134,15 +152,19 @@ export class EnhancedInvisibleIntelligenceService {
       const attachments = Array.from(interaction.options.resolved?.attachments?.values() || []);
       
       // Step 2: Create processing context
+      const attachmentInfo = attachments.map(att => ({
+        name: att.name,
+        url: att.url,
+        contentType: att.contentType || undefined
+      }));
+      
+      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(content, attachmentInfo);
+      
       const context: ProcessingContext = {
         userId: interaction.user.id,
         channelId: interaction.channelId,
         guildId: interaction.guildId,
-        analysis: this.analysisService.analyzeMessage(content, attachments.map(att => ({
-          name: att.name,
-          url: att.url,
-          contentType: att.contentType || undefined
-        }))),
+        analysis: this.adaptAnalysisInterface(unifiedAnalysis),
         results: new Map(),
         errors: []
       };
@@ -257,11 +279,13 @@ export class EnhancedInvisibleIntelligenceService {
       }
 
       // Create context for regeneration
+      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(lastPrompt, []);
+      
       const context: ProcessingContext = {
         userId,
         channelId,
         guildId,
-        analysis: this.analysisService.analyzeMessage(lastPrompt, []),
+        analysis: this.adaptAnalysisInterface(unifiedAnalysis),
         results: new Map(),
         errors: []
       };
@@ -357,11 +381,13 @@ export class EnhancedInvisibleIntelligenceService {
       }
 
       // Create processing context
+      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(content, attachments);
+      
       const context: ProcessingContext = {
         userId: message.author.id,
         channelId: message.channelId,
         guildId: message.guildId,
-        analysis: this.analysisService.analyzeMessage(content, attachments),
+        analysis: this.adaptAnalysisInterface(unifiedAnalysis),
         results: new Map(),
         errors: []
       };

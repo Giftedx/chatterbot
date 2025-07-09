@@ -29,7 +29,6 @@ import { mcpIntegrationOrchestrator, MCPIntegrationOrchestratorService } from '.
 // Modularized Intelligence Services
 import {
   intelligencePermissionService,
-  intelligenceAnalysisService,
   intelligenceCapabilityService,
   intelligenceAdminService,
   intelligenceContextService,
@@ -37,6 +36,12 @@ import {
   type EnhancedContext,
   type MCPResultValue
 } from './intelligence/index.js';
+
+// Core unified services
+import { unifiedMessageAnalysisService, type UnifiedMessageAnalysis } from './core/message-analysis.service.js';
+
+// Interface compatibility types
+import type { IntelligenceAnalysis } from './intelligence/analysis.service.js';
 
 /**
  * Unified Intelligence Service - Single /optin command with comprehensive AI-driven features
@@ -92,6 +97,28 @@ export class UnifiedIntelligenceService {
         metadata: { error: String(error) }
       });
     }
+  }
+
+  /**
+   * Adapter function to convert UnifiedMessageAnalysis to IntelligenceAnalysis for backward compatibility
+   */
+  private adaptAnalysisInterface(unifiedAnalysis: UnifiedMessageAnalysis): IntelligenceAnalysis {
+    return {
+      needsPersonaSwitch: unifiedAnalysis.needsPersonaSwitch,
+      suggestedPersona: unifiedAnalysis.suggestedPersona,
+      needsAdminFeatures: unifiedAnalysis.needsAdminFeatures,
+      adminCommands: unifiedAnalysis.adminCommands,
+      needsMultimodal: unifiedAnalysis.needsMultimodal,
+      attachmentAnalysis: unifiedAnalysis.attachmentAnalysis,
+      needsConversationManagement: unifiedAnalysis.needsConversationManagement,
+      conversationActions: unifiedAnalysis.conversationActions,
+      needsMemoryOperation: unifiedAnalysis.needsMemoryOperation,
+      memoryActions: unifiedAnalysis.memoryActions,
+      needsMCPTools: unifiedAnalysis.needsMCPTools,
+      mcpRequirements: unifiedAnalysis.mcpRequirements,
+      complexityLevel: unifiedAnalysis.complexity,
+      confidence: unifiedAnalysis.confidence
+    };
   }
 
   /**
@@ -381,7 +408,8 @@ export class UnifiedIntelligenceService {
       });
 
       // Step 3: Analyze message to determine needed capabilities
-      const analysis = await intelligenceAnalysisService.analyzeMessage(message, capabilities);
+      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(message, [], capabilities);
+      const analysis = this.adaptAnalysisInterface(unifiedAnalysis);
 
       // Step 4: Check for admin features first (they might provide direct responses)
       if (intelligenceAdminService.hasAdminIntent(message.content)) {
@@ -406,7 +434,7 @@ export class UnifiedIntelligenceService {
         message,
         analysis,
         capabilities,
-        mcpResult.results as Map<string, MCPResultValue>
+        mcpResult.results as any
       );
 
       // Step 7: Generate AI response using the Agentic Intelligence Service

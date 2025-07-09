@@ -161,8 +161,11 @@ export class UnifiedMessageAnalysisService {
    * Determine attachment type
    */
   private getAttachmentType(attachment: Attachment | AttachmentInfo): string {
-    const name = 'name' in attachment ? attachment.name : attachment.filename;
-    const contentType = 'contentType' in attachment ? attachment.contentType : attachment.contentType;
+    // Both interfaces should have 'name', but handle both cases safely
+    const name = attachment.name;
+    const contentType = 'contentType' in attachment 
+      ? attachment.contentType 
+      : (attachment as any).contentType;
     
     const ext = name?.split('.').pop()?.toLowerCase();
     const type = contentType?.toLowerCase() || '';
