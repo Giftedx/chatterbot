@@ -308,10 +308,12 @@ export class DirectMCPExecutor {
             const html = response.data;
             const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
             const title = titleMatch ? titleMatch[1].trim() : url;
-            const textContent = html
-              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
+            const sanitizeHtml = require('sanitize-html');
+            const sanitizedHtml = sanitizeHtml(html, {
+              allowedTags: [],
+              allowedAttributes: {},
+            });
+            const textContent = sanitizedHtml
               .replace(/\s+/g, ' ')
               .trim()
               .substring(0, 1000);
