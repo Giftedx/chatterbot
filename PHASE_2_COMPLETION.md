@@ -23,8 +23,8 @@
 **The Discord Gemini Bot now provides:**
 
 ### **Dual Intelligence Modes**
-1. **Unified Intelligence** (Phase 1) - `/optin` → Contextual AI with agentic features
-2. **Enhanced Intelligence** (Phase 2) - `/optin <message>` → Advanced AI with MCP tools
+1. **Core Intelligence** (Phase 1) - `/chat` → Contextual AI with agentic features
+2. **Enhanced Intelligence** (Phase 2) - `/chat <message>` → Advanced AI with MCP tools
 
 ### **Enterprise-Grade Features**
 - **Contextual Help**: Responds to "help", "what can you do"
@@ -132,13 +132,13 @@ npm run dev
 
 ### **Basic Test**
 ```
-User: /optin Hello, can you help me research something?
+User: /chat Hello, can you help me research something?
 Bot: [Enhanced processing with web search + AI analysis]
 ```
 
 ### **Advanced Test**
 ```
-User: /optin [uploads image] Analyze this and research related topics
+User: /chat [uploads image] Analyze this and research related topics
 Bot: [Multi-modal analysis + web research + contextual insights]
 ```
 

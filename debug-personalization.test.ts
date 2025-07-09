@@ -2,8 +2,8 @@
  * Debug test for personalization engine topic extraction
  */
 
-import { PersonalizationEngine } from '../personalization-engine.service.js';
-import { MCPManager } from '../../mcp-manager.service.js';
+import { PersonalizationEngine } from './src/services/enhanced-intelligence/personalization-engine.service.js';
+import { MCPManager } from './src/services/mcp-manager.service.js';
 
 describe('Debug Personalization Engine', () => {
   let personalizationEngine: PersonalizationEngine;

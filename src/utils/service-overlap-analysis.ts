@@ -37,14 +37,6 @@ const currentServices: ServiceInterval[] = [
 
   // Intelligence Services
   {
-    start: 200,
-    end: 350,
-    serviceName: 'UnifiedIntelligenceService',
-    functionality: ['conversation-handling', 'response-generation', 'permission-management', 'context-building'],
-    codeLines: 580,
-    dependencies: ['gemini', 'discord.js', 'core-services', 'intelligence-modules']
-  },
-  {
     start: 300,
     end: 500,
     serviceName: 'EnhancedInvisibleIntelligenceService',

@@ -91,8 +91,8 @@ You should see:
 
 ### 🧠 **Dual Intelligence Modes**
 
-**Unified Intelligence** (Phase 1): `/optin` → Contextual AI with agentic features
-**Enhanced Intelligence** (Phase 2): `/optin <message>` → Advanced AI with MCP tools
+**Core Intelligence** (Phase 1): `/chat` → Contextual AI with agentic features
+**Enhanced Intelligence** (Phase 2): `/chat <message>` → Advanced AI with MCP tools
 
 ### 🔍 **Real MCP API Integration**
 
@@ -114,14 +114,14 @@ Enhanced Intelligence provides excellent functionality even without external API
 ### Test Enhanced Intelligence
 
 ```
-User: /optin Can you research the latest developments in AI?
+User: /chat Can you research the latest developments in AI?
 Bot: [Uses real web search + content extraction + AI analysis]
 ```
 
 ### Test Multi-modal Processing
 
 ```
-User: /optin [uploads image] What's in this image and what does it mean?
+User: /chat [uploads image] What's in this image and what does it mean?
 Bot: [Advanced image analysis + contextual insights]
 ```
 
@@ -177,7 +177,7 @@ src/services/enhanced-intelligence/
 After activation, verify Enhanced Intelligence is working:
 
 1. **Check Bot Startup Logs**: Look for "Enhanced Intelligence (MCP-enabled)"
-2. **Test `/optin` Command**: Should show enhanced capabilities
+2. **Test `/chat` Command**: Should show enhanced capabilities
 3. **Test with Complex Query**: Try research or analysis requests
 4. **Monitor Performance**: Check response times and capabilities
 

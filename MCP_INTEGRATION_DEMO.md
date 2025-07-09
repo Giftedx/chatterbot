@@ -28,7 +28,7 @@ This document demonstrates the completed MCP (Model Context Protocol) integratio
 
 ### Basic User Flow
 
-1. **User Runs `/optin`** - Activates AI intelligence system
+1. **User Runs `/chat`** - Activates AI intelligence system
 2. **Natural Conversation** - User asks questions that may require external tools
 3. **Automatic Tool Detection** - AI determines when MCP tools are needed
 4. **Consent Prompt** - Interactive Discord buttons for permission approval

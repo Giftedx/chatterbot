@@ -7,7 +7,7 @@ describe('Enhanced Intelligence slash command registration', () => {
     const service = new EnhancedInvisibleIntelligenceService();
     const cmd = service.createSlashCommand();
 
-    expect(cmd.name).toBe('optin');
+    expect(cmd.name).toBe('chat');
     expect(cmd.description).toBe('Opt into enhanced AI conversation with images, research and more');
   });
 });

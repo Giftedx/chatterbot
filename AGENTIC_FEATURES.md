@@ -37,7 +37,7 @@ Agentic AI goes beyond simple question-answering. It's an AI system that:
 ## 📋 Commands
 
 ### Core Commands
-- `/optin [prompt]` - Get AI assistance with agentic intelligence
+- `/chat [prompt]` - Get AI assistance with agentic intelligence
 - `/agentic-help` - Get help with agentic features
 
 ### Knowledge Management
@@ -78,7 +78,7 @@ AGENTIC_MODERATOR_ROLES=moderator_role_id_1,moderator_role_id_2
 ## 🔄 How It Works
 
 ### 1. Query Processing
-When a user asks a question (via `/optin` or mentions):
+When a user asks a question (via `/chat` or mentions):
 
 1. **Knowledge Check**: Searches the knowledge base for relevant information
 2. **Response Generation**: Generates a response using the best available information

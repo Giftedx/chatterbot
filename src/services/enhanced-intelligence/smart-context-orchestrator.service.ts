@@ -8,11 +8,12 @@
 
 import { Message } from 'discord.js';
 import { MCPManager } from '../mcp-manager.service.js';
-import { PersonalizationEngine } from './personalization-engine.service.js';
-import { DirectMCPExecutor } from './direct-mcp-executor.service.js';
 import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
 import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
+import { DirectMCPExecutor, directMCPExecutor } from './direct-mcp-executor.service.js';
+import { PersonalizationEngine, personalizationEngine } from './personalization-engine.service.js';
+import { mcpManager } from '../mcp-manager.service.js';
 
 export interface SmartContextResult {
   enhancedPrompt: string;
@@ -51,10 +52,14 @@ export class SmartContextOrchestratorService {
   private personalizationEngine: PersonalizationEngine;
   private directExecutor: DirectMCPExecutor;
 
-  constructor(mcpManager?: MCPManager) {
+  constructor(
+    mcpManager: MCPManager = mcpManager,
+    personalizationEngine?: PersonalizationEngine,
+    directExecutor?: DirectMCPExecutor
+    ) {
     this.mcpManager = mcpManager;
-    this.personalizationEngine = new PersonalizationEngine(mcpManager);
-    this.directExecutor = new DirectMCPExecutor();
+    this.personalizationEngine = personalizationEngine || new PersonalizationEngine(mcpManager);
+    this.directExecutor = directExecutor || new DirectMCPExecutor();
   }
 
   /**
@@ -84,7 +89,7 @@ export class SmartContextOrchestratorService {
     try {
       // Phase 1: Memory and Personalization Context
       const personalContext = await this.buildPersonalizedContext(
-        message, analysis, capabilities, strategy
+        message
       );
       if (personalContext) {
         enhancedPrompt = personalContext.prompt;
@@ -98,7 +103,7 @@ export class SmartContextOrchestratorService {
       // Phase 2: Real-Time Information Context
       if (strategy.prioritizeRealTime && this.needsRealTimeInfo(message.content)) {
         const realTimeContext = await this.buildRealTimeContext(
-          message.content, analysis, strategy
+          message.content
         );
         if (realTimeContext) {
           enhancedPrompt += `\n\n[REAL-TIME INFORMATION]\n${realTimeContext.content}`;
@@ -112,7 +117,7 @@ export class SmartContextOrchestratorService {
       // Phase 3: Deep Knowledge Context
       if (strategy.deepWebResearch && this.needsDeepResearch(message.content, analysis)) {
         const knowledgeContext = await this.buildDeepKnowledgeContext(
-          message.content, analysis, strategy
+          message.content
         );
         if (knowledgeContext) {
           enhancedPrompt += `\n\n[RESEARCH CONTEXT]\n${knowledgeContext.content}`;
@@ -125,7 +130,7 @@ export class SmartContextOrchestratorService {
       // Phase 4: Cross-Reference and Synthesis
       if (strategy.crossReferenceMemory && contextSources.length > 1) {
         const synthesizedContext = await this.synthesizeContext(
-          enhancedPrompt, contextSources, analysis
+          enhancedPrompt, contextSources
         );
         if (synthesizedContext) {
           enhancedPrompt = synthesizedContext.enhancedPrompt;
@@ -136,7 +141,7 @@ export class SmartContextOrchestratorService {
       // Phase 5: User Expertise Adaptation
       if (strategy.adaptToUserExpertise) {
         const adaptedContext = await this.adaptContextToUserExpertise(
-          enhancedPrompt, message.author.id, analysis
+          enhancedPrompt, message.author.id
         );
         if (adaptedContext) {
           enhancedPrompt = adaptedContext.prompt;
@@ -182,10 +187,7 @@ export class SmartContextOrchestratorService {
    * Build personalized context using memory and user patterns
    */
   private async buildPersonalizedContext(
-    message: Message,
-    _analysis: UnifiedMessageAnalysis,
-    _capabilities: UserCapabilities,
-    _strategy: ContextOrchestrationStrategy
+    message: Message
   ): Promise<{ prompt: string; sources: string[]; memoryEntries: number; personalizationFactors: number } | null> {
     try {
       const sources: string[] = [];
@@ -242,9 +244,7 @@ export class SmartContextOrchestratorService {
    * Build real-time context using web search and current information
    */
   private async buildRealTimeContext(
-    content: string,
-    _analysis: UnifiedMessageAnalysis,
-    _strategy: ContextOrchestrationStrategy
+    content: string
   ): Promise<{ content: string; sources: string[]; sourceCount: number } | null> {
     try {
       // Extract search queries from content
@@ -288,9 +288,7 @@ export class SmartContextOrchestratorService {
    * Build deep knowledge context using content extraction and research
    */
   private async buildDeepKnowledgeContext(
-    content: string,
-    _analysis: UnifiedMessageAnalysis,
-    _strategy: ContextOrchestrationStrategy
+    content: string
   ): Promise<{ content: string; sources: string[]; sourceCount: number } | null> {
     try {
       const urls = this.extractUrls(content);
@@ -333,8 +331,7 @@ export class SmartContextOrchestratorService {
    */
   private async synthesizeContext(
     prompt: string,
-    sources: string[],
-    _analysis: UnifiedMessageAnalysis
+    sources: string[]
   ): Promise<{ enhancedPrompt: string } | null> {
     try {
       // Use sequential thinking to synthesize context if available
@@ -368,8 +365,7 @@ export class SmartContextOrchestratorService {
    */
   private async adaptContextToUserExpertise(
     prompt: string,
-    userId: string,
-    _analysis: UnifiedMessageAnalysis
+    userId: string
   ): Promise<{ prompt: string } | null> {
     try {
       // Get user expertise level from personalization engine
@@ -436,7 +432,7 @@ export class SmartContextOrchestratorService {
     const questionPattern = /([^.!?]*\?)/g;
     const questions = content.match(questionPattern);
     if (questions) {
-      queries.push(...questions.map(q => q.trim()));
+      queries.push(...questions.map(q => q.trim().replace(/\?$/, '')));
     }
     
     // Extract key topics
@@ -478,4 +474,8 @@ export class SmartContextOrchestratorService {
 }
 
 // Export singleton instance
-export const smartContextOrchestrator = new SmartContextOrchestratorService();
+export const smartContextOrchestrator = new SmartContextOrchestratorService(
+  mcpManager,
+  personalizationEngine,
+  directMCPExecutor
+);

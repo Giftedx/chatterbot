@@ -18,7 +18,7 @@ describe('End-to-End Enhanced Intelligence Integration', () => {
       const slashCommand = enhancedService.createSlashCommand();
       
       expect(slashCommand).toBeDefined();
-      expect(slashCommand.name).toBe('optin');
+      expect(slashCommand.name).toBe('chat');
       expect(slashCommand.description).toContain('enhanced AI conversation');
     });
 
