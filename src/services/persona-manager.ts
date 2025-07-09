@@ -4,7 +4,7 @@ import { prisma } from '../db/prisma';
 async function loadPersistedPersonas() {
     try {
     const dbPersonas = await prisma.persona.findMany();
-    dbPersonas.forEach(p => personaRegistry.upsert({ name: p.name, systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.parse(p.styleHints) : undefined }));
+    dbPersonas.forEach((p: any) => personaRegistry.upsert({ name: p.name, systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.parse(p.styleHints) : undefined }));
   } catch (err) {
     console.error('Failed to load personas from DB', err);
   }

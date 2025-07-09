@@ -410,7 +410,7 @@ export class ConversationThreadService {
         }
       });
 
-      return threads.map(thread => ({
+      return threads.map((thread: any) => ({
         id: thread.id,
         channelId: thread.channelId,
         userId: thread.userId,
@@ -570,7 +570,7 @@ export class ConversationThreadService {
         }
       });
 
-      return threads.map(thread => ({
+      return threads.map((thread: any) => ({
         id: thread.id,
         channelId: thread.channelId,
         userId: thread.userId,
