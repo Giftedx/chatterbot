@@ -5,6 +5,7 @@ import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard
 import { healthCheck } from './health.js';
 import { agenticCommands } from './commands/agentic-commands.js';
 import { logger } from './utils/logger.js';
+import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
 // Import AgenticIntelligenceService if its direct command handling is to be preserved outside CoreIntelligenceService
 // import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 
@@ -65,6 +66,23 @@ client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
   console.log(`🤖 Core Intelligence Discord Bot v3.0 ready!`);
   console.log(`Features: Agentic(${enableAgenticFeatures}), Personalization(${enablePersonalization}), EnhancedMemory(${enableEnhancedMemory}), EnhancedUI(${enableEnhancedUI}), ResponseCache(${enableResponseCache})`);
+
+  // Initialize Enhanced Intelligence if enabled
+  if (enablePersonalization) {
+    console.log(`🚀 Activating Enhanced Intelligence features...`);
+    try {
+      const enhancedStatus = await enhancedIntelligenceActivation.activateEnhancedIntelligence();
+      console.log(`✅ Enhanced Intelligence activated with ${enhancedStatus.availableFeatures.length} features:`);
+      enhancedStatus.availableFeatures.forEach(feature => {
+        console.log(`   - ${feature}`);
+      });
+      console.log(`🔗 MCP Connections: ${enhancedStatus.mcpConnectionsActive} active`);
+      console.log(`⚡ Production Optimizations: ${enhancedStatus.performanceOptimizationsActive ? 'Enabled' : 'Disabled'}`);
+    } catch (error) {
+      console.error(`❌ Enhanced Intelligence activation failed:`, error);
+      console.log(`⚡ Bot will continue with standard capabilities.`);
+    }
+  }
 
   if (mcpManagerInstance) {
     console.log(`🔧 Initializing MCP Manager...`);
@@ -161,6 +179,12 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
   
   try {
+    if (enablePersonalization && enhancedIntelligenceActivation.isActivated()) {
+      console.log('🧠 Shutting down Enhanced Intelligence...');
+      await enhancedIntelligenceActivation.shutdown();
+      console.log('✅ Enhanced Intelligence shutdown complete');
+    }
+    
     if (mcpManagerInstance) {
       console.log('🔧 Shutting down MCP Manager...');
       await mcpManagerInstance.shutdown();
