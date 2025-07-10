@@ -101,15 +101,8 @@ export class MockPrismaClient {
         return created;
       }
     },
-    delete: async (query: any) => {
-      const existing = Array.from(this.moderationConfigs.values()).find(c => c.guildId === query.where.guildId);
-      if (existing) {
-        this.moderationConfigs.delete(existing.id);
-        return existing;
-      }
-      return null;
-    },
-    deleteMany: async () => {
+
+    deleteMany: async (query: any) => {
       const count = this.moderationConfigs.size;
       this.moderationConfigs.clear();
       return { count };
@@ -142,7 +135,9 @@ export class MockPrismaClient {
     },
     findFirst: async (query: any) => {
       return Array.from(this.userMemories.values()).find(m => 
-        m.userId === query.where.userId && m.guildId === query.where.guildId
+        m.userId === query.where.userId && 
+        m.guildId === (query.where.guildId || '')
+
       ) || null;
     },
     findUnique: async (query: any) => {
@@ -166,7 +161,7 @@ export class MockPrismaClient {
     upsert: async (query: any) => {
       const whereClause = query.where.userId_guildId;
       const existing = Array.from(this.userMemories.values()).find(m => 
-        m.userId === whereClause?.userId && m.guildId === whereClause?.guildId
+        m.userId === whereClause.userId && m.guildId === whereClause.guildId
       );
       if (existing) {
         const updated = { ...existing, ...query.update, lastUpdated: new Date() };
@@ -179,50 +174,39 @@ export class MockPrismaClient {
         return created;
       }
     },
-    update: async (query: any) => {
-      const whereClause = query.where.userId_guildId;
-      const existing = Array.from(this.userMemories.values()).find(m => 
-        m.userId === whereClause?.userId && m.guildId === whereClause?.guildId
-      );
-      if (existing) {
-        const updated = { ...existing, ...query.data, lastUpdated: new Date() };
-        this.userMemories.set(existing.id, updated);
-        return updated;
-      }
-      throw new Error('Record not found');
-    },
     deleteMany: async (query: any) => {
+      const where = query?.where;
       let count = 0;
-      const toDelete = [];
       
-      for (const [id, memory] of this.userMemories.entries()) {
-        let shouldDelete = true;
-        
-        if (query?.where?.userId?.startsWith) {
-          shouldDelete = memory.userId.startsWith(query.where.userId.startsWith);
-        } else if (query?.where?.userId) {
-          shouldDelete = memory.userId === query.where.userId;
-        } else if (query?.where?.guildId) {
-          shouldDelete = memory.guildId === query.where.guildId;
-        }
-        
-        if (shouldDelete) {
-          toDelete.push(id);
+      if (where?.userId?.startsWith) {
+        // Handle startsWith query
+        const prefix = where.userId.startsWith;
+        const toDelete = Array.from(this.userMemories.entries()).filter(([_, memory]) => 
+          memory.userId.startsWith(prefix)
+        );
+        toDelete.forEach(([id, _]) => {
+          this.userMemories.delete(id);
           count++;
-        }
+        });
+      } else {
+        // Delete all if no specific where clause
+        count = this.userMemories.size;
+        this.userMemories.clear();
       }
       
-      toDelete.forEach(id => this.userMemories.delete(id));
       return { count };
     },
     delete: async (query: any) => {
-      const existing = Array.from(this.userMemories.values()).find(m => 
-        m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
+      const whereClause = query.where.userId_guildId;
+      const toDelete = Array.from(this.userMemories.entries()).find(([_, memory]) => 
+        memory.userId === whereClause.userId && memory.guildId === whereClause.guildId
       );
-      if (existing) {
-        this.userMemories.delete(existing.id);
-        return existing;
+      
+      if (toDelete) {
+        this.userMemories.delete(toDelete[0]);
+        return toDelete[1];
       }
+      
       return null;
     }
   };
