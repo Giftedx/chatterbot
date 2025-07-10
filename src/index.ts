@@ -68,7 +68,7 @@ client.once('ready', async () => {
   console.log(`Features: Agentic(${enableAgenticFeatures}), Personalization(${enablePersonalization}), EnhancedMemory(${enableEnhancedMemory}), EnhancedUI(${enableEnhancedUI}), ResponseCache(${enableResponseCache})`);
 
   // Initialize Enhanced Intelligence if enabled
-  if (enablePersonalization) {
+  if (process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true') {
     console.log(`🚀 Activating Enhanced Intelligence features...`);
     try {
       const enhancedStatus = await enhancedIntelligenceActivation.activateEnhancedIntelligence();
