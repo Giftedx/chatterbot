@@ -82,14 +82,14 @@ GEMINI_API_KEY=your_gemini_api_key
 # Optional
 NODE_ENV=production
 ENABLE_ENHANCED_INTELLIGENCE=true
-DATABASE_URL=your_database_url
+DATABASE_URL=your_database_url # Used for database features; bot works without it if those features are not enabled.
 ```
 
 ## 📊 Monitoring
 
 ### Health Check Endpoint
 
-Your bot includes a health check endpoint at `/health` that returns:
+Your bot includes a health check endpoint at `/health` that returns a JSON object with status, uptime, memory usage, environment, version, and feature flags. This endpoint is confirmed to be working as described.
 
 ```json
 {
@@ -111,6 +111,12 @@ Your bot includes a health check endpoint at `/health` that returns:
   }
 }
 ```
+
+### Docker Support
+
+This project includes Docker support for building and running the application. You can use the `npm run docker:build`, `npm run docker:run`, `npm run docker:stop`, and `npm run docker:logs` commands as defined in `package.json`.
+
+**Note:** The contents of `docker-compose.yml` and any specific GitHub Actions workflows (e.g., `.github/workflows/deploy.yml`) could not be automatically verified during this documentation review due to technical limitations. Please manually review these files to ensure they align with your deployment strategy.
 
 ### Uptime Monitoring
 

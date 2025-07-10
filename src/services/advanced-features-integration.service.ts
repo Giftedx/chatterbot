@@ -502,4 +502,3 @@ function getValidatedVectorProvider(provider?: string): 'pinecone' | 'weaviate' 
   }
   return 'chroma'; // Default value
 }
-});

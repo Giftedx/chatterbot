@@ -24,9 +24,9 @@ export type ModerationStatus = 'approved' | 'flagged' | 'rejected' | 'pending_re
 export interface MediaFile {
   id: number;
   userId: string;
-  guildId?: string;
+  guildId?: string | null;
   channelId: string;
-  messageId?: string;
+  messageId?: string | null;
   
   // File metadata
   filename: string;

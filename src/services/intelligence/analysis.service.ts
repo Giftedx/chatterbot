@@ -176,7 +176,7 @@ export class IntelligenceAnalysisService {
    */
   private analyzeAttachments(attachments: Attachment[], content: string): AttachmentAnalysis[] {
     return attachments.map(attachment => {
-      const type = this.getContentTypeCategory(attachment.contentType);
+      const type = this.getContentTypeCategory(attachment.contentType ?? undefined);
       
       return {
         type,

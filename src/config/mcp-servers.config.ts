@@ -233,15 +233,15 @@ export function getServersByPriority(priority: MCPServerConfig['priority']): Rec
 /**
  * Validate server configuration
  */
-export function validateServerConfig(serverName: string, config: MCPServerConfig): boolean {
+export function validateServerConfig(serverName: string, config: MCPServerConfig): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
   // Check if required environment variables are available
   for (const [key, value] of Object.entries(config.env)) {
     if (key.endsWith('_KEY') || key.endsWith('_TOKEN')) {
       if (!value) {
-        console.warn(`Missing required environment variable for ${serverName}: ${key}`);
-        return false;
+        errors.push(`Missing required environment variable for ${serverName}: ${key}`);
       }
     }
   }
-  return true;
+  return { isValid: errors.length === 0, errors };
 }

@@ -175,7 +175,7 @@ Bot: [Detects research need → performs web search → extracts key content →
 | Script | Purpose | Status |
 |--------|---------|--------|
 | `npm run dev` | Development with hot reload | ✅ Working |
-| `npm run build` | TypeScript compilation | ⚠️ Hangs (use tsx for now) |
+| `npm run build` | TypeScript compilation | ✅ Working |
 | `npm start` | Run compiled version | ✅ Works in production |
 | `npm test` | Run test suite | ✅ 54/54 suites passing (100% tests) |
 | `npm run lint` | Code quality check | ✅ Working |

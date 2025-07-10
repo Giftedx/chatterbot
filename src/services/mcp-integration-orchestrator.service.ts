@@ -137,7 +137,7 @@ export class MCPIntegrationOrchestratorService {
       }
 
       // Phase 3: Medium Priority Tools (Execute for complex queries)
-      if (this.isPhaseEnabled(3) && analysis.complexityLevel === 'complex' && capabilities.hasAdminCommands) {
+      if (this.isPhaseEnabled(3) && analysis.complexity === 'complex' && capabilities.hasAdminCommands) {
         await this.executePhase3Tools(context, results, toolsExecuted, fallbacksUsed);
       }
 
@@ -505,7 +505,7 @@ export class MCPIntegrationOrchestratorService {
 
     if (analysis.needsMemoryOperation) capabilities.push('memory', 'context');
     if (analysis.needsMCPTools) capabilities.push('search', 'web', 'extraction');
-    if (analysis.complexityLevel === 'complex') capabilities.push('reasoning', 'analysis');
+    if (analysis.complexity === 'complex') capabilities.push('reasoning', 'analysis');
     if (analysis.needsMultimodal) capabilities.push('multimodal', 'content');
     if (analysis.needsAdminFeatures) capabilities.push('database', 'analytics');
 
@@ -514,7 +514,7 @@ export class MCPIntegrationOrchestratorService {
 
   private determinePriority(analysis: IntelligenceAnalysis): 'low' | 'medium' | 'high' | 'critical' {
     if (analysis.needsAdminFeatures) return 'critical';
-    if (analysis.complexityLevel === 'complex') return 'high';
+    if (analysis.complexity === 'complex') return 'high';
     if (analysis.needsMCPTools) return 'medium';
     return 'low';
   }

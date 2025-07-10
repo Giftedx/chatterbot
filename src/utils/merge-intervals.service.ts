@@ -69,6 +69,15 @@ export class MergeIntervalsService {
   }
 
   /**
+   * Calculate duplicate lines saved by merging
+   */
+  private calculateDuplicateLines(original: ServiceInterval[], merged: ServiceInterval[]): number {
+    const originalTotalLines = original.reduce((sum, service) => sum + service.codeLines, 0);
+    const mergedTotalLines = merged.reduce((sum, service) => sum + service.codeLines, 0);
+    return originalTotalLines - mergedTotalLines;
+  }
+
+  /**
    * Analyze services for overlapping functionality and provide consolidation recommendations
    */
   analyzeServiceOverlaps(services: ServiceInterval[]): MergedServiceResult {
@@ -77,7 +86,7 @@ export class MergeIntervalsService {
     const mergedCount = merged.length;
     
     // Calculate duplicate lines saved
-    const duplicateLines = this.calculateDuplicateLines(services);
+    const duplicateLines = this.calculateDuplicateLines(services, merged);
 
     const recommendations = this.generateConsolidationRecommendations(services, merged);
 
@@ -194,6 +203,19 @@ export class MergeIntervalsService {
       excessiveDependencies,
       complexServices
     };
+  }
+
+  /**
+   * Calculates the total number of lines that are duplicated/overlapped
+   * by comparing original service lines to merged service lines.
+   */
+  private calculateDuplicateLines(originalServices: ServiceInterval[]): number {
+    const totalOriginalLines = originalServices.reduce((sum, service) => sum + service.codeLines, 0);
+    const mergedServices = this.mergeServiceIntervals([...originalServices]);
+    const totalMergedLines = mergedServices.reduce((sum, service) => sum + service.codeLines, 0);
+    
+    // The difference represents lines that were merged due to overlap
+    return Math.max(0, totalOriginalLines - totalMergedLines);
   }
 }
 

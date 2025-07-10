@@ -15,6 +15,7 @@ export interface MCPConsentDecision {
   action: 'allow_once' | 'always_allow' | 'deny' | 'always_deny';
   timestamp: Date;
   guildId?: string;
+  [key: string]: unknown; // Add index signature
 }
 
 export interface MCPAuditLog {
@@ -27,6 +28,7 @@ export interface MCPAuditLog {
   timestamp: Date;
   guildId?: string;
   errorMessage?: string;
+  [key: string]: unknown; // Add index signature
 }
 
 export interface MCPToolExecutionContext {
@@ -228,7 +230,7 @@ export class MCPSecurityManager {
       // Log to structured logger
       logger.info('MCP Tool Execution', {
         operation: 'mcp-tool-execution',
-        metadata: auditLog
+        metadata: { ...auditLog } // Use spread operator to conform to Record<string, unknown>
       });
 
       // Store in database for long-term audit trail
@@ -236,7 +238,7 @@ export class MCPSecurityManager {
     } catch (error) {
       logger.error('Failed to log MCP tool execution', {
         operation: 'mcp-audit-logging',
-        metadata: { error: String(error), auditLog }
+        metadata: { error: String(error), ...auditLog } // Use spread operator here too
       });
     }
   }
@@ -324,7 +326,7 @@ export class MCPSecurityManager {
     // In a real implementation, this would store in the database
     logger.info('Storing MCP consent decision', {
       operation: 'mcp-consent-storage',
-      metadata: consent
+      metadata: { ...consent } // Use spread operator to conform to Record<string, unknown>
     });
   }
 
@@ -332,7 +334,7 @@ export class MCPSecurityManager {
     // In a real implementation, this would store in the database
     logger.info('Storing MCP audit log', {
       operation: 'mcp-audit-storage',
-      metadata: auditLog
+      metadata: { ...auditLog } // Use spread operator to conform to Record<string, unknown>
     });
   }
 

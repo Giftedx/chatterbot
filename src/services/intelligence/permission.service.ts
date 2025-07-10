@@ -15,6 +15,8 @@ export interface UserCapabilities {
   hasAdvancedAI: boolean;
   hasAnalytics: boolean;
   hasAdminCommands: boolean;
+  hasAdmin: boolean; // Added for explicit admin check
+  hasMCPTools: boolean; // Added for explicit MCP tools check
 }
 
 export interface PermissionContext {
@@ -52,12 +54,14 @@ export class IntelligencePermissionService {
    */
   public async getUserCapabilities(userId: string, context: Partial<PermissionContext>): Promise<UserCapabilities> {
     try {
-      const [hasBasicAI, hasMultimodal, hasAdvancedAI, hasAnalytics, hasAdminCommands] = await Promise.all([
+      const [hasBasicAI, hasMultimodal, hasAdvancedAI, hasAnalytics, hasAdminCommands, hasAdmin, hasMCPTools] = await Promise.all([
         rbacService.hasPermission(userId, 'ai.query', { guildId: context.guildId }),
         rbacService.hasPermission(userId, 'ai.multimodal', { guildId: context.guildId }),
         rbacService.hasPermission(userId, 'ai.advanced', { guildId: context.guildId }),
         rbacService.hasPermission(userId, 'analytics.view', { guildId: context.guildId }),
-        rbacService.hasPermission(userId, 'commands.admin', { guildId: context.guildId })
+        rbacService.hasPermission(userId, 'commands.admin', { guildId: context.guildId }),
+        rbacService.hasPermission(userId, 'commands.admin', { guildId: context.guildId }), // Assuming hasAdmin maps to commands.admin
+        rbacService.hasPermission(userId, 'ai.mcp_tools', { guildId: context.guildId })  // Assuming hasMCPTools maps to ai.mcp_tools
       ]);
 
       return {
@@ -65,7 +69,9 @@ export class IntelligencePermissionService {
         hasMultimodal,
         hasAdvancedAI,
         hasAnalytics,
-        hasAdminCommands
+        hasAdminCommands,
+        hasAdmin,
+        hasMCPTools
       };
     } catch (error) {
       logger.error('Failed to get user capabilities', {
@@ -79,7 +85,9 @@ export class IntelligencePermissionService {
         hasMultimodal: false,
         hasAdvancedAI: false,
         hasAnalytics: false,
-        hasAdminCommands: false
+        hasAdminCommands: false,
+        hasAdmin: false,
+        hasMCPTools: false
       };
     }
   }

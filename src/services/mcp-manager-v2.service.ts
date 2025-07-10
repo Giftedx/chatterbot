@@ -223,7 +223,7 @@ export class MCPManager {
 
     try {
       // Validate server configuration
-      const validationResult = validateServerConfig(config);
+      const validationResult = validateServerConfig(name, config);
       if (!validationResult.isValid) {
         logger.error('Invalid MCP server configuration', {
           operation: 'mcp-connect',

@@ -29,22 +29,6 @@ async function initializePrisma() {
   return prisma;
 }
 
-// Initialize immediately for test environment  
-if (process.env.NODE_ENV === 'test') {
-  // Use mock for tests to avoid async initialization issues
-  try {
-    const { mockPrisma } = require('./prisma-mock.js');
-    prisma = mockPrisma;
-  } catch (error) {
-    console.log('⚠️ Mock Prisma not available, creating minimal mock');
-    prisma = {
-      $connect: () => Promise.resolve(),
-      $disconnect: () => Promise.resolve(),
-    };
-  }
-  return prisma;
-}
-
 // Initialize synchronously for non-test environments, async for test environments
 if (process.env.NODE_ENV === 'test') {
   // For tests, we'll initialize lazily when needed

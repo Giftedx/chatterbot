@@ -3,15 +3,7 @@
  * Core file analysis coordination and processing
  */
 
-// Use local interface instead of Prisma import
-interface MediaFile {
-  id: number;
-  filename: string;
-  contentType: string;
-  size: number;
-  // Add other required properties as needed
-}
-
+import { MediaFile } from '@prisma/client';
 import {
   FileProcessingOptions,
   MultimodalAnalysisResult,
