@@ -12,15 +12,15 @@ import {
 import { URL } from 'url';
 
 // MCP specific
-import { MCPManager } from './mcp-manager.service';
-import { UnifiedMCPOrchestratorService, MCPOrchestrationResult, MCPToolResult } from './core/mcp-orchestrator.service';
+import { MCPManager } from './mcp-manager.service.js';
+import { UnifiedMCPOrchestratorService, MCPOrchestrationResult, MCPToolResult } from './core/mcp-orchestrator.service.js';
 
 // Unified Core Services
 import { UnifiedAnalyticsService } from './core/unified-analytics.service.js';
 
 // Agentic and Gemini
-import { AgenticIntelligenceService, AgenticQuery, AgenticResponse } from './agentic-intelligence.service';
-import { GeminiService } from './gemini.service';
+import { AgenticIntelligenceService, AgenticQuery, AgenticResponse } from './agentic-intelligence.service.js';
+import { GeminiService } from './gemini.service.js';
 
 // Core Intelligence Sub-Services
 import {
@@ -31,28 +31,30 @@ import {
     // IntelligenceAnalysis, // Not directly used here, adapted from UnifiedMessageAnalysis
     intelligenceAdminService,
     intelligenceCapabilityService
-} from './intelligence';
+} from './intelligence/index.js';
 
-import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentInfo } from './core/message-analysis.service';
+import { unifiedMessageAnalysisService, UnifiedMessageAnalysis, AttachmentInfo } from './core/message-analysis.service.js';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
-import { EnhancedMemoryService } from './enhanced-intelligence/memory.service';
-import { EnhancedUIService } from './enhanced-intelligence/ui.service';
-import { EnhancedResponseService } from './enhanced-intelligence/response.service';
-import { EnhancedCacheService } from './enhanced-intelligence/cache.service';
-import { PersonalizationEngine } from './enhanced-intelligence/personalization-engine.service';
-import { UserBehaviorAnalyticsService } from './enhanced-intelligence/behavior-analytics.service';
-import { SmartRecommendationService } from './enhanced-intelligence/smart-recommendation.service';
-import { UserMemoryService } from '../memory/user-memory.service';
-import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types';
+import { EnhancedMemoryService } from './enhanced-intelligence/memory.service.js';
+import { EnhancedUIService } from './enhanced-intelligence/ui.service.js';
+import { EnhancedResponseService } from './enhanced-intelligence/response.service.js';
+import { EnhancedCacheService } from './enhanced-intelligence/cache.service.js';
+import { PersonalizationEngine } from './enhanced-intelligence/personalization-engine.service.js';
+import { UserBehaviorAnalyticsService } from './enhanced-intelligence/behavior-analytics.service.js';
+import { SmartRecommendationService } from './enhanced-intelligence/smart-recommendation.service.js';
+import { UserMemoryService } from '../memory/user-memory.service.js';
+import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types.js';
 
 
 // Utilities and Others
-import { logger } from '../utils/logger';
-import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager';
-import { ModerationService } from '../moderation/moderation-service';
-import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components';
-import { urlToGenerativePart } from '../utils/image-helper';
+import { logger } from '../utils/logger.js';
+import { logInteraction } from './analytics.js';
+import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager.js';
+import { ModerationService } from '../moderation/moderation-service.js';
+import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
+import { urlToGenerativePart } from '../utils/image-helper.js';
+
 // import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
 
 // Local MCPResultValue types for context aggregation (ideally imported or shared)
