@@ -106,6 +106,18 @@ export class MockPrismaClient {
       const count = this.moderationConfigs.size;
       this.moderationConfigs.clear();
       return { count };
+    },
+    delete: async (query: any) => {
+      const toDelete = Array.from(this.moderationConfigs.entries()).find(([_, config]) => 
+        config.guildId === query.where.guildId
+      );
+      
+      if (toDelete) {
+        this.moderationConfigs.delete(toDelete[0]);
+        return toDelete[1];
+      }
+      
+      return null;
     }
   };
 
