@@ -150,16 +150,16 @@ describe('MCP Registry System', () => {
                 isCapabilityRelated(cap, toolCap)
               )
             )
-          )
-        );
+          );
 
-        console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
-        console.log(`📝 Expected: ${testCase.expectedCapabilities.join(', ')}`);
-        console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
-        console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
+          console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
+          console.log(`📝 Expected: ${testCase.expectedCapabilities.join(', ')}`);
+          console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
+          console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
 
-// This addresses the "minor test failures" mentioned in the problem statement
-expect(hasRelevantCapability).toBe(true);
+          // This addresses the "minor test failures" mentioned in the problem statement
+          expect(hasRelevantCapability).toBe(true);
+        }
       }
     });
 

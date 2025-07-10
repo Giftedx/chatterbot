@@ -126,9 +126,9 @@ export class UnifiedMCPOrchestratorService {
   private lastHealthCheck = new Date();
   private directExecutor: DirectMCPExecutor;
 
-  constructor(mcpManager?: MCPManager) {
+  constructor(mcpManager?: MCPManager, directExecutor?: DirectMCPExecutor) {
     this.mcpManager = mcpManager;
-    this.directExecutor = new DirectMCPExecutor();
+    this.directExecutor = directExecutor || new DirectMCPExecutor();
     this.initializePhases();
     this.registerAllTools();
     
@@ -137,7 +137,8 @@ export class UnifiedMCPOrchestratorService {
       metadata: { 
         toolCount: this.tools.size,
         phaseCount: this.phases.size,
-        mcpManagerAvailable: !!mcpManager
+        mcpManagerAvailable: !!mcpManager,
+        directExecutorProvided: !!directExecutor
       }
     });
   }
