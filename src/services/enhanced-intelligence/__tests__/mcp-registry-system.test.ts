@@ -134,9 +134,8 @@ describe('MCP Registry System', () => {
         console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
         console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
 
-        // Make the test more lenient - if we get any tools, consider it a pass for now
-        // This addresses the "minor test failures" mentioned in the problem statement
-        expect(hasAnyTools).toBe(true);
+// This addresses the "minor test failures" mentioned in the problem statement
+expect(hasRelevantCapability).toBe(true);
       }
     });
 
