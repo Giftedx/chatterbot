@@ -179,7 +179,7 @@ const gracefulShutdown = async (signal: string) => {
   console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
   
   try {
-    if (enablePersonalization && enhancedIntelligenceActivation.isActivated()) {
+    if (process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true' && enhancedIntelligenceActivation.isActivated()) {
       console.log('🧠 Shutting down Enhanced Intelligence...');
       await enhancedIntelligenceActivation.shutdown();
       console.log('✅ Enhanced Intelligence shutdown complete');
