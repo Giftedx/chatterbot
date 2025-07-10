@@ -131,24 +131,13 @@ describe('MCP Registry System', () => {
         
         // Verify at least some relevant tools were found
         expect(recommendations.length).toBeGreaterThan(0);
-        // Check if any tools were found at all
         
-        
-        
-        
-        
-        
-        
-        
-        
-        if (recommendations.length > 0) {
-          // More lenient matching - just check if any capability is somewhat related
-          const hasRelevantCapability = recommendations.some(tool => 
-            testCase.expectedCapabilities.some(cap => 
-              tool.capabilities.some(toolCap => 
-                toolCap.includes(cap) || cap.includes(toolCap) || 
-                isCapabilityRelated(cap, toolCap)
-              )
+        // More lenient matching - just check if any capability is somewhat related
+        const hasRelevantCapability = recommendations.some(tool => 
+          testCase.expectedCapabilities.some(cap => 
+            tool.capabilities.some(toolCap => 
+              toolCap.includes(cap) || cap.includes(toolCap) || 
+              isCapabilityRelated(cap, toolCap)
             )
           )
         );
@@ -158,8 +147,8 @@ describe('MCP Registry System', () => {
         console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
         console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
 
-// This addresses the "minor test failures" mentioned in the problem statement
-expect(hasRelevantCapability).toBe(true);
+        // This addresses the "minor test failures" mentioned in the problem statement
+        expect(hasRelevantCapability).toBe(true);
       }
     });
 

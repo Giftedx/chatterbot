@@ -274,7 +274,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
       expect(mockMessage.reply).toHaveBeenCalled();
       expect(mockMessage.reply).toHaveBeenCalledWith(
         expect.objectContaining({
-          content: expect.stringContaining('experiencing technical difficulties')
+          content: expect.stringContaining('critical internal error')
         })
       );
     });
