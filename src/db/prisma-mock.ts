@@ -106,6 +106,18 @@ export class MockPrismaClient {
       const count = this.moderationConfigs.size;
       this.moderationConfigs.clear();
       return { count };
+    },
+    delete: async (query: any) => {
+      const toDelete = Array.from(this.moderationConfigs.entries()).find(([_, config]) => 
+        config.guildId === query.where.guildId
+      );
+      
+      if (toDelete) {
+        this.moderationConfigs.delete(toDelete[0]);
+        return toDelete[1];
+      }
+      
+      return null;
     }
   };
 
@@ -173,6 +185,18 @@ export class MockPrismaClient {
         this.userMemories.set(id, created);
         return created;
       }
+    },
+    update: async (query: any) => {
+      const whereClause = query.where.userId_guildId;
+      const existing = Array.from(this.userMemories.values()).find(m => 
+        m.userId === whereClause.userId && m.guildId === whereClause.guildId
+      );
+      if (existing) {
+        const updated = { ...existing, ...query.data, lastUpdated: new Date() };
+        this.userMemories.set(existing.id, updated);
+        return updated;
+      }
+      return null;
     },
     deleteMany: async (query: any) => {
       const where = query?.where;
