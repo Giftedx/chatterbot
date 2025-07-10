@@ -492,5 +492,14 @@ export const advancedFeaturesIntegration = new AdvancedFeaturesIntegrationServic
   enableAdvancedWorkflows: process.env.ENABLE_ADVANCED_WORKFLOWS === 'true',
   enableKnowledgeGraphEnhancement: process.env.ENABLE_KNOWLEDGE_GRAPH === 'true',
   enableAPIOptimization: process.env.ENABLE_API_OPTIMIZATION === 'true',
-  vectorDatabaseProvider: (process.env.VECTOR_DATABASE_PROVIDER as 'pinecone' | 'weaviate' | 'qdrant' | 'chroma') || 'chroma'
+  vectorDatabaseProvider: getValidatedVectorProvider(process.env.VECTOR_DATABASE_PROVIDER)
+});
+
+function getValidatedVectorProvider(provider?: string): 'pinecone' | 'weaviate' | 'qdrant' | 'chroma' {
+  const validProviders = ['pinecone', 'weaviate', 'qdrant', 'chroma'];
+  if (provider && validProviders.includes(provider)) {
+    return provider as 'pinecone' | 'weaviate' | 'qdrant' | 'chroma';
+  }
+  return 'chroma'; // Default value
+}
 });
