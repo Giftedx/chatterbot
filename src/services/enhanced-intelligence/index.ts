@@ -37,38 +37,52 @@ import { SmartRecommendationService } from './smart-recommendation.service.js';
 import { ProcessingContext } from './types.js';
 import type { MCPManager } from '../mcp-manager.service.js';
 
+// Import interfaces for dependency injection
+import type {
+  IEnhancedIntelligenceServiceDependencies,
+  IMCPToolsService,
+  IMemoryService,
+  IUIService,
+  IResponseService,
+  ICacheService,
+  IUserMemoryService,
+  IPersonalizationEngine,
+  IBehaviorAnalyticsService,
+  ISmartRecommendationService
+} from './interfaces.js';
+
 export class EnhancedInvisibleIntelligenceService {
   
   // Modular services
-  private mcpToolsService: UnifiedMCPOrchestratorService;
-  private memoryService: EnhancedMemoryService;
-  private uiService: EnhancedUIService;
-  private responseService: EnhancedResponseService;
-  private cacheService: EnhancedCacheService;
-  private userMemoryService: UserMemoryService;
+  private mcpToolsService: IMCPToolsService;
+  private memoryService: IMemoryService;
+  private uiService: IUIService;
+  private responseService: IResponseService;
+  private cacheService: ICacheService;
+  private userMemoryService: IUserMemoryService;
 
   // Personalization intelligence services (optional features)
-  private personalizationEngine?: PersonalizationEngine;
-  private behaviorAnalytics?: UserBehaviorAnalyticsService;
-  private smartRecommendations?: SmartRecommendationService;
+  private personalizationEngine?: IPersonalizationEngine;
+  private behaviorAnalytics?: IBehaviorAnalyticsService;
+  private smartRecommendations?: ISmartRecommendationService;
   // TODO: Add crossSessionLearning when interface compatibility is resolved
   // private crossSessionLearning: CrossSessionLearningEngine;
 
-  constructor(mcpManager?: MCPManager) {
-    this.mcpToolsService = new UnifiedMCPOrchestratorService(mcpManager);
-    this.memoryService = new EnhancedMemoryService();
-    this.uiService = new EnhancedUIService();
-    this.responseService = new EnhancedResponseService();
-    this.cacheService = new EnhancedCacheService();
-    this.userMemoryService = new UserMemoryService();
+  constructor(dependencies: IEnhancedIntelligenceServiceDependencies) {
+    this.mcpToolsService = dependencies.mcpToolsService;
+    this.memoryService = dependencies.memoryService;
+    this.uiService = dependencies.uiService;
+    this.responseService = dependencies.responseService;
+    this.cacheService = dependencies.cacheService;
+    this.userMemoryService = dependencies.userMemoryService;
     
     // Initialize personalization intelligence services
     try {
-      this.behaviorAnalytics = new UserBehaviorAnalyticsService();
-      this.smartRecommendations = new SmartRecommendationService();
+      this.behaviorAnalytics = dependencies.behaviorAnalytics;
+      this.smartRecommendations = dependencies.smartRecommendations;
       // TODO: Fix interface compatibility for CrossSessionLearningEngine
       // this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
-      this.personalizationEngine = new PersonalizationEngine(mcpManager);
+      this.personalizationEngine = dependencies.personalizationEngine;
       
       // Initialize MCP tools service
       this.mcpToolsService.initialize().catch(error => {
@@ -599,8 +613,9 @@ export class EnhancedInvisibleIntelligenceService {
     // Utility function to convert camelCase to kebab-case
     const toKebabCase = (str: string): string => str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
-    // Normalize toolId to kebab-case
-    const normalizedToolId = toKebabCase(toolId);
+    // Apply the conversion but don't use the result for now
+    toKebabCase(toolId);
+    
     // Simple mapping based on common tool IDs
     const toolCapabilities: Record<string, string[]> = {
       'web-search': ['web-search', 'research'],
@@ -699,4 +714,28 @@ export class EnhancedInvisibleIntelligenceService {
       return originalResponse;
     }
   }
+}
+
+/**
+ * Factory function to create EnhancedInvisibleIntelligenceService with all dependencies
+ * Maintains backward compatibility while enabling dependency injection
+ */
+export function createEnhancedInvisibleIntelligenceService(
+  mcpManager?: MCPManager
+): EnhancedInvisibleIntelligenceService {
+  // Import the concrete implementations
+  const dependencies: IEnhancedIntelligenceServiceDependencies = {
+    mcpToolsService: new UnifiedMCPOrchestratorService(mcpManager),
+    memoryService: new EnhancedMemoryService(),
+    uiService: new EnhancedUIService(),
+    responseService: new EnhancedResponseService(),
+    cacheService: new EnhancedCacheService(),
+    userMemoryService: new UserMemoryService(),
+    // Optional personalization services
+    behaviorAnalytics: new UserBehaviorAnalyticsService(),
+    smartRecommendations: new SmartRecommendationService(),
+    personalizationEngine: new PersonalizationEngine(mcpManager)
+  };
+  
+  return new EnhancedInvisibleIntelligenceService(dependencies);
 }

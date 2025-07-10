@@ -3,14 +3,18 @@
  * Verifies complete integration from Enhanced Intelligence Service through to API integrations
  */
 
-import { EnhancedInvisibleIntelligenceService } from '../index.js';
+import { 
+  EnhancedInvisibleIntelligenceService, 
+  createEnhancedInvisibleIntelligenceService 
+} from '../index.js';
 import { directMCPExecutor } from '../direct-mcp-executor.service.js';
 
 describe('End-to-End Enhanced Intelligence Integration', () => {
   let enhancedService: EnhancedInvisibleIntelligenceService;
 
   beforeEach(() => {
-    enhancedService = new EnhancedInvisibleIntelligenceService();
+    // Use the factory function for easier instantiation
+    enhancedService = createEnhancedInvisibleIntelligenceService();
   });
 
   describe('Enhanced Intelligence Service', () => {
