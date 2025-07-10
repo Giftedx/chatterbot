@@ -120,7 +120,7 @@ describe('MCP Registry System', () => {
         // Accept the test if we have tools with capabilities (less strict for robust testing)
         expect(hasRelevantCapability || hasAnyCapabilities).toBe(true);
         
-        console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
+        console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`); // Mocked, no output
       }
     });
 
