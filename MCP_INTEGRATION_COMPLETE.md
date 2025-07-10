@@ -35,7 +35,7 @@ The **Optimal MCP Server Integration for Discord AI Chatbots** has been successf
 - ✅ Error handling for initialization failures
 
 #### **Enhanced Intelligence Integration**
-- ✅ UnifiedIntelligenceService accepts MCPManager instance
+- ✅ CoreIntelligenceService accepts MCPManager instance
 - ✅ Backward compatibility maintained with existing services
 - ✅ All existing functionality preserved while adding MCP capabilities
 
@@ -115,10 +115,10 @@ npm start
 
 ### 2. Discord Usage
 ```
-# Enable enhanced intelligence for a user
-/optin enable:true
+# Use the chat command for intelligent conversation
+/chat <your message>
 
-# Then send messages to get MCP-enhanced responses with:
+# Get MCP-enhanced responses with:
 🧠 Persistent memory across conversations
 🔍 Real-time web search capabilities  
 📄 Content extraction from URLs

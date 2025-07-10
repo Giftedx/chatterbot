@@ -5,7 +5,7 @@
  */
 
 import { mcpManager } from '../src/services/mcp-manager.service.js';
-import { UnifiedIntelligenceService } from '../src/services/unified-intelligence.service.js';
+import { CoreIntelligenceService } from '../src/services/core-intelligence.service.js';
 
 // Type definitions for better TypeScript support
 interface ServerStatus {
@@ -125,22 +125,32 @@ async function example4_ContentExtraction() {
 
 /**
  * Example 5: Enhanced Intelligence Service with MCP
- * Demonstrates how to use UnifiedIntelligenceService with MCP integration
+ * Demonstrates how to use CoreIntelligenceService with MCP integration
  */
 async function example5_EnhancedIntelligence() {
   console.log('=== Example 5: Enhanced Intelligence with MCP ===\n');
   
   try {
-    // Create UnifiedIntelligenceService with MCP Manager
+    // Create CoreIntelligenceService with MCP Manager
     console.log('🤖 Creating Enhanced Intelligence Service...');
-    const intelligenceService = new UnifiedIntelligenceService(undefined, mcpManager);
     
-    console.log('✅ UnifiedIntelligenceService created with MCP integration');
+    const config = {
+      enableAgenticFeatures: true,
+      enablePersonalization: true,
+      enableEnhancedMemory: true,
+      enableEnhancedUI: true,
+      enableResponseCache: true,
+      mcpManager: mcpManager
+    };
+    
+    const intelligenceService = new CoreIntelligenceService(config);
+    
+    console.log('✅ CoreIntelligenceService created with MCP integration');
     console.log('💡 This service can now access all MCP capabilities for enhanced responses');
     
     // The service will automatically use MCP tools when processing messages
     console.log('🎯 Ready to process intelligent messages with MCP-enhanced capabilities');
-    console.log(`🔧 Service has access to ${Object.keys(intelligenceService).length} enhanced features`);
+    console.log(`🔧 Service has access to comprehensive intelligence features`);
     
   } catch (error) {
     console.error('❌ Enhanced Intelligence setup failed:', error);
@@ -325,7 +335,7 @@ To enable MCP features in your Discord bot:
    npm start
 
 3. 💬 Use in Discord:
-   /optin enable:true  # Enable intelligent conversation
+   /chat <message>  # Use the chat command for intelligent conversation
    
    Then send messages to get MCP-enhanced responses with:
    - 🧠 Persistent memory across conversations

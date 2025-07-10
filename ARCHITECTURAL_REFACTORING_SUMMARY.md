@@ -134,7 +134,7 @@ interface MCPOrchestrationResult {
 - Documented interfaces and capabilities
 
 ### Phase 2: **Next Steps** - Service Integration
-1. **Update UnifiedIntelligenceService** to use core services
+1. **Update CoreIntelligenceService** to use core services
 2. **Migrate EnhancedInvisibleIntelligenceService** to unified architecture
 3. **Replace direct service calls** with unified implementations
 4. **Validate end-to-end functionality** across all intelligence tiers

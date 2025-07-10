@@ -57,7 +57,7 @@ Successfully consolidated **4 overlapping MCP orchestration services** into a si
 
 ## 📁 Service Dependencies Updated
 
-### UnifiedIntelligenceService
+### CoreIntelligenceService
 - **Before**: Used `MCPIntegrationOrchestratorService`
 - **After**: Uses `UnifiedMCPOrchestratorService.orchestrateIntelligentResponseAsIntegration()`
 - **Status**: ✅ Updated and working

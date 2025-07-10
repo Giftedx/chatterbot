@@ -10,7 +10,7 @@ Successfully consolidated three overlapping message analysis services into a sin
 
 ## Changes Made
 
-### 1. Updated UnifiedIntelligenceService
+### 1. Updated CoreIntelligenceService
 - **File**: `src/services/unified-intelligence.service.ts`
 - **Changes**:
   - Replaced `intelligenceAnalysisService.analyzeMessage()` calls
