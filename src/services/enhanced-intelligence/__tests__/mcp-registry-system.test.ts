@@ -131,24 +131,13 @@ describe('MCP Registry System', () => {
         
         // Verify at least some relevant tools were found
         expect(recommendations.length).toBeGreaterThan(0);
-        // Check if any tools were found at all
         
-        
-        
-        
-        
-        
-        
-        
-        
-        if (recommendations.length > 0) {
-          // More lenient matching - just check if any capability is somewhat related
-          const hasRelevantCapability = recommendations.some(tool => 
-            testCase.expectedCapabilities.some(cap => 
-              tool.capabilities.some(toolCap => 
-                toolCap.includes(cap) || cap.includes(toolCap) || 
-                isCapabilityRelated(cap, toolCap)
-              )
+        // More lenient matching - just check if any capability is somewhat related
+        const hasRelevantCapability = recommendations.some(tool => 
+          testCase.expectedCapabilities.some(cap => 
+            tool.capabilities.some(toolCap => 
+              toolCap.includes(cap) || cap.includes(toolCap) || 
+              isCapabilityRelated(cap, toolCap)
             )
           );
 
