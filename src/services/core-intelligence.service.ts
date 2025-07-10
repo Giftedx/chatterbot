@@ -207,6 +207,7 @@ export class CoreIntelligenceService {
             }
         } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle interaction:', { interactionId: interaction.id, error });
+            console.error('Error handling interaction', error);
             if (interaction && typeof interaction.isRepliable === 'function' && interaction.isRepliable()) {
                 const errorMessage = 'An error occurred while processing your request.';
                 if (interaction.deferred || interaction.replied) {
@@ -246,13 +247,25 @@ export class CoreIntelligenceService {
     }
 
     public async handleMessage(message: Message): Promise<void> {
-        if (message.author.bot || !this.optedInUsers.has(message.author.id) || message.content.startsWith('/') || (message.content.length < 3 && message.attachments.size === 0)) {
-            return;
+        try {
+            if (message.author.bot || !this.optedInUsers.has(message.author.id) || message.content.startsWith('/') || (message.content.length < 3 && message.attachments.size === 0)) {
+                return;
+            }
+            if ('sendTyping' in message.channel) await message.channel.sendTyping();
+            const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
+            const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
+            await message.reply(responseOptions);
+        } catch (error) {
+            logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
+            console.error('Failed to send reply', error);
+            
+            // Try to send a fallback error message
+            try {
+                await message.reply({ content: '🤖 Sorry, I encountered an error while processing your message. Please try again later.' });
+            } catch (replyError) {
+                logger.error('[CoreIntelSvc] Failed to send error reply:', { messageId: message.id, error: replyError });
+            }
         }
-        if ('sendTyping' in message.channel) await message.channel.sendTyping();
-        const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
-        const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
-        await message.reply(responseOptions);
     }
 
     private async _processPromptAndGenerateResponse(
@@ -314,6 +327,7 @@ export class CoreIntelligenceService {
 
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });
+            console.error('Critical Error in _processPromptAndGenerateResponse', error);
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'critical_error_caught', isSuccess: false, error: error.message, duration: Date.now() - startTime });
             return { content: "🤖 Sorry, I encountered a critical internal error. Please try again later." };
         } finally {

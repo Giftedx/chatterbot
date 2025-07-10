@@ -42,6 +42,13 @@ if (process.env.NODE_ENV === 'test') {
       $disconnect: () => Promise.resolve(),
     };
   }
+  return prisma;
+}
+
+// Initialize synchronously for non-test environments, async for test environments
+if (process.env.NODE_ENV === 'test') {
+  // For tests, we'll initialize lazily when needed
+  prisma = null;
 } else {
   try {
     prisma = new PrismaClient();
@@ -51,4 +58,12 @@ if (process.env.NODE_ENV === 'test') {
   }
 }
 
-export { prisma };
+// Helper function to get prisma instance, initializing if needed
+async function getPrisma() {
+  if (!prisma && process.env.NODE_ENV === 'test') {
+    return await initializePrisma();
+  }
+  return prisma;
+}
+
+export { prisma, getPrisma };

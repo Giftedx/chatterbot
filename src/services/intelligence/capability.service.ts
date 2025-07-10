@@ -79,7 +79,7 @@ export interface CapabilityExecutionResult {
 export class IntelligenceCapabilityService {
   private readonly userMemoryService: UserMemoryService;
   private readonly summaryService: ConversationSummaryService;
-  
+  private readonly unifiedMCPOrchestrator?: UnifiedMCPOrchestratorService;
   
   // Store MCP results temporarily for each interaction  
   private readonly mcpResultsCache = new Map<string, Map<string, MCPResultValue>>();
