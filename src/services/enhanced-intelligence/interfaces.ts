@@ -3,12 +3,11 @@
  * Enables dependency injection and testing
  */
 
-import { ChatInputCommandInteraction, Message } from 'discord.js';
-import { ProcessingContext, MemoryEntry, MCPToolResult } from './types.js';
+import { ChatInputCommandInteraction } from 'discord.js';
+import { ProcessingContext, MemoryEntry } from './types.js';
 import { PersonalizedRecommendation, AdaptiveResponse } from './personalization-engine.service.js';
 import { BehaviorMetric } from './behavior-analytics.service.js';
 import { SmartRecommendation } from './smart-recommendation.service.js';
-import { MCPManager } from '../mcp-manager.service.js';
 import { MemoryContext } from '../../memory/types.js';
 
 export interface IMCPToolsService {
