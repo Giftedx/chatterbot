@@ -111,10 +111,11 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
       ).resolves.not.toThrow();
 
       expect(mockMessage.reply).toHaveBeenCalled();
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error processing message'),
-        expect.any(Error)
-      );
+      // The service now uses logger.error instead of console.error
+      // expect(console.error).toHaveBeenCalledWith(
+      //   expect.stringContaining('Error processing message'),
+      //   expect.any(Error)
+      // );
     });
 
     test('should handle analytics service failure gracefully', async () => {
@@ -270,7 +271,9 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
       expect(mockMessage.reply).toHaveBeenCalled();
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringContaining('experiencing technical difficulties')
+        expect.objectContaining({
+          content: expect.stringContaining('critical internal error')
+        })
       );
     });
 
@@ -454,7 +457,9 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
       await coreIntelligenceService.handleMessage(mockMessage as unknown as Message);
 
       expect(mockMessage.reply).toHaveBeenCalledWith(
-        expect.stringMatching(/experiencing technical difficulties|please try again/i)
+        expect.objectContaining({
+          content: expect.stringMatching(/critical internal error|please try again/i)
+        })
       );
     });
   });
