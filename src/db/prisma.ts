@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 
 let prisma: PrismaClient | any;
 
-// Initialize prisma client with proper error handling
+// Initialize Prisma client synchronously 
 async function initializePrisma() {
   if (process.env.NODE_ENV === 'test') {
     try {
@@ -25,6 +25,22 @@ async function initializePrisma() {
       console.error('❌ PrismaClient not available. Run "npx prisma generate" to generate the client.');
       throw error;
     }
+  }
+  return prisma;
+}
+
+// Initialize immediately for test environment  
+if (process.env.NODE_ENV === 'test') {
+  // Use mock for tests to avoid async initialization issues
+  try {
+    const { mockPrisma } = require('./prisma-mock.js');
+    prisma = mockPrisma;
+  } catch (error) {
+    console.log('⚠️ Mock Prisma not available, creating minimal mock');
+    prisma = {
+      $connect: () => Promise.resolve(),
+      $disconnect: () => Promise.resolve(),
+    };
   }
   return prisma;
 }
