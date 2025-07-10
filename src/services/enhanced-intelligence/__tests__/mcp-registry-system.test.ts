@@ -123,32 +123,17 @@ describe('MCP Registry System', () => {
         console.log(`📝 Testing case: "${testCase.input}"`);
         console.log(`📝 Recommendations count: ${recommendations.length}`);
         
-        // If no recommendations, skip capability check to avoid failing the test
-        if (recommendations.length === 0) {
-          console.log(`⚠️ No recommendations for "${testCase.input}" - skipping capability check`);
-          continue;
-        }
-        
         // Verify at least some relevant tools were found
         expect(recommendations.length).toBeGreaterThan(0);
-        // Check if any tools were found at all
         
-        
-        
-        
-        
-        
-        
-        
-        
-        if (recommendations.length > 0) {
-          // More lenient matching - just check if any capability is somewhat related
-          const hasRelevantCapability = recommendations.some(tool => 
-            testCase.expectedCapabilities.some(cap => 
-              tool.capabilities.some(toolCap => 
-                toolCap.includes(cap) || cap.includes(toolCap) || 
-                isCapabilityRelated(cap, toolCap)
-              )
+        // Check if the recommended tools actually have the expected capabilities
+        // This is more precise than the previous overly lenient approach
+        const hasRelevantCapability = recommendations.some(tool => 
+          testCase.expectedCapabilities.some(expectedCap => 
+            tool.capabilities.some(toolCap => 
+              // Direct match or closely related capabilities
+              toolCap === expectedCap || 
+              isCapabilityRelated(expectedCap, toolCap)
             )
           )
         );
@@ -158,8 +143,8 @@ describe('MCP Registry System', () => {
         console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
         console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
 
-// This addresses the "minor test failures" mentioned in the problem statement
-expect(hasRelevantCapability).toBe(true);
+        // Ensure tools actually match expected capabilities instead of just checking if any exist
+        expect(hasRelevantCapability).toBe(true);
       }
     });
 
