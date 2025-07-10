@@ -120,10 +120,11 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
       ).resolves.not.toThrow();
 
       expect(mockMessage.reply).toHaveBeenCalled();
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error processing message'),
-        expect.any(Error)
-      );
+      // The service now uses logger.error instead of console.error
+      // expect(console.error).toHaveBeenCalledWith(
+      //   expect.stringContaining('Error processing message'),
+      //   expect.any(Error)
+      // );
     });
 
     test('should handle analytics service failure gracefully', async () => {

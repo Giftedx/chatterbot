@@ -101,6 +101,7 @@ export class MockPrismaClient {
         return created;
       }
     },
+
     deleteMany: async (query: any) => {
       const count = this.moderationConfigs.size;
       this.moderationConfigs.clear();
@@ -136,12 +137,26 @@ export class MockPrismaClient {
       return Array.from(this.userMemories.values()).find(m => 
         m.userId === query.where.userId && 
         m.guildId === (query.where.guildId || '')
+
       ) || null;
     },
     findUnique: async (query: any) => {
       return Array.from(this.userMemories.values()).find(m => 
         m.userId === query.where.userId_guildId?.userId && m.guildId === query.where.userId_guildId?.guildId
       ) || null;
+    },
+    findMany: async (query: any) => {
+      let memories = Array.from(this.userMemories.values());
+      if (query?.where?.userId) {
+        memories = memories.filter(m => m.userId === query.where.userId);
+      }
+      if (query?.where?.guildId) {
+        memories = memories.filter(m => m.guildId === query.where.guildId);
+      }
+      if (query?.where?.userId?.startsWith) {
+        memories = memories.filter(m => m.userId.startsWith(query.where.userId.startsWith));
+      }
+      return memories;
     },
     upsert: async (query: any) => {
       const whereClause = query.where.userId_guildId;
@@ -266,3 +281,6 @@ export class MockPrismaClient {
 }
 
 export const mockPrisma = new MockPrismaClient();
+
+// CommonJS export for tests that use require()
+module.exports = { mockPrisma };

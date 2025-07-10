@@ -53,7 +53,7 @@ export class SmartContextOrchestratorService {
   private directExecutor: DirectMCPExecutor;
 
   constructor(
-    mcpManager?: MCPManager,
+    mcpManager: MCPManager = mcpManager,
     personalizationEngine?: PersonalizationEngine,
     directExecutor?: DirectMCPExecutor
     ) {

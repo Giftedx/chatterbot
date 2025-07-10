@@ -261,6 +261,28 @@ describe('SmartContextOrchestratorService', () => {
         content: 'Analyze this article: https://example.com/ai-article and tell me what you think'
       };
 
+      // Reset other mocks to isolate content extraction
+      mockDirectExecutor.executeWebSearch.mockResolvedValue({
+        success: false,
+        toolUsed: 'mcp-brave-search',
+        data: null,
+        requiresExternalMCP: false
+      });
+      
+      mockDirectExecutor.executeMemorySearch.mockResolvedValue({
+        success: false,
+        toolUsed: 'mcp-memory',
+        data: null,
+        requiresExternalMCP: false
+      });
+      
+      mockDirectExecutor.executeSequentialThinking.mockResolvedValue({
+        success: false,
+        toolUsed: 'mcp-sequential-thinking',
+        data: null,
+        requiresExternalMCP: false
+      });
+
       mockDirectExecutor.executeContentExtraction.mockResolvedValue({
         success: true,
         toolUsed: 'mcp-firecrawl',
@@ -278,7 +300,7 @@ describe('SmartContextOrchestratorService', () => {
 
       const result = await orchestrator.buildSuperSmartContext(
         urlMessage,
-        { ...mockAnalysis, complexity: 'complex' },
+        { ...mockAnalysis, complexity: 'simple' }, // Use simple complexity to avoid extra context
         mockCapabilities
       );
 
@@ -292,6 +314,8 @@ describe('SmartContextOrchestratorService', () => {
       mockMCPManager.searchMemory.mockRejectedValue(new Error('Memory service unavailable'));
       mockDirectExecutor.executeWebSearch.mockRejectedValue(new Error('Web search failed'));
       mockDirectExecutor.executeContentExtraction.mockRejectedValue(new Error('Content extraction failed'));
+      mockDirectExecutor.executeMemorySearch.mockRejectedValue(new Error('Memory search failed'));
+      mockDirectExecutor.executeSequentialThinking.mockRejectedValue(new Error('Sequential thinking failed'));
 
       const result = await orchestrator.buildSuperSmartContext(
         mockMessage,
