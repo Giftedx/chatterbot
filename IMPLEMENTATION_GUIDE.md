@@ -59,7 +59,8 @@ pnpm init
 pnpm add -D @nx/node @nx/docker @nx/kubernetes
 
 # Project structure
-mkdir -p {apps,libs,tools,infrastructure}/{agents,services,shared,types,utils}
+# Project structure
+mkdir -p src/{agents,services,shared,types,utils}
 mkdir -p {docker,k8s,terraform,monitoring,docs}
 ```
 
