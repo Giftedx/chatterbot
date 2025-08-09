@@ -133,12 +133,13 @@ describe('MCP Registry System', () => {
               toolCap.includes(cap) || cap.includes(toolCap) || 
               isCapabilityRelated(cap, toolCap)
             )
-          );
+          )
+        );
 
-          console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
-          console.log(`📝 Expected: ${testCase.expectedCapabilities.join(', ')}`);
-          console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
-          console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
+        console.log(`📝 "${testCase.input}" -> Tools: ${recommendations.map(t => t.id).join(', ')}`);
+        console.log(`📝 Expected: ${testCase.expectedCapabilities.join(', ')}`);
+        console.log(`📝 Found capabilities: ${recommendations.map(t => t.capabilities.join(', ')).join(' | ')}`);
+        console.log(`📝 Has relevant capability: ${hasRelevantCapability}`);
 
         // Ensure tools actually match expected capabilities instead of just checking if any exist
         expect(hasRelevantCapability).toBe(true);
