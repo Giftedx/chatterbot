@@ -4,16 +4,14 @@ import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
     ButtonInteraction,
-    EmbedBuilder,
     Collection,
-    Attachment,
-    Client // Added Client for _createMessageForPipeline
+    Attachment
 } from 'discord.js';
 import { URL } from 'url';
 
 // MCP specific
 import { MCPManager } from './mcp-manager.service.js';
-import { UnifiedMCPOrchestratorService, MCPOrchestrationResult, MCPToolResult } from './core/mcp-orchestrator.service.js';
+import { UnifiedMCPOrchestratorService, MCPOrchestrationResult } from './core/mcp-orchestrator.service.js';
 
 // Unified Core Services
 import { UnifiedAnalyticsService } from './core/unified-analytics.service.js';
@@ -49,7 +47,6 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 
 // Utilities and Others
 import { logger } from '../utils/logger.js';
-import { logInteraction } from './analytics.js';
 import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager.js';
 import { ModerationService } from '../moderation/moderation-service.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
@@ -57,16 +54,7 @@ import { urlToGenerativePart } from '../utils/image-helper.js';
 
 // import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
 
-// Local MCPResultValue types for context aggregation (ideally imported or shared)
-type WebSearchResult = { query: string; results: Array<{ title: string; description: string; url: string; snippet: string; }>; metadata: Record<string, unknown>; };
-type ContentExtractionResult = { urls: Array<{ url: string; title: string; content: string; metadata: Record<string, unknown>; }>; };
-type OSRSDataResult = { query: string; data: string; metadata: Record<string, unknown>; };
-type MCPResultValue = WebSearchResult | ContentExtractionResult | OSRSDataResult | { error: string };
 
-type LocalWebSearchResult = { query: string; results: Array<{ title: string; description: string; url: string; snippet: string; }>; metadata: Record<string, unknown>; };
-type LocalContentExtractionResult = { urls: Array<{ url: string; title: string; content: string; metadata: Record<string, unknown>; }>; };
-type LocalOSRSDataResult = { query: string; data: string; metadata: Record<string, unknown>; };
-type LocalMCPResultValue = LocalWebSearchResult | LocalContentExtractionResult | LocalOSRSDataResult | { error: string } | { data: Record<string, unknown> };
 
 
 interface CommonAttachment {
@@ -309,7 +297,7 @@ export class CoreIntelligenceService {
             const history = await getHistory(channelId);
             const agenticContextData = await this._aggregateAgenticContext(messageForPipeline, unifiedAnalysis, capabilities, mcpOrchestrationResult, history, analyticsData);
 
-            let { agenticResponse, fullResponseText } = await this._generateAgenticResponse(
+            let { fullResponseText } = await this._generateAgenticResponse(
                 agenticContextData, userId, channelId, guildId, commonAttachments,
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );

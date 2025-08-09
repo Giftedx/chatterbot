@@ -3,7 +3,7 @@
  * Slash commands for agentic intelligence features
  */
 
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, GuildMember, PermissionsBitField } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, GuildMember, PermissionsBitField } from 'discord.js';
 import { agenticIntelligenceService } from '../services/agentic-intelligence.service.js';
 import { knowledgeBaseService } from '../services/knowledge-base.service.js';
 import { escalationService } from '../services/escalation.service.js';

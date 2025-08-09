@@ -102,7 +102,7 @@ export class MockPrismaClient {
       }
     },
 
-    deleteMany: async (query: any) => {
+    deleteMany: async () => {
       const count = this.moderationConfigs.size;
       this.moderationConfigs.clear();
       return { count };
