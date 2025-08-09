@@ -205,18 +205,7 @@ export class MergeIntervalsService {
     };
   }
 
-  /**
-   * Calculates the total number of lines that are duplicated/overlapped
-   * by comparing original service lines to merged service lines.
-   */
-  private calculateDuplicateLines(originalServices: ServiceInterval[]): number {
-    const totalOriginalLines = originalServices.reduce((sum, service) => sum + service.codeLines, 0);
-    const mergedServices = this.mergeServiceIntervals([...originalServices]);
-    const totalMergedLines = mergedServices.reduce((sum, service) => sum + service.codeLines, 0);
-    
-    // The difference represents lines that were merged due to overlap
-    return Math.max(0, totalOriginalLines - totalMergedLines);
-  }
+
 }
 
 // Singleton instance
