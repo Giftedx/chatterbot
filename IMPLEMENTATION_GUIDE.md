@@ -1232,7 +1232,7 @@ export class MemoryService {
   }
 
   async storeMemory(memory: Omit<Memory, 'id' | 'embedding' | 'createdAt'>): Promise<string> {
-    const id = `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const id = `memory_${globalThis.crypto.randomUUID()}`;
     
     // Generate embedding for the memory content
     const embedding = await this.embeddingService.generateEmbedding(memory.content);
