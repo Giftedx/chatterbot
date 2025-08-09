@@ -180,7 +180,7 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Security plugins
   await app.register(cors, {
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || false,
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : false,
   });
   
   await app.register(helmet, {
