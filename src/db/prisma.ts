@@ -29,10 +29,12 @@ async function initializePrisma() {
   return prisma;
 }
 
-// Initialize synchronously for non-test environments, async for test environments
+// Initialize synchronously for non-test environments, mock for tests
 if (process.env.NODE_ENV === 'test') {
-  // For tests, we'll initialize lazily when needed
-  prisma = null;
+  // For tests, always use mock - don't try real client
+  console.log('⚠️ Using mock Prisma client for tests');
+  const { mockPrisma } = require('./prisma-mock.js');
+  prisma = mockPrisma;
 } else {
   try {
     prisma = new PrismaClient();

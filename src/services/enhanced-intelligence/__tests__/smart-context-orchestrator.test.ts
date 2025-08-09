@@ -119,7 +119,9 @@ describe('SmartContextOrchestratorService', () => {
       hasMultimodal: true,
       hasAdvancedAI: true,
       hasAnalytics: false,
-      hasAdminCommands: false
+      hasAdminCommands: false,
+      hasAdmin: false,
+      hasMCPTools: true
     };
 
     test('should build comprehensive smart context with multiple sources', async () => {
@@ -483,7 +485,9 @@ describe('SmartContextOrchestratorService', () => {
         hasMultimodal: true,
         hasAdvancedAI: true,
         hasAnalytics: false,
-        hasAdminCommands: false
+        hasAdminCommands: false,
+        hasAdmin: false,
+        hasMCPTools: true
       };
 
       // Mock tool responses for the complex message
