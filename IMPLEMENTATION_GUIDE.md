@@ -1954,9 +1954,9 @@ export class LLMRouter {
           model: 'claude-3.5-sonnet',
           max_tokens: 10,
           messages: [{ role: 'user', content: 'test' }],
-        }).catch(() => null),
+        }).catch((err) => { logger.error('Anthropic health check failed', { error: err }); return null; }),
         this.gemini.getGenerativeModel({ model: 'models/gemini-2.0-flash' })
-          .generateContent('test').catch(() => null),
+          .generateContent('test').catch((err) => { logger.error('Gemini health check failed', { error: err }); return null; }),
       ];
 
       await Promise.allSettled(testPromise);
