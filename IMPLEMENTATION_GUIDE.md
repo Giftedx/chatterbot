@@ -1831,8 +1831,12 @@ export class LLMRouter {
   }
 
   private async generateGeminiResponse(model: string, request: LLMRequest): Promise<LLMResponse> {
+    // Ensure the model identifier is in the correct Gemini API format
+    const geminiModelId = model.startsWith('models/')
+      ? model
+      : (model.startsWith('gemini-') ? `models/${model}` : (() => { throw new Error(`Invalid Gemini model identifier: ${model}`); })());
     const genModel = this.gemini.getGenerativeModel({ 
-      model: model.replace('gemini-', 'models/gemini-'),
+      model: geminiModelId,
       generationConfig: {
         maxOutputTokens: request.constraints?.maxTokens || 4000,
         temperature: request.constraints?.temperature || 0.7,
