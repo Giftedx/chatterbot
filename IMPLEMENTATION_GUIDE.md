@@ -45,7 +45,7 @@ wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/sha
 sudo apt update && sudo apt install terraform
 
 # Additional tools
-npm install -g pnpm turbo nx @nestjs/cli
+npm install -g pnpm turbo nx
 ```
 
 #### Project Structure Setup
