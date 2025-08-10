@@ -12,6 +12,7 @@ import { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
 import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
 import { DirectMCPExecutor } from '../enhanced-intelligence/direct-mcp-executor.service.js';
+import { IntelligenceAnalysis } from '../intelligence/analysis.service.js';
 
 export interface MCPToolResult {
   success: boolean;
@@ -1157,7 +1158,7 @@ export class UnifiedMCPOrchestratorService {
    */
   async orchestrateIntelligentResponseAsIntegration(
     message: Message,
-    analysis: any, // IntelligenceAnalysis from legacy services
+    analysis: IntelligenceAnalysis, // IntelligenceAnalysis from legacy services
     capabilities: UserCapabilities
   ): Promise<{
     success: boolean;
@@ -1175,9 +1176,9 @@ export class UnifiedMCPOrchestratorService {
       hasUrls: analysis.hasUrls || false,
       attachmentTypes: analysis.attachmentTypes || [],
       urls: analysis.urls || [],
-      complexity: analysis.complexityLevel || 'simple',
+      complexity: analysis.complexity || 'simple',
       intents: analysis.intents || [],
-      requiredTools: analysis.requiredCapabilities || [],
+      requiredTools: analysis.requiredTools || [],
       
       // Enhanced analysis capabilities  
       needsPersonaSwitch: false,
@@ -1195,8 +1196,8 @@ export class UnifiedMCPOrchestratorService {
       conversationActions: [],
       needsMemoryOperation: false,
       memoryActions: [],
-      needsMCPTools: (analysis.requiredCapabilities || []).length > 0,
-      mcpRequirements: analysis.requiredCapabilities || [],
+      needsMCPTools: (analysis.mcpRequirements || []).length > 0,
+      mcpRequirements: analysis.mcpRequirements || [],
       
       // Analysis metadata
       confidence: analysis.confidence || 0.8,

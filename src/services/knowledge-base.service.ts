@@ -248,14 +248,14 @@ export class KnowledgeBaseService {
       });
 
       return {
-        totalEntries,
-        bySource: bySource.reduce((acc: Record<string, number>, item: any) => {
-          acc[item.source] = item._count.source;
-          return acc;
-        }, {}),
-        averageConfidence: avgConfidence._avg.confidence || 0,
-        recentAdditions
-      };
+  totalEntries,
+  bySource: bySource.reduce((acc: Record<string, number>, item: { source: string; _count: { source: number } }) => {
+    acc[item.source] = item._count.source;
+    return acc;
+  }, {}),
+  averageConfidence: avgConfidence._avg.confidence || 0,
+  recentAdditions
+};
     } catch (error) {
       logger.error('Failed to get knowledge base stats', error);
       return {

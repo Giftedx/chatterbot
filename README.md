@@ -109,6 +109,20 @@ src/
 
 ---
 
+### Database
+- If you build or run locally outside Docker, generate Prisma client once:
+  - `npx prisma generate`
+- Default DB is SQLite. Set `DATABASE_URL` to switch.
+
+---
+
+### Observability
+- Health: GET `/health` on `HEALTH_CHECK_PORT` (default 3000)
+- Metrics: GET `/metrics` (Prometheus exposition format)
+- Analytics dashboard (optional): enable with `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:${ANALYTICS_DASHBOARD_PORT||3001}`
+
+---
+
 ### Docker
 ```bash
 # Build

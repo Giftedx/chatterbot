@@ -383,11 +383,15 @@ export class MCPManager {
       connected: boolean;
       phase: number;
       priority: string;
-      capabilities?: any;
+      capabilities?: ServerCapabilities;
     }>;
   } {
     const enabledServers = getEnabledServers();
-    const status: any = {
+    const status: {
+      totalServers: number;
+      connectedServers: number;
+      serverStatus: Record<string, { connected: boolean; phase: number; priority: string; capabilities?: ServerCapabilities }>
+    } = {
       totalServers: Object.keys(enabledServers).length,
       connectedServers: 0,
       serverStatus: {}
