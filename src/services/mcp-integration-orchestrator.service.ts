@@ -242,8 +242,8 @@ export class MCPIntegrationOrchestratorService {
       name: 'Real-World Knowledge',
       priority: 'high',
       tools: ['web-search', 'content-extraction', 'file-processing', 'github-integration'],
-      requiredEnvVars: ['BRAVE_SEARCH_API_KEY', 'FIRECRAWL_API_KEY', 'GITHUB_TOKEN'],
-      enabled: !!(process.env.BRAVE_SEARCH_API_KEY || process.env.FIRECRAWL_API_KEY)
+      requiredEnvVars: ['BRAVE_API_KEY', 'FIRECRAWL_API_KEY', 'GITHUB_TOKEN'],
+      enabled: !!(process.env.BRAVE_API_KEY || process.env.FIRECRAWL_API_KEY)
     });
 
     // Phase 3: Structured Data & AI Enhancement (Database + AI Tools)

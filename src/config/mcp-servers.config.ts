@@ -56,9 +56,9 @@ const phase2Servers: Record<string, MCPServerConfig> = {
     command: 'npx',
     args: ['@modelcontextprotocol/server-brave-search'],
     env: {
-      BRAVE_API_KEY: process.env.BRAVE_SEARCH_API_KEY,
+      BRAVE_API_KEY: process.env.BRAVE_API_KEY,
     },
-    enabled: !!process.env.BRAVE_SEARCH_API_KEY,
+    enabled: !!process.env.BRAVE_API_KEY,
     priority: 'high',
     phase: 2,
     description: 'Real-time web search with privacy-focused results',
