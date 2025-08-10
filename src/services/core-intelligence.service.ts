@@ -297,7 +297,7 @@ export class CoreIntelligenceService {
             const history = await getHistory(channelId);
             const agenticContextData = await this._aggregateAgenticContext(messageForPipeline, unifiedAnalysis, capabilities, mcpOrchestrationResult, history, analyticsData);
 
-            const { fullResponseText } = await this._generateAgenticResponse(
+            let { fullResponseText } = await this._generateAgenticResponse(
                 agenticContextData, userId, channelId, guildId, commonAttachments,
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );

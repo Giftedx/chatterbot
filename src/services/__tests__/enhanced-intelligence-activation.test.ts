@@ -42,10 +42,10 @@ describe('Enhanced Intelligence Activation Service', () => {
     } as unknown as jest.Mocked<MCPManager>;
 
     // Mock PersonalizationEngine
-    mockPersonalizationEngine = {} as jest.Mocked<PersonalizationEngine>;
+    const mockPersonalizationEngine = {} as jest.Mocked<PersonalizationEngine>;
 
     // Mock SmartContextOrchestratorService
-    mockContextOrchestrator = {} as jest.Mocked<SmartContextOrchestratorService>;
+    const mockContextOrchestrator = {} as jest.Mocked<SmartContextOrchestratorService>;
 
     // Mock DirectMCPExecutor
     mockDirectExecutor = {

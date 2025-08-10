@@ -494,7 +494,7 @@ describe('Cache Infrastructure Tests', () => {
 
       const result = await cacheService.get(key);
       expect(result).toBeDefined();
-      expect((result as { analysis: string })?.analysis).toBe('Image shows a landscape');
+      expect((result as any)?.analysis).toBe('Image shows a landscape');
     });
 
     it('should handle cache eviction with metrics tracking', async () => {

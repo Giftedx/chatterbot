@@ -24,7 +24,7 @@ global.console = {
 };
 
 // Mock fetch globally with proper typing
-(global as { fetch: jest.Mock }).fetch = jest.fn();
+(global as any).fetch = jest.fn();
 
 // Mock Prisma Client - commented out for now due to type issues
 // Will be re-enabled once Prisma client is properly generated
@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 // Global test utilities with proper typing
-(global as { testUtils: Record<string, unknown> }).testUtils = {
+(global as any).testUtils = {
   mockDiscordMessage: (content: string, author = 'test-user') => ({
     content,
     author: { id: author, username: author },

@@ -85,8 +85,8 @@ export class StreamingResponseProcessor {
     
     // Gracefully handle cases where monitor is mocked improperly and may not
     // execute or return the wrapped callback result (similar to AdaptiveRateLimiter safeguard)
-    const monitorFn = (this.performanceMonitor && typeof (this.performanceMonitor as { monitor?: () => unknown }).monitor === 'function')
-      ? (this.performanceMonitor as { monitor: () => unknown }).monitor.bind(this.performanceMonitor)
+    const monitorFn = (this.performanceMonitor && typeof this.performanceMonitor.monitor === 'function')
+      ? this.performanceMonitor.monitor.bind(this.performanceMonitor)
       : async (_op: string, fn: () => Promise<StreamingMetrics>) => fn();
 
     // Ensure we create a placeholder metrics entry immediately so that callers can
