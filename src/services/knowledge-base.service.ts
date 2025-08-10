@@ -249,7 +249,7 @@ export class KnowledgeBaseService {
 
       return {
         totalEntries,
-        bySource: bySource.reduce((acc: Record<string, number>, item: any) => {
+        bySource: bySource.reduce((acc: Record<string, number>, item: { source: string; _count: { source: number } }) => {
           acc[item.source] = item._count.source;
           return acc;
         }, {}),

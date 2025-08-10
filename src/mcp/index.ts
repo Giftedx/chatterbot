@@ -96,8 +96,9 @@ export interface PlaywrightNavigateParams {
   url: string;
 }
 export interface PlaywrightNavigateResult {
-  pageTitle?: string;
-  pageContent?: string;
+  actions?: Array<{ action: string; target: string; success: boolean; timestamp: string }>;
+  screenshots?: string[];
+  data?: { pageTitle: string; pageContent: string };
 }
 export async function playwrightNavigate(
   params: PlaywrightNavigateParams

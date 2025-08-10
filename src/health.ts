@@ -6,6 +6,10 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'http';
 import { logger } from './utils/logger.js';
 
+let totalRequests = 0;
+let healthRequests = 0;
+let metricsRequests = 0;
+
 interface HealthStatus {
   status: 'healthy' | 'unhealthy';
   timestamp: string;
@@ -35,7 +39,9 @@ export class HealthCheck {
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse) {
+    totalRequests++;
     if (req.url === '/health' && req.method === 'GET') {
+      healthRequests++;
       try {
         const healthStatus = await this.getHealthStatus();
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -48,10 +54,39 @@ export class HealthCheck {
           error: 'Health check failed' 
         }));
       }
-    } else {
-      res.writeHead(404);
-      res.end('Not Found');
+      return;
     }
+
+    if (req.url === '/metrics' && req.method === 'GET') {
+      metricsRequests++;
+      const mem = process.memoryUsage();
+      const lines = [
+        '# HELP app_process_uptime_seconds Process uptime in seconds',
+        '# TYPE app_process_uptime_seconds gauge',
+        `app_process_uptime_seconds ${process.uptime()}`,
+        '# HELP app_process_heap_used_bytes Heap used in bytes',
+        '# TYPE app_process_heap_used_bytes gauge',
+        `app_process_heap_used_bytes ${mem.heapUsed}`,
+        '# HELP app_process_heap_total_bytes Heap total in bytes',
+        '# TYPE app_process_heap_total_bytes gauge',
+        `app_process_heap_total_bytes ${mem.heapTotal}`,
+        '# HELP app_requests_total Total HTTP requests to health server',
+        '# TYPE app_requests_total counter',
+        `app_requests_total ${totalRequests}`,
+        '# HELP app_health_requests_total Total /health requests',
+        '# TYPE app_health_requests_total counter',
+        `app_health_requests_total ${healthRequests}`,
+        '# HELP app_metrics_requests_total Total /metrics requests',
+        '# TYPE app_metrics_requests_total counter',
+        `app_metrics_requests_total ${metricsRequests}`
+      ];
+      res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+      res.end(lines.join('\n'));
+      return;
+    }
+
+    res.writeHead(404);
+    res.end('Not Found');
   }
 
   private async getHealthStatus(): Promise<HealthStatus> {

@@ -283,18 +283,18 @@ export class MCPProductionIntegrationService {
         thoughtNumber: 1,
         totalThoughts: 5
       });
-      const stepsRaw = (result as any).steps ?? [];
-      const steps = stepsRaw.map((step: any) => ({
-        stepNumber: step.stepNumber,
-        thought: step.thought,
-        analysis: step.analysis ?? step.reasoning ?? '',
-        conclusion: step.conclusion
-      }));
-      return {
-        steps,
-        finalAnswer: (result as any).finalAnswer ?? '',
-        completed: (result as any).completed !== false
-      };
+      const stepsRaw = (result as SequentialThinkingResult).steps ?? [];
+const steps = stepsRaw.map((step) => ({
+  stepNumber: step.stepNumber,
+  thought: step.thought,
+  analysis: step.analysis ?? step.reasoning ?? '',
+  conclusion: step.conclusion
+}));
+return {
+  steps,
+  finalAnswer: (result as { finalAnswer?: string }).finalAnswer ?? '',
+  completed: (result as { completed?: boolean }).completed !== false
+};
     } catch (err) {
       console.warn(`Sequential thinking fallback for ${thought}`, err);
       return {
@@ -314,12 +314,12 @@ export class MCPProductionIntegrationService {
 
   private async performBrowserAutomation(url: string): Promise<MCPBrowserAutomationResult> {
     try {
-      const res: any = await playwrightNavigate({ url });
-      return {
-        actions: res.actions || [],
-        screenshots: res.screenshots || [],
-        data: res.data || { pageTitle: 'Unknown', pageContent: '' }
-      };
+      const res = await playwrightNavigate({ url });
+return {
+  actions: res.actions || [],
+  screenshots: res.screenshots || [],
+  data: res.data || { pageTitle: 'Unknown', pageContent: '' }
+};
     } catch (err) {
       console.warn(`Browser automation fallback for ${url}`, err);
       return {
