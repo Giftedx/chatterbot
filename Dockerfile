@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (include dev deps for TypeScript build)
+RUN npm ci
 
 # Copy source code
 COPY src/ ./src/
@@ -37,9 +37,6 @@ COPY --from=builder --chown=botuser:nodejs /app/dist ./dist
 COPY --from=builder --chown=botuser:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=botuser:nodejs /app/package*.json ./
 COPY --from=builder --chown=botuser:nodejs /app/prisma ./prisma
-
-# Copy database migration files
-COPY --chown=botuser:nodejs prisma/ ./prisma/
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data && chown botuser:nodejs /app/data
