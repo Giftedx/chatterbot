@@ -65,7 +65,7 @@ export class AudioDatabaseService {
     updates: AudioAnalysisUpdatePayload
   ): Promise<void> {
     try {
-      const updateData: any = {};
+      const updateData: Record<string, unknown> = {};
 
       // Convert analysis results to JSON-compatible format
       if (updates.audioAnalysis) {
@@ -139,7 +139,7 @@ export class AudioDatabaseService {
       });
 
       // Build search query
-      const whereClause: any = {
+      const whereClause: Record<string, unknown> = {
         userId,
         fileType: 'audio',
         processingStatus: 'completed',
@@ -159,11 +159,11 @@ export class AudioDatabaseService {
       });
 
       // Convert to search results with relevance scoring
-      const searchResults: AudioSearchResult[] = files.map((file: any) => {
+      const searchResults: AudioSearchResult[] = files.map((file: Record<string, any>) => {
         const relevanceScore = this.calculateRelevanceScore(file, query);
         
         return {
-          file: file as unknown as MediaFile, // Type conversion for compatibility
+          file: file as unknown as MediaFile, // Preserve compatibility
           relevanceScore,
           matchedSegments: includeTranscription ? this.extractMatchedSegments(file, query) : undefined,
           highlightedText: this.generateHighlightedText(file, query)
@@ -218,7 +218,7 @@ export class AudioDatabaseService {
       }
 
       if (file.audioAnalysis && typeof file.audioAnalysis === 'object') {
-        const audioAnalysis = file.audioAnalysis as any;
+        const audioAnalysis = file.audioAnalysis as { transcription?: { text?: string } };
         if (audioAnalysis.transcription?.text) {
           return audioAnalysis.transcription.text;
         }
@@ -361,7 +361,7 @@ export class AudioDatabaseService {
   /**
    * Calculate relevance score for search results
    */
-  private calculateRelevanceScore(file: any, query: string): number {
+  private calculateRelevanceScore(file: Record<string, any>, query: string): number {
     let score = 0;
     const queryLower = query.toLowerCase();
 
@@ -404,19 +404,19 @@ export class AudioDatabaseService {
   /**
    * Extract matched segments from transcription
    */
-  private extractMatchedSegments(file: any, query: string): any[] {
+  private extractMatchedSegments(file: Record<string, any>, query: string): Array<{ text?: string }> {
     try {
       if (!file.audioAnalysis || typeof file.audioAnalysis !== 'object') {
         return [];
       }
 
-      const analysis = file.audioAnalysis as any;
+      const analysis = file.audioAnalysis as { transcription?: { segments?: Array<{ text?: string }> } };
       if (!analysis.transcription?.segments) {
         return [];
       }
 
       const queryLower = query.toLowerCase();
-      return analysis.transcription.segments.filter((segment: any) =>
+      return analysis.transcription.segments.filter((segment: { text?: string }) =>
         segment.text?.toLowerCase().includes(queryLower)
       );
 
@@ -428,7 +428,7 @@ export class AudioDatabaseService {
   /**
    * Generate highlighted text for search results
    */
-  private generateHighlightedText(file: any, query: string): string | undefined {
+  private generateHighlightedText(file: Record<string, any>, query: string): string | undefined {
     const text = file.extractedText || file.description || '';
     if (!text || !query) return undefined;
 

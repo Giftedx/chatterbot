@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unified Analytics Service
  * 
@@ -451,5 +452,5 @@ export class UnifiedAnalyticsService {
   }
 }
 
-// Singleton instance for easy import
-export let unifiedAnalyticsService = new UnifiedAnalyticsService();
+// Legacy convenience path: default singleton instance
+export const unifiedAnalyticsService = new UnifiedAnalyticsService();

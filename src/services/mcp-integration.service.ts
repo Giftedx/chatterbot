@@ -267,8 +267,8 @@ export class MCPIntegrationService {
    * Get MCP system status and metrics
    */
   public async getSystemStatus(): Promise<{
-    mcpStatus: any;
-    securityMetrics: any;
+    mcpStatus: { connectedServers: number; serverStatus: Record<string, { connected: boolean }> };
+    securityMetrics: { totalExecutions: number; blockedExecutions: number; uniqueUsers: number; topTools: Array<{ serverName: string; toolName: string; count: number }>; consentDecisions: { allowOnce: number; alwaysAllow: number; deny: number; alwaysDeny: number } };
     capabilities: MCPCapability[];
   }> {
     const mcpStatus = this.mcpManager.getStatus();

@@ -56,7 +56,7 @@ export class DocumentDatabaseService {
       await prisma.mediaFile.update({
         where: { id: fileId },
         data: {
-          documentMetadata: updates.documentMetadata as any,
+          documentMetadata: updates.documentMetadata as unknown as Record<string, unknown>,
           extractedText: updates.extractedText,
           description: updates.description,
           tags: JSON.stringify(updates.tags),
@@ -108,7 +108,7 @@ export class DocumentDatabaseService {
       } = options;
 
       // Build where conditions
-      const whereConditions: any = {
+      const whereConditions: Record<string, unknown> = {
         userId,
         fileType: 'document',
         processingStatus: 'completed',
@@ -129,11 +129,12 @@ export class DocumentDatabaseService {
 
       // Add content type filter
       if (contentType) {
+        const existing = (whereConditions as Record<string, unknown>).documentMetadata as Record<string, unknown> | undefined;
         whereConditions.documentMetadata = {
-          ...whereConditions.documentMetadata,
+          ...(existing || {}),
           path: ['contentType'],
           equals: contentType
-        };
+        } as Record<string, unknown>;
       }
 
       // Add category filters

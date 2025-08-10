@@ -51,6 +51,11 @@ export class EnhancedIntelligenceActivationService {
     };
   }
 
+  // Minimal internal type guard to avoid any/unknown and keep behavior unchanged
+  private isSuccessResult(result: unknown): result is { success: boolean } {
+    return !!result && typeof (result as { success?: unknown }).success === 'boolean';
+  }
+
   /**
    * Phase 1: Enhanced Intelligence Activation
    * Activates real MCP API integrations and advanced features
@@ -238,7 +243,7 @@ export class EnhancedIntelligenceActivationService {
       // Test Firecrawl API (run regardless of API key to allow fallbacks in tests)
       if (this.directExecutor) {
         const testExtraction = await this.directExecutor.executeContentExtraction(['https://example.com']);
-        validations.firecrawl = !!testExtraction && (testExtraction as any).success === true;
+        validations.firecrawl = this.isSuccessResult(testExtraction) && testExtraction.success === true;
       }
     } catch (error) {
       logger.warn('Firecrawl API validation failed', { error: String(error) });
@@ -248,7 +253,7 @@ export class EnhancedIntelligenceActivationService {
       // Test Sequential Thinking
       if (this.directExecutor) {
         const testThinking = await this.directExecutor.executeSequentialThinking('test thought');
-        validations.sequentialThinking = !!testThinking && (testThinking as any).success === true;
+        validations.sequentialThinking = this.isSuccessResult(testThinking) && testThinking.success === true;
       }
     } catch (error) {
       logger.warn('Sequential Thinking validation failed', { error: String(error) });

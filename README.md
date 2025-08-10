@@ -447,3 +447,12 @@ This pattern avoids the pitfalls of Jest ESM mocking and ensures your tests are 
 For more on ESM mocking challenges, see [Jest ESM docs](https://jestjs.io/docs/ecmascript-modules) and [community notes](https://blog.revathskumar.com/2024/07/jest-module-mocking-in-es-modules.html).
 
 ---
+
+## Development
+
+- Install deps: `npm ci`
+- Lint: `npm run lint`
+- Typecheck: `npm run typecheck`
+- Test: `npm test`
+- Detect open handles: `npm run test:detect`
+- See `docs/testing-and-di.md` for guidance on dependency injection in tests and how to mock core services.

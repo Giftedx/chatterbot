@@ -103,7 +103,7 @@ export class MCPClientWrapper {
     }
   }
 
-  async listTools(): Promise<any> {
+  async listTools(): Promise<unknown> {
     if (!this.connected) {
       throw new Error('MCP Client not connected');
     }
@@ -350,7 +350,7 @@ export class MCPManager {
   /**
    * List available tools from a specific server
    */
-  public async listTools(serverName: string): Promise<any> {
+  public async listTools(serverName: string): Promise<unknown> {
     const client = this.getClient(serverName);
     
     if (!client) {

@@ -384,9 +384,9 @@ export class MCPSecurityManager {
   }
 
   private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
-    void userId;
-    void serverName;
-    void toolName;
+    void _userId;
+    void _serverName;
+    void _toolName;
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;

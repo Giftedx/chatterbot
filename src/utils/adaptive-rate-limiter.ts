@@ -188,9 +188,9 @@ export class AdaptiveRateLimiter {
   // Decide which monitor function to use
   const monitorFn = (PerformanceMonitor && typeof PerformanceMonitor.monitor === 'function')
     ? PerformanceMonitor.monitor.bind(PerformanceMonitor)
-    : async (_op: string, fn: () => Promise<any>) => fn();
+    : async (_op: string, fn: () => Promise<unknown>) => fn();
 
-  let result: { allowed: boolean; retryAfter?: number; reason?: string } | undefined;
+  let result: unknown;
   try {
     result = await monitorFn('rate-limit-check', innerCheck);
   } catch (err) {
@@ -203,7 +203,7 @@ export class AdaptiveRateLimiter {
     result = await innerCheck();
   }
 
-  return result;
+  return result as { allowed: boolean; retryAfter?: number; reason?: string };
 }
 
       

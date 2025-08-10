@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
     Interaction,
     Message,
@@ -75,6 +76,7 @@ export interface CoreIntelligenceConfig {
         mcpOrchestrator?: UnifiedMCPOrchestratorService;
         analyticsService?: UnifiedAnalyticsService;
         messageAnalysisService?: typeof unifiedMessageAnalysisService;
+        geminiService?: GeminiService;
     };
 }
 
@@ -113,7 +115,7 @@ export class CoreIntelligenceService {
         this.analyticsService = config.dependencies?.analyticsService ?? new UnifiedAnalyticsService();
         this.messageAnalysisService = config.dependencies?.messageAnalysisService ?? unifiedMessageAnalysisService;
         
-        this.geminiService = new GeminiService();
+        this.geminiService = config.dependencies?.geminiService ?? new GeminiService();
         this.moderationService = new ModerationService();
         this.permissionService = intelligencePermissionService;
         this.contextService = intelligenceContextService;

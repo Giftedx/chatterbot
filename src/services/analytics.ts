@@ -187,15 +187,15 @@ export async function getUsageMetrics(timeRange: 'today' | 'week' | 'month' | 'a
   });
 
   const totalCommands = events.length;
-  const successfulCommands = events.filter((e: any) => e.isSuccess).length;
+  const successfulCommands = events.filter((e: { isSuccess: boolean }) => e.isSuccess).length;
   const failedCommands = totalCommands - successfulCommands;
-  const uniqueUsers = new Set(events.map((e: any) => e.userId)).size;
-  const uniqueGuilds = new Set(events.filter((e: any) => e.guildId).map((e: any) => e.guildId)).size;
+  const uniqueUsers = new Set(events.map((e: { userId: string }) => e.userId)).size;
+  const uniqueGuilds = new Set(events.filter((e: { guildId: string | null }) => e.guildId).map((e: { guildId: string | null }) => e.guildId)).size;
   const averageCommandsPerUser = uniqueUsers > 0 ? Math.round((totalCommands / uniqueUsers) * 100) / 100 : 0;
 
   // Most active hour
   const hourCounts: Record<number, number> = {};
-  events.forEach((event: any) => {
+  events.forEach((event: { timestamp: Date }) => {
     const hour = new Date(event.timestamp).getHours();
     hourCounts[hour] = (hourCounts[hour] || 0) + 1;
   });
@@ -205,7 +205,7 @@ export async function getUsageMetrics(timeRange: 'today' | 'week' | 'month' | 'a
 
   // Most active day
   const dayCounts: Record<string, number> = {};
-  events.forEach((event: any) => {
+  events.forEach((event: { timestamp: Date }) => {
     const day = new Date(event.timestamp).toISOString().split('T')[0];
     dayCounts[day] = (dayCounts[day] || 0) + 1;
   });
@@ -215,7 +215,7 @@ export async function getUsageMetrics(timeRange: 'today' | 'week' | 'month' | 'a
 
   // Command breakdown
   const commandBreakdown: Record<string, number> = {};
-  events.forEach((event: any) => {
+  events.forEach((event: { command: string }) => {
     commandBreakdown[event.command] = (commandBreakdown[event.command] || 0) + 1;
   });
 
