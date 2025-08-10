@@ -1178,7 +1178,7 @@ export class UnifiedMCPOrchestratorService {
       urls: analysis.urls || [],
       complexity: analysis.complexityLevel || 'simple',
       intents: analysis.intents || [],
-      requiredTools: analysis.requiredTools || [],
+      requiredTools: analysis.requiredCapabilities || [],
       
       // Enhanced analysis capabilities  
       needsPersonaSwitch: false,
