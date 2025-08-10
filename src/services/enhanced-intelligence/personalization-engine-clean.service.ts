@@ -175,7 +175,6 @@ export class PersonalizationEngine {
     try {
       return await PerformanceMonitor.monitor('personalization-recommendations', async () => {
         const pattern = await this.getUserPattern(userId, guildId);
-        // const insights = this.learningInsights.get(userId) || []; // Not used in current implementation
         const recommendations: PersonalizedRecommendation[] = [];
 
         // Tool recommendations based on usage patterns
