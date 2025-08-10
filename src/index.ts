@@ -10,7 +10,7 @@ import { enhancedIntelligenceActivation } from './services/enhanced-intelligence
 // import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 
 
-console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
+// console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
 
 // Validate required env vars early
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
