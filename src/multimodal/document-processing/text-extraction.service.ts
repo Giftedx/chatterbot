@@ -111,7 +111,7 @@ export class DocumentTextExtractionService {
 
       // Simulate page range extraction by taking a portion of the text
       const totalPages = fullExtraction.pageCount || 1;
-      const pageRatio = Math.min((endPage - startPage + 1) / totalPages, 1);
+      // const pageRatio = Math.min((endPage - startPage + 1) / totalPages, 1); // Not currently used
       const startIndex = Math.floor((startPage - 1) / totalPages * fullExtraction.fullText.length);
       const endIndex = Math.floor(endPage / totalPages * fullExtraction.fullText.length);
       

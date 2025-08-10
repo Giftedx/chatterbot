@@ -48,8 +48,8 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
     typeof (h as { unref?: () => void }).unref === 'function';
   global.setInterval = ((fn: (...args: unknown[]) => unknown, delay?: number, ...args: unknown[]): ReturnType<typeof setInterval> => {
     const id = originalSetInterval(fn, delay as number, ...args);
-    if (typeof (id as any)?.unref === 'function') {
-      (id as any).unref();
+    if (typeof (id as { unref?: () => void })?.unref === 'function') {
+      (id as { unref: () => void }).unref();
     }
     globalIntervals.push(id);
     return id;
@@ -57,8 +57,8 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
 
   global.setTimeout = ((fn: (...args: unknown[]) => unknown, delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
     const id = originalSetTimeout(fn, delay as number, ...args);
-    if (typeof (id as any)?.unref === 'function') {
-      (id as any).unref();
+    if (typeof (id as { unref?: () => void })?.unref === 'function') {
+      (id as { unref: () => void }).unref();
     }
     globalIntervals.push(id);
     return id;

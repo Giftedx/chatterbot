@@ -89,7 +89,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Unified Service Failure Scenarios', () => {
     test('should handle MCP orchestrator service failure gracefully', async () => {
       // Mock MCP orchestrator to fail
-      const mockMCPOrchestrator = require('../core/mcp-orchestrator.service.js');
+      const mockMCPOrchestrator = await import('../core/mcp-orchestrator.service.js');
       
       // Create a mock for the MCP orchestrator service if it doesn't exist
       if (!mockMCPOrchestrator.mcpOrchestratorService) {
@@ -129,7 +129,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle analytics service failure gracefully', async () => {
       // Mock analytics service to fail
-      const mockAnalytics = require('../core/unified-analytics.service.js');
+      const mockAnalytics = await import('../core/unified-analytics.service.js');
       mockAnalytics.unifiedAnalyticsService.logMessage = jest.fn()
         .mockRejectedValue(new Error('Analytics service failed'));
 
@@ -156,7 +156,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle message analysis service failure gracefully', async () => {
       // Mock message analysis service to fail
-      const mockAnalysis = require('../core/message-analysis.service.js');
+      const mockAnalysis = await import('../core/message-analysis.service.js');
       mockAnalysis.unifiedMessageAnalysisService.analyzeMessage = jest.fn()
         .mockRejectedValue(new Error('Message analysis failed'));
 
@@ -185,7 +185,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Modular Intelligence Service Failures', () => {
     test('should handle capability service failure gracefully', async () => {
       // Mock capability service to fail
-      const mockCapability = require('../intelligence/capability.service.js');
+      const mockCapability = await import('../intelligence/capability.service.js');
       mockCapability.intelligenceCapabilityService.executeDetectedCapabilities = jest.fn()
         .mockRejectedValue(new Error('Capability service failed'));
 
@@ -212,7 +212,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle context service failure gracefully', async () => {
       // Mock context service to fail
-      const mockContext = require('../intelligence/context.service.js');
+      const mockContext = await import('../intelligence/context.service.js');
       mockContext.intelligenceContextService.buildEnhancedContext = jest.fn()
         .mockRejectedValue(new Error('Context service failed'));
 
@@ -241,7 +241,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Gemini API Failure Scenarios', () => {
     test('should handle Gemini API timeout gracefully', async () => {
       // Mock Gemini service to timeout
-      const mockGemini = require('../gemini.service.js');
+      const mockGemini = await import('../gemini.service.js');
       
       // Create a mock for the GeminiService class if it doesn't exist
       if (!mockGemini.geminiService) {
@@ -281,7 +281,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle Gemini API rate limiting gracefully', async () => {
       // Mock Gemini service to return rate limit error
-      const mockGemini = require('../gemini.service.js');
+      const mockGemini = await import('../gemini.service.js');
       
       // Create a mock for the GeminiService class if it doesn't exist
       if (!mockGemini.geminiService) {
@@ -371,10 +371,10 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Multiple Service Failure Scenarios', () => {
     test('should handle cascade failures gracefully', async () => {
       // Mock multiple services to fail
-      const mockAnalysis = require('../core/message-analysis.service.js');
-      const mockMCPOrchestrator = require('../core/mcp-orchestrator.service.js');
-      const mockAnalytics = require('../core/unified-analytics.service.js');
-      const mockGemini = require('../gemini.service.js');
+      const mockAnalysis = await import('../core/message-analysis.service.js');
+      const mockMCPOrchestrator = await import('../core/mcp-orchestrator.service.js');
+      const mockAnalytics = await import('../core/unified-analytics.service.js');
+      const mockGemini = await import('../gemini.service.js');
 
       // Create mocks for services if they don't exist
       if (!mockAnalysis.unifiedMessageAnalysisService) {
@@ -436,7 +436,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Recovery and Retry Logic', () => {
     test('should attempt retry on transient failures', async () => {
       // Mock Gemini service to fail once then succeed
-      const mockGemini = require('../gemini.service.js');
+      const mockGemini = await import('../gemini.service.js');
       
       // Create a mock for the GeminiService class if it doesn't exist
       if (!mockGemini.geminiService) {
@@ -479,7 +479,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Error Message Quality', () => {
     test('should provide helpful error messages to users', async () => {
       // Mock Gemini service to fail
-      const mockGemini = require('../gemini.service.js');
+      const mockGemini = await import('../gemini.service.js');
       
       // Create a mock for the GeminiService class if it doesn't exist  
       if (!mockGemini.geminiService) {

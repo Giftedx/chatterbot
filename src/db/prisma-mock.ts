@@ -35,7 +35,7 @@ export class MockPrismaClient {
 
   // Mock implementation for each model
   persona = {
-    create: async (data: any) => {
+    create: async (data: { data: Record<string, unknown> }) => {
       const id = this.counters.personas++;
       const persona = { id, ...data.data, createdAt: new Date(), updatedAt: new Date() };
       this.personas.set(id, persona);
@@ -44,10 +44,10 @@ export class MockPrismaClient {
     findMany: async () => {
       return Array.from(this.personas.values());
     },
-    findUnique: async (query: any) => {
+    findUnique: async (query: { where: { id: number } }) => {
       return this.personas.get(query.where.id) || null;
     },
-    update: async (query: any) => {
+    update: async (query: { where: { id: number }; data: Record<string, unknown> }) => {
       const existing = this.personas.get(query.where.id);
       if (existing) {
         const updated = { ...existing, ...query.data, updatedAt: new Date() };
@@ -56,7 +56,7 @@ export class MockPrismaClient {
       }
       return null;
     },
-    delete: async (query: any) => {
+    delete: async (query: { where: { id: number } }) => {
       const deleted = this.personas.get(query.where.id);
       this.personas.delete(query.where.id);
       return deleted;
@@ -64,7 +64,7 @@ export class MockPrismaClient {
   };
 
   analyticsEvent = {
-    create: async (data: any) => {
+    create: async (data: { data: Record<string, unknown> }) => {
       const id = this.counters.analyticsEvents++;
       const event = { id, ...data.data, timestamp: new Date() };
       this.analyticsEvents.set(id, event);
@@ -79,16 +79,16 @@ export class MockPrismaClient {
   };
 
   moderationConfig = {
-    create: async (data: any) => {
+    create: async (data: { data: Record<string, unknown> }) => {
       const id = this.counters.moderationConfigs++;
       const config = { id, ...data.data, createdAt: new Date(), updatedAt: new Date() };
       this.moderationConfigs.set(id, config);
       return config;
     },
-    findUnique: async (query: any) => {
+    findUnique: async (query: { where: { guildId: string } }) => {
       return Array.from(this.moderationConfigs.values()).find(c => c.guildId === query.where.guildId) || null;
     },
-    upsert: async (query: any) => {
+    upsert: async (query: { where: { guildId: string }; update: Record<string, unknown>; create: Record<string, unknown> }) => {
       const existing = Array.from(this.moderationConfigs.values()).find(c => c.guildId === query.where.guildId);
       if (existing) {
         const updated = { ...existing, ...query.update, updatedAt: new Date() };
@@ -107,8 +107,8 @@ export class MockPrismaClient {
       this.moderationConfigs.clear();
       return { count };
     },
-    delete: async (query: any) => {
-      const toDelete = Array.from(this.moderationConfigs.entries()).find(([_, config]) => 
+    delete: async (query: { where: { guildId: string } }) => {
+      const toDelete = Array.from(this.moderationConfigs.entries()).find(([, config]) => 
         config.guildId === query.where.guildId
       );
       
@@ -205,10 +205,10 @@ export class MockPrismaClient {
       if (where?.userId?.startsWith) {
         // Handle startsWith query
         const prefix = where.userId.startsWith;
-        const toDelete = Array.from(this.userMemories.entries()).filter(([_, memory]) => 
+        const toDelete = Array.from(this.userMemories.entries()).filter(([, memory]) => 
           memory.userId.startsWith(prefix)
         );
-        toDelete.forEach(([id, _]) => {
+        toDelete.forEach(([id]) => {
           this.userMemories.delete(id);
           count++;
         });
@@ -222,7 +222,7 @@ export class MockPrismaClient {
     },
     delete: async (query: any) => {
       const whereClause = query.where.userId_guildId;
-      const toDelete = Array.from(this.userMemories.entries()).find(([_, memory]) => 
+      const toDelete = Array.from(this.userMemories.entries()).find(([, memory]) => 
         memory.userId === whereClause.userId && memory.guildId === whereClause.guildId
       );
       

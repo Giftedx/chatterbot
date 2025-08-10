@@ -31,7 +31,7 @@ let RequestBatchProcessor: any;
 let AdaptiveRateLimiter: any;
 
 try {
-  const streamingModule = require('../../utils/streaming-processor.js');
+  const streamingModule = await import('../../utils/streaming-processor.js');
   StreamingResponseProcessor = streamingModule.default;
   console.log('StreamingResponseProcessor imported:', !!StreamingResponseProcessor);
 } catch (error) {
@@ -39,7 +39,7 @@ try {
 }
 
 try {
-  const batchModule = require('../../utils/request-batch-processor.js');
+  const batchModule = await import('../../utils/request-batch-processor.js');
   RequestBatchProcessor = batchModule.default;
   console.log('RequestBatchProcessor imported:', !!RequestBatchProcessor);
 } catch (error) {
@@ -47,7 +47,7 @@ try {
 }
 
 try {
-  const rateLimiterModule = require('../../utils/adaptive-rate-limiter.js');
+  const rateLimiterModule = await import('../../utils/adaptive-rate-limiter.js');
   AdaptiveRateLimiter = rateLimiterModule.default;
   console.log('AdaptiveRateLimiter imported:', !!AdaptiveRateLimiter);
 } catch (error) {

@@ -334,23 +334,26 @@ export class UnifiedAnalyticsService {
       res.setHeader('Content-Type', 'application/json');
 
       switch (path) {
-        case '/stats':
+        case '/stats': {
           const stats = await this.getDetailedStats();
           res.writeHead(200);
           res.end(JSON.stringify(stats));
           break;
+        }
 
-        case '/usage':
+        case '/usage': {
           const timeRange = (url.searchParams.get('range') as any) || 'week';
           const usage = await this.getUsageMetrics(timeRange);
           res.writeHead(200);
           res.end(JSON.stringify(usage));
           break;
+        }
 
-        case '/health':
+        case '/health': {
           res.writeHead(200);
           res.end(JSON.stringify({ status: 'healthy', timestamp: new Date().toISOString() }));
           break;
+        }
 
         default:
           res.writeHead(404);

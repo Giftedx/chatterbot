@@ -105,7 +105,7 @@ export class MultimodalConversationService {
     return Array.from(topics).slice(0, 10);
   }
 
-  private async extractConversationEntities(batchResult: BatchProcessingResult, conversationText?: string): Promise<Array<{ entity: string; type: string; confidence: number }>> {
+  private async extractConversationEntities(batchResult: BatchProcessingResult, _conversationText?: string): Promise<Array<{ entity: string; type: string; confidence: number }>> {
     const entities: Array<{ entity: string; type: string; confidence: number }> = [];
     
     // Add file-based entities

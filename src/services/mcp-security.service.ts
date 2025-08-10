@@ -4,8 +4,7 @@
  * as outlined in the MCP integration research document
  */
 
-import { Message, ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
-import { prisma } from '../db/prisma.js';
+import { ButtonInteraction, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import { logger } from '../utils/logger.js';
 
 export interface MCPConsentDecision {
@@ -385,7 +384,7 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(userId: string, serverName: string, toolName: string): boolean {
+  private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;

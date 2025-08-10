@@ -193,11 +193,11 @@ export class ContextSearchService {
       });
 
       // Convert to search results
-      const results: ThreadSearchResult[] = threadTopics.map((tt: any) => ({
+      const results: ThreadSearchResult[] = threadTopics.map((tt: { thread: { guildId?: string; summary?: string } }) => ({
         thread: {
           ...tt.thread,
           guildId: tt.thread.guildId || undefined
-        } as any,
+        } as { guildId?: string; summary?: string },
         relevanceScore: 0.9, // High relevance for direct topic match
         matchingMessages: [], // Would need to fetch actual messages
         highlightedContent: [tt.thread.summary || `Topic: ${topicName}`],
@@ -242,7 +242,7 @@ export class ContextSearchService {
    * Build database search filters
    */
   private buildSearchFilters(query: ContextSearchQuery, options: ContextSearchOptions) {
-    const filters: any = {
+    const filters: { userId: string; channelId?: string; guildId?: string; createdAt?: { gte: Date; lte: Date }; status?: string } = {
       userId: query.userId
     };
 
@@ -273,7 +273,7 @@ export class ContextSearchService {
    */
   private async searchByContent(
     searchTerms: string[],
-    filters: any
+    filters: { userId: string; channelId?: string; guildId?: string; createdAt?: { gte: Date; lte: Date }; status?: string }
   ): Promise<ThreadSearchResult[]> {
     const results: ThreadSearchResult[] = [];
 
@@ -299,7 +299,7 @@ export class ContextSearchService {
             thread: {
               ...thread,
               guildId: thread.guildId || undefined
-            } as any,
+            } as { guildId?: string; summary?: string },
             relevanceScore: this.calculateContentRelevance(thread.summary || '', searchTerms),
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [this.extractSnippet(thread.summary || '', term)],
@@ -322,7 +322,7 @@ export class ContextSearchService {
    */
   private async searchByTopics(
     searchTerms: string[],
-    filters: any
+    filters: { userId: string; channelId?: string; guildId?: string; createdAt?: { gte: Date; lte: Date }; status?: string }
   ): Promise<ThreadSearchResult[]> {
     const results: ThreadSearchResult[] = [];
 
@@ -357,7 +357,7 @@ export class ContextSearchService {
             thread: {
               ...tt.thread,
               guildId: tt.thread.guildId || undefined
-            } as any,
+            } as { guildId?: string; summary?: string },
             relevanceScore: 0.8, // High relevance for topic matches
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [`Topic: ${topic.displayName || topic.name}`],
@@ -379,7 +379,7 @@ export class ContextSearchService {
    */
   private async searchByTitles(
     searchTerms: string[],
-    filters: any
+    filters: { userId: string; channelId?: string; guildId?: string; createdAt?: { gte: Date; lte: Date }; status?: string }
   ): Promise<ThreadSearchResult[]> {
     const results: ThreadSearchResult[] = [];
 
@@ -399,7 +399,7 @@ export class ContextSearchService {
             thread: {
               ...thread,
               guildId: thread.guildId || undefined
-            } as any,
+            } as { guildId?: string; threadTitle?: string },
             relevanceScore: this.calculateTitleRelevance(thread.threadTitle || '', searchTerms),
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [thread.threadTitle || ''],

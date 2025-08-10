@@ -87,15 +87,15 @@ export class QualityAssessmentService {
     const consistency = this.assessConsistency(mediaFile, metadata);
     const technical = this.assessTechnicalQuality(mediaFile, metadata);
 
-    // Calculate weighted overall score
-    const overallScore = (
-      clarity * 0.3 +        // 30% weight on clarity
-      background * 0.25 +    // 25% weight on background noise
-      consistency * 0.25 +   // 25% weight on consistency
-      technical * 0.2        // 20% weight on technical quality
-    );
+    // Calculate weighted overall score (commented out as not used in return)
+    // const overallScore = (
+    //   clarity * 0.3 +        // 30% weight on clarity
+    //   background * 0.25 +    // 25% weight on background noise
+    //   consistency * 0.25 +   // 25% weight on consistency
+    //   technical * 0.2        // 20% weight on technical quality
+    // );
 
-    const factors = this.identifyQualityFactors(clarity, background, consistency, technical);
+    // const factors = this.identifyQualityFactors(clarity, background, consistency, technical);
 
     return {
       clarity: Math.round(clarity * 100) / 100,

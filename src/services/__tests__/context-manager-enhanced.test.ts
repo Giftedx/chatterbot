@@ -3,7 +3,7 @@
  * Tests the intelligent conversation caching and management features
  */
 
-import { ContextManager, ChatMessage } from '../context-manager.js';
+import { ContextManager } from '../context-manager.js';
 import { Part } from '@google/generative-ai';
 
 // Mock dependencies

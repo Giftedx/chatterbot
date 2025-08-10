@@ -311,7 +311,7 @@ export class DirectMCPExecutor {
             const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
             const title = titleMatch ? titleMatch[1].trim() : url;
             let textContent = html;
-            const sanitizeHtml = require("sanitize-html");
+            const { default: sanitizeHtml } = await import("sanitize-html");
             textContent = sanitizeHtml(html, {
               allowedTags: [],
               allowedAttributes: {},

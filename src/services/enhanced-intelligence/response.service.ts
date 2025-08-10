@@ -5,7 +5,6 @@
 
 import { GeminiService } from '../gemini.service.js';
 import { getHistory } from '../context-manager.js';
-import { getActivePersona } from '../persona-manager.js';
 import { ProcessingContext, PersonaInfo, MCPToolResult } from './types.js';
 
 export class EnhancedResponseService {

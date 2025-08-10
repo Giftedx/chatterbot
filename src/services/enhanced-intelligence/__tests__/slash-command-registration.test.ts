@@ -1,5 +1,4 @@
 import { 
-  EnhancedInvisibleIntelligenceService, 
   createEnhancedInvisibleIntelligenceService 
 } from '../index.js';
 
