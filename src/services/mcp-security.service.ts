@@ -315,9 +315,6 @@ export class MCPSecurityManager {
   }
 
   private async getStoredConsent(_userId: string, _serverName: string, _toolName: string): Promise<MCPConsentDecision | null> {
-    void userId;
-    void serverName;
-    void toolName;
     // In a real implementation, this would query the database
     // For now, return null (no stored consent)
     return null;
