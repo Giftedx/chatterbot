@@ -71,7 +71,7 @@ export class MCPSecurityManager {
 
     // Check database for persistent consent decisions
     try {
-      const storedConsent = await this.getStoredConsent(context.userId, context.serverName, context.toolName);
+              const storedConsent = await this.getStoredConsent();
       if (storedConsent) {
         this.consentCache.set(cacheKey, storedConsent);
         
@@ -315,7 +315,7 @@ export class MCPSecurityManager {
     return (now - consentTime) < this.consentCacheTTL;
   }
 
-  private async getStoredConsent(userId: string, serverName: string, toolName: string): Promise<MCPConsentDecision | null> {
+  private async getStoredConsent(): Promise<MCPConsentDecision | null> {
     // In a real implementation, this would query the database
     // For now, return null (no stored consent)
     return null;

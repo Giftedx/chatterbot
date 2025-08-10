@@ -220,11 +220,11 @@ export class UserBehaviorAnalyticsService {
     learningTrend: Array<{ date: Date; newTopics: string[]; proficiency: number }>;
   }> {
     try {
-      const userKey = `${userId}_${guildId || ''}`;
-      const metrics = this.behaviorData.get(userKey) || [];
+      // const userKey = `${userId}_${guildId || ''}`; // Not used in current implementation
+      // const metrics = this.behaviorData.get(userKey) || []; // Not used in current implementation
       const periodStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
       const periodEnd = new Date();
-      const recentMetrics = metrics.filter(m => m.timestamp >= periodStart);
+      // const recentMetrics = metrics.filter(m => m.timestamp >= periodStart); // Not used in return
 
       return {
         periodStart,

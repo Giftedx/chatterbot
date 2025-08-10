@@ -29,7 +29,7 @@ jest.mock('../../utils/logger.js', () => ({
 
 // Create a simple mock performanceMonitor
 const mockPerformanceMonitor = {
-  monitor: async (_operation: string, fn: () => Promise<any>, _context?: object) => await fn()
+  monitor: async (_operation: string, fn: () => Promise<any>) => await fn()
 };
 
 interface APIResponse {

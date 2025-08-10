@@ -145,7 +145,7 @@ describe('Cycle 8: Performance Optimization - Basic Tests', () => {
         priority: 'medium',
         type: 'text',
         data: { prompt: 'test prompt' },
-        callback: (result: unknown) => {
+        callback: () => {
           // Callback executed but result not used in this test
         },
         timeoutMs: 5000,
@@ -274,7 +274,7 @@ describe('Cycle 8: Performance Optimization - Basic Tests', () => {
         priority: 'high',
         type: 'text',
         data: { prompt: 'integration test' },
-        callback: (result: unknown) => { 
+        callback: () => { 
           // Callback executed but result not used in this test
         },
         timeoutMs: 5000,
