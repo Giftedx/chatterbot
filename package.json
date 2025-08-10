@@ -20,8 +20,8 @@
     "docker:stop": "echo 'No docker-compose.yml in repo; stop container via docker stop <id>'",
     "docker:logs": "echo 'Use your container runtime logs viewer (no compose file in repo)'",
     "deploy:prod": "npm run build && npm run docker:build && npm run docker:run",
-          "deploy:analytics": "echo 'No docker-compose.yml in repo; use ENABLE_ANALYTICS_DASHBOARD to start built-in dashboard'",
-      "db:migrate": "npx prisma migrate deploy",
+    "deploy:analytics": "echo 'No docker-compose.yml in repo; use ENABLE_ANALYTICS_DASHBOARD to start built-in dashboard'",
+    "db:migrate": "npx prisma migrate deploy",
     "db:studio": "npx prisma studio",
     "docs": "typedoc"
   },
