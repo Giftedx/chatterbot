@@ -240,7 +240,7 @@ export class SpeakerDetectionService {
    */
   private determineInteractionStyle(
     speakers: DetectedSpeaker[],
-    segments: Array<TranscriptionSegment & { speakerId: string }>
+    _segments: Array<TranscriptionSegment & { speakerId: string }>
   ): string {
     if (speakers.length === 1) {
       return 'monologue';
@@ -268,7 +268,7 @@ export class SpeakerDetectionService {
     speakers: DetectedSpeaker[];
     segments: Array<TranscriptionSegment & { speakerId: string }>;
   }): string {
-    const { speakerCount, speakers } = speakerResults;
+    const { speakerCount, speakers, segments } = speakerResults;
     
     if (speakerCount === 1) {
       return `Single speaker detected.`;

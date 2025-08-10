@@ -5,7 +5,8 @@
 
 import {
   ContextSearchQuery,
-  ThreadSearchResult
+  ThreadSearchResult,
+  ConversationThread
 } from './types.js';
 import { ConversationThreadService } from './conversation-thread.service.js';
 import { TopicDetectionService } from './topic-detection.service.js';
@@ -254,7 +255,7 @@ export class ContextSearchService {
       filters.guildId = query.guildId;
     }
 
-    if (query.timeRange) {
+    if (query.timeRange && query.timeRange.start && query.timeRange.end) {
       filters.createdAt = {
         gte: query.timeRange.start,
         lte: query.timeRange.end
@@ -297,9 +298,20 @@ export class ContextSearchService {
         for (const thread of threads) {
           results.push({
             thread: {
-              ...thread,
-              guildId: thread.guildId || undefined
-            } as { guildId?: string; summary?: string },
+              id: thread.id,
+              channelId: thread.channelId,
+              userId: thread.userId,
+              guildId: thread.guildId || undefined,
+              threadTitle: thread.threadTitle,
+              currentTopic: thread.currentTopic,
+              status: thread.status,
+              summary: thread.summary,
+              importance: thread.importance,
+              messageCount: thread.messageCount,
+              tokenCount: thread.tokenCount,
+              createdAt: thread.createdAt,
+              lastActivity: thread.lastActivity
+            } as ConversationThread,
             relevanceScore: this.calculateContentRelevance(thread.summary || '', searchTerms),
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [this.extractSnippet(thread.summary || '', term)],
@@ -355,9 +367,20 @@ export class ContextSearchService {
         for (const tt of threadTopics) {
           results.push({
             thread: {
-              ...tt.thread,
-              guildId: tt.thread.guildId || undefined
-            } as { guildId?: string; summary?: string },
+              id: tt.thread.id,
+              channelId: tt.thread.channelId,
+              userId: tt.thread.userId,
+              guildId: tt.thread.guildId || undefined,
+              threadTitle: tt.thread.threadTitle,
+              currentTopic: tt.thread.currentTopic,
+              status: tt.thread.status,
+              summary: tt.thread.summary,
+              importance: tt.thread.importance,
+              messageCount: tt.thread.messageCount,
+              tokenCount: tt.thread.tokenCount,
+              createdAt: tt.thread.createdAt,
+              lastActivity: tt.thread.lastActivity
+            } as ConversationThread,
             relevanceScore: 0.8, // High relevance for topic matches
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [`Topic: ${topic.displayName || topic.name}`],
@@ -397,9 +420,20 @@ export class ContextSearchService {
         for (const thread of threads) {
           results.push({
             thread: {
-              ...thread,
-              guildId: thread.guildId || undefined
-            } as { guildId?: string; threadTitle?: string },
+              id: thread.id,
+              channelId: thread.channelId,
+              userId: thread.userId,
+              guildId: thread.guildId || undefined,
+              threadTitle: thread.threadTitle,
+              currentTopic: thread.currentTopic,
+              status: thread.status,
+              summary: thread.summary,
+              importance: thread.importance,
+              messageCount: thread.messageCount,
+              tokenCount: thread.tokenCount,
+              createdAt: thread.createdAt,
+              lastActivity: thread.lastActivity
+            } as ConversationThread,
             relevanceScore: this.calculateTitleRelevance(thread.threadTitle || '', searchTerms),
             matchingMessages: [], // Would need to fetch actual messages
             highlightedContent: [thread.threadTitle || ''],
