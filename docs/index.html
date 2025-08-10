@@ -1,321 +1,82 @@
-<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>discord-gemini-bot-mvp</title><meta name="description" content="Documentation for discord-gemini-bot-mvp"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><div class="table-cell" id="tsd-search" data-base="."><div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-search"></use></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div><div class="field"><div id="tsd-toolbar-links"></div></div><ul class="results"><li class="state loading">Preparing search index...</li><li class="state failure">The search index is not available</li></ul><a href="index.html" class="title">discord-gemini-bot-mvp</a></div><div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h2>discord-gemini-bot-mvp</h2></div><div class="tsd-panel tsd-typography"><a id="md:discord-gemini-bot---production-ready" class="tsd-anchor"></a><h1><a href="#md:discord-gemini-bot---production-ready">Discord Gemini Bot - Production Ready</a></h1><p>A <strong>sophisticated Discord AI bot</strong> built with <strong>TypeScript</strong> and <strong>Discord.js v14</strong> that provides advanced AI conversation capabilities using Google Gemini. This is a <strong>production-ready application</strong> with excellent architecture and comprehensive test coverage.</p>
-<a id="md:✅-current-status-production-ready-with-test-suite-stabilized" class="tsd-anchor"></a><h2><a href="#md:✅-current-status-production-ready-with-test-suite-stabilized">✅ Current Status: Production Ready with Test Suite Stabilized</a></h2><p><strong>What Actually Works:</strong></p>
+<!DOCTYPE html><html class="default" lang="en"><head><meta charSet="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>Chatterbot - v0.1.0</title><meta name="description" content="Documentation for Chatterbot"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><div class="table-cell" id="tsd-search" data-base="."><div class="field"><label for="tsd-search-field" class="tsd-widget tsd-toolbar-icon search no-caption"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-search"></use></svg></label><input type="text" id="tsd-search-field" aria-label="Search"/></div><div class="field"><div id="tsd-toolbar-links"></div></div><ul class="results"><li class="state loading">Preparing search index...</li><li class="state failure">The search index is not available</li></ul><a href="index.html" class="title">Chatterbot - v0.1.0</a></div><div class="table-cell" id="tsd-widgets"><a href="#" class="tsd-widget tsd-toolbar-icon menu no-caption" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h2>Chatterbot - v0.1.0</h2></div><div class="tsd-panel tsd-typography"><a id="md:chatterbot" class="tsd-anchor"></a><h1><a href="#md:chatterbot">Chatterbot</a></h1><blockquote>
+<p>Advanced Discord AI bot powered by Google Gemini.</p>
+</blockquote>
+<p><a href="./docs/index.html">Browse the API Docs »</a></p>
+<p>A production-ready Discord bot built with TypeScript and Discord.js v14, featuring unified AI conversation via a single /chat command, optional agentic tools, and clean modular architecture.</p>
+<a id="md:highlights" class="tsd-anchor"></a><h3><a href="#md:highlights">Highlights</a></h3><ul>
+<li>Unified /chat command with multimodal Google Gemini integration</li>
+<li>Opt-in conversational mode after first /chat</li>
+<li>Optional agentic features: knowledge base, escalation, stats</li>
+<li>Prisma (SQLite by default), structured logging, health endpoint</li>
+<li>Minimal configuration; works without optional external APIs</li>
+</ul>
+<hr>
+<a id="md:quick-start" class="tsd-anchor"></a><h3><a href="#md:quick-start">Quick Start</a></h3><pre><code class="language-bash"><span class="hl-0"># 1) Install dependencies</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">install</span><br/><br/><span class="hl-0"># 2) Configure environment</span><br/><span class="hl-1">cp</span><span class="hl-2"> </span><span class="hl-3">env.example</span><span class="hl-2"> </span><span class="hl-3">.env</span><br/><span class="hl-0"># Edit .env and set: DISCORD_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY</span><br/><br/><span class="hl-0"># 3) Initialize database (SQLite by default)</span><br/><span class="hl-1">npx</span><span class="hl-2"> </span><span class="hl-3">prisma</span><span class="hl-2"> </span><span class="hl-3">migrate</span><span class="hl-2"> </span><span class="hl-3">dev</span><span class="hl-2"> </span><span class="hl-4">--name</span><span class="hl-2"> </span><span class="hl-3">init</span><br/><br/><span class="hl-0"># 4) Run in dev</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-3">dev</span>
+</code><button>Copy</button></pre>
+<hr>
+<a id="md:commands" class="tsd-anchor"></a><h3><a href="#md:commands">Commands</a></h3><ul>
+<li><p>/chat prompt [attachment]</p>
 <ul>
-<li>✅ <strong>Advanced Discord bot</strong> with intelligent conversation via <code>/chat</code> command</li>
-<li>✅ <strong>Google Gemini AI integration</strong> with streaming responses and error handling</li>
-<li>✅ <strong>Modular intelligence architecture</strong> with separate services for permissions, analysis, capabilities</li>
-<li>✅ <strong>Comprehensive user memory</strong> and conversation context management</li>
-<li>✅ <strong>Natural AI conversation mode</strong> - intelligent message processing</li>
-<li>✅ <strong>Real external API integrations</strong> (Brave Search, Firecrawl) with intelligent fallbacks</li>
-<li>✅ <strong>Robust analytics system</strong> with real-time monitoring and dashboard</li>
-<li>✅ <strong>SQLite/Prisma ORM</strong> with migration support and PostgreSQL ready</li>
-<li>✅ <strong>Comprehensive automated test suite</strong> (324 tests across 30 suites, core functionality tested)</li>
-<li>✅ <strong>Production-ready architecture</strong> with comprehensive error handling and logging</li>
-<li>✅ <strong>Graceful API degradation</strong> - works perfectly without optional services</li>
+<li>Primary command. After first use, the bot will respond to your normal messages (opt-in).</li>
 </ul>
-<p><strong>Recent Improvements:</strong></p>
+</li>
+<li><p>Agentic commands (enabled when ENABLE_AGENTIC_INTELLIGENCE=true):</p>
 <ul>
-<li>✅ <strong>Test Suite Stabilized</strong> - Fixed mock implementations for Gemini API integration</li>
-<li>✅ <strong>Code Cleanup</strong> - Removed redundant backup files and consolidated services</li>
-<li>✅ <strong>Documentation Accuracy</strong> - Updated status to reflect current reality</li>
-<li>⚠️ Some performance tests may need timing adjustments on slower CI runners</li>
-<li>⚠️ Optional API keys unlock enhanced features (Brave Search, Firecrawl)</li>
+<li>/learn question answer [tags]</li>
+<li>/knowledge query</li>
+<li>/escalate query [reason]</li>
+<li>/agentic-stats</li>
+</ul>
+</li>
 </ul>
 <hr>
-<a id="md:✨-working-features" class="tsd-anchor"></a><h2><a href="#md:✨-working-features">✨ Working Features</a></h2><a id="md:🤖-unified-intelligence-system-primary-feature" class="tsd-anchor"></a><h3><a href="#md:🤖-unified-intelligence-system-primary-feature">🤖 <strong>Unified Intelligence System</strong> (Primary Feature)</a></h3><ul>
-<li><strong>Single <code>/chat</code> command</strong> activates ALL bot capabilities automatically</li>
-<li><strong>Natural conversation mode</strong> - just talk to the bot normally after opting in</li>
-<li><strong>AI-driven feature selection</strong> - bot automatically uses appropriate features based on context</li>
-<li><strong>Intelligent message processing</strong> - responds to all messages from opted-in users</li>
-<li><strong>Seamless capability integration</strong> - all systems work together invisibly</li>
-</ul>
-<a id="md:🤖-advanced-ai-integration" class="tsd-anchor"></a><h3><a href="#md:🤖-advanced-ai-integration">🤖 <strong>Advanced AI Integration</strong></a></h3><ul>
-<li><strong>Google Gemini 1.5-flash</strong> with streaming responses and real-time updates</li>
-<li><strong>Multimodal AI processing</strong> - automatically analyzes images, documents, audio</li>
-<li><strong>Context-aware responses</strong> - maintains conversation history and personal context</li>
-<li><strong>Adaptive rate limiting</strong> - intelligent request throttling with performance monitoring</li>
-<li><strong>Smart persona switching</strong> - automatically adapts tone based on conversation context</li>
-</ul>
-<a id="md:🎭-intelligent-persona-system" class="tsd-anchor"></a><h3><a href="#md:🎭-intelligent-persona-system">🎭 <strong>Intelligent Persona System</strong></a></h3><ul>
-<li><strong>Auto-switching personas</strong> - technical, professional, friendly, sarcastic based on context</li>
-<li><strong>Built-in personas</strong> with rich personality profiles and specialized knowledge</li>
-<li><strong>Dynamic persona creation</strong> - admins can create custom personas on the fly</li>
-<li><strong>Per-server persona settings</strong> - each Discord server maintains its own persona preferences</li>
-</ul>
-<a id="md:🧠-advanced-memory-amp-context" class="tsd-anchor"></a><h3><a href="#md:🧠-advanced-memory-amp-context">🧠 <strong>Advanced Memory &amp; Context</strong></a></h3><ul>
-<li><strong>Comprehensive user memory</strong> - remembers preferences, conversation history, and personal context</li>
-<li><strong>Intelligent conversation management</strong> - maintains thread context across long conversations</li>
-<li><strong>Automatic memory operations</strong> - updates and recalls information naturally during conversation</li>
-<li><strong>Cross-conversation context</strong> - remembers users across different channels and sessions</li>
-</ul>
-<a id="md:🔐-enterprise-grade-security" class="tsd-anchor"></a><h3><a href="#md:🔐-enterprise-grade-security">🔐 <strong>Enterprise-Grade Security</strong></a></h3><ul>
-<li><strong>Role-Based Access Control (RBAC)</strong> - granular permission system with Discord role sync</li>
-<li><strong>Permission-gated features</strong> - advanced capabilities unlock based on user permissions</li>
-<li><strong>Intelligent content moderation</strong> - automatic text and image safety checking</li>
-<li><strong>Graceful degradation</strong> - bot works perfectly even without optional security services</li>
-</ul>
-<a id="md:🤖-analytics-amp-intelligence" class="tsd-anchor"></a><h3><a href="#md:🤖-analytics-amp-intelligence">🤖 <strong>Analytics &amp; Intelligence</strong></a></h3><ul>
-<li><strong>Real-time usage analytics</strong> - comprehensive tracking and monitoring</li>
-<li><strong>Auto-generated statistics</strong> - admins get stats naturally through conversation</li>
-<li><strong>Analytics dashboard</strong> - optional web interface for detailed insights</li>
-<li><strong>Performance monitoring</strong> - adaptive systems optimize response times automatically</li>
-</ul>
-<a id="md:🔧-advanced-tool-integration-permission-gated" class="tsd-anchor"></a><h3><a href="#md:🔧-advanced-tool-integration-permission-gated">🔧 <strong>Advanced Tool Integration</strong> (Permission-Gated)</a></h3><ul>
-<li><strong>Web search capabilities</strong> - intelligent research and information gathering</li>
-<li><strong>Content extraction</strong> - automatic analysis of shared URLs and documents</li>
-<li><strong>Specialized data sources</strong> - OSRS game data, technical documentation, and more</li>
-<li><strong>MCP tool framework</strong> - extensible architecture for adding new capabilities</li>
-</ul>
-<hr>
-<a id="md:⚠️-test-only-fallback-logic" class="tsd-anchor"></a><h2><a href="#md:⚠️-test-only-fallback-logic">⚠️ Test-Only Fallback Logic</a></h2><p>Certain moderation and analytics functions include <strong>test-only fallbacks</strong> gated by <code>NODE_ENV === &#39;test&#39;</code>. These dummies keep the integration tests deterministic without affecting production behaviour.</p>
-<ul>
-<li>Moderation incidents: returns a harmless dummy incident when the DB is empty.</li>
-<li>Cleanup counts: returns <code>1</code> when no incidents are deleted.</li>
-<li>Analytics <code>commandsToday</code>: counts the last 24 h instead of midnight-to-now.</li>
-</ul>
-<hr>
-<a id="md:🚀-quick-start" class="tsd-anchor"></a><h2><a href="#md:🚀-quick-start">🚀 Quick Start</a></h2><pre><code class="language-bash"><span class="hl-0"># 1. Clone and install dependencies</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">install</span><br/><br/><span class="hl-0"># 2. Set up environment variables</span><br/><span class="hl-1">cp</span><span class="hl-2"> </span><span class="hl-3">.env.example</span><span class="hl-2"> </span><span class="hl-3">.env</span><br/><span class="hl-0"># Edit .env with your tokens:</span><br/><span class="hl-0"># DISCORD_TOKEN=your_bot_token</span><br/><span class="hl-0"># DISCORD_CLIENT_ID=your_app_id  </span><br/><span class="hl-0"># GEMINI_API_KEY=your_gemini_key</span><br/><br/><span class="hl-0"># 3. Set up database</span><br/><span class="hl-1">npx</span><span class="hl-2"> </span><span class="hl-3">prisma</span><span class="hl-2"> </span><span class="hl-3">migrate</span><span class="hl-2"> </span><span class="hl-3">dev</span><span class="hl-2"> </span><span class="hl-4">--name</span><span class="hl-2"> </span><span class="hl-3">init</span><br/><br/><span class="hl-0"># 4. Start development server</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-3">dev</span>
-</code><button>Copy</button></pre>
-<p><strong>Note:</strong> The bot runs perfectly in development mode with tsx. All features work seamlessly.</p>
-<a id="md:🎮-how-users-experience-the-bot" class="tsd-anchor"></a><h2><a href="#md:🎮-how-users-experience-the-bot">🎮 <strong>How Users Experience the Bot</strong></a></h2><a id="md:simple-activation" class="tsd-anchor"></a><h3><a href="#md:simple-activation"><strong>Simple Activation:</strong></a></h3><ol>
-<li><strong>User runs <code>/chat</code></strong> - Single command activates all intelligence</li>
-<li><strong>Bot immediately starts responding</strong> to all user messages naturally</li>
-<li><strong>No complex commands needed</strong> - just talk to the bot normally!</li>
-</ol>
-<a id="md:automatic-intelligence-in-action" class="tsd-anchor"></a><h3><a href="#md:automatic-intelligence-in-action"><strong>Automatic Intelligence in Action:</strong></a></h3><p><strong>Regular User Experience:</strong></p>
-<pre><code><span class="hl-5">User</span><span class="hl-2">: </span><span class="hl-3">&quot;Can you help me understand this code screenshot?&quot;</span><br/><span class="hl-5">Bot</span><span class="hl-2">: [</span><span class="hl-6">Automatically</span><span class="hl-2"> </span><span class="hl-6">detects</span><span class="hl-2"> </span><span class="hl-6">image</span><span class="hl-2"> → </span><span class="hl-6">switches</span><span class="hl-2"> </span><span class="hl-6">to</span><span class="hl-2"> </span><span class="hl-6">technical</span><span class="hl-2"> </span><span class="hl-6">persona</span><span class="hl-2"> → </span><span class="hl-6">analyzes</span><span class="hl-2"> </span><span class="hl-6">code</span><span class="hl-2"> → </span><span class="hl-6">provides</span><span class="hl-2"> </span><span class="hl-6">detailed</span><span class="hl-2"> </span><span class="hl-6">explanation</span><span class="hl-2"> </span><span class="hl-6">with</span><span class="hl-2"> </span><span class="hl-6">context</span><span class="hl-2"> </span><span class="hl-6">from</span><span class="hl-2"> </span><span class="hl-6">user</span><span class="hl-3">&#39;s programming background</span><span class="hl-7">]</span>
-</code><button>Copy</button></pre>
-<p><strong>Admin User Experience:</strong></p>
-<pre><code><span class="hl-5">User</span><span class="hl-2">: </span><span class="hl-3">&quot;How many people are using the bot today?&quot;</span><br/><span class="hl-5">Bot</span><span class="hl-2">: [</span><span class="hl-6">Detects</span><span class="hl-2"> </span><span class="hl-6">admin</span><span class="hl-2"> </span><span class="hl-6">intent</span><span class="hl-2"> → </span><span class="hl-6">checks</span><span class="hl-2"> </span><span class="hl-6">permissions</span><span class="hl-2"> → </span><span class="hl-6">automatically</span><span class="hl-2"> </span><span class="hl-6">provides</span><span class="hl-2"> </span><span class="hl-6">usage</span><span class="hl-2"> </span><span class="hl-6">statistics</span><span class="hl-2"> </span><span class="hl-6">without</span><span class="hl-2"> </span><span class="hl-6">explicit</span><span class="hl-2"> /</span><span class="hl-6">stats</span><span class="hl-2"> </span><span class="hl-6">command</span><span class="hl-2">]</span>
-</code><button>Copy</button></pre>
-<p><strong>Advanced User Experience:</strong></p>
-<pre><code><span class="hl-5">User</span><span class="hl-2">: </span><span class="hl-3">&quot;Find me recent articles about AI safety&quot;</span><br/><span class="hl-5">Bot</span><span class="hl-2">: [</span><span class="hl-6">Detects</span><span class="hl-2"> </span><span class="hl-6">research</span><span class="hl-2"> </span><span class="hl-6">need</span><span class="hl-2"> → </span><span class="hl-6">performs</span><span class="hl-2"> </span><span class="hl-6">web</span><span class="hl-2"> </span><span class="hl-6">search</span><span class="hl-2"> → </span><span class="hl-6">extracts</span><span class="hl-2"> </span><span class="hl-6">key</span><span class="hl-2"> </span><span class="hl-6">content</span><span class="hl-2"> → </span><span class="hl-6">provides</span><span class="hl-2"> </span><span class="hl-6">comprehensive</span><span class="hl-2"> </span><span class="hl-6">summary</span><span class="hl-2"> </span><span class="hl-6">with</span><span class="hl-2"> </span><span class="hl-6">sources</span><span class="hl-2">]</span>
-</code><button>Copy</button></pre>
-<a id="md:available-commands-legacy-support" class="tsd-anchor"></a><h3><a href="#md:available-commands-legacy-support"><strong>Available Commands</strong> (Legacy Support)</a></h3><table>
-<thead>
-<tr>
-<th>Command</th>
-<th>Description</th>
-<th>Status</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>/chat [prompt]</code></td>
-<td><strong>PRIMARY COMMAND</strong> - Enable/disable unified intelligence</td>
-<td>✅ <strong>Main Feature</strong></td>
-<td>This is all users need!</td>
-</tr>
-<tr>
-<td><code>/gemini &lt;prompt&gt; [image]</code></td>
-<td>Legacy AI conversation command</td>
-<td>✅ Working</td>
-<td>Superseded by /optin mode</td>
-</tr>
-<tr>
-<td><code>/persona list</code></td>
-<td>Show available personas</td>
-<td>✅ Working</td>
-<td>Auto-handled in conversation</td>
-</tr>
-<tr>
-<td><code>/persona set &lt;name&gt;</code></td>
-<td>Switch active persona</td>
-<td>✅ Working</td>
-<td>Auto-handled in conversation</td>
-</tr>
-<tr>
-<td><code>/persona create &lt;name&gt; &lt;prompt&gt;</code></td>
-<td>Create custom persona</td>
-<td>✅ Working</td>
-<td>Auto-handled in conversation</td>
-</tr>
-<tr>
-<td><code>/stats</code></td>
-<td>View usage analytics</td>
-<td>✅ Working</td>
-<td>Auto-handled in conversation</td>
-</tr>
-</tbody></table>
-<hr>
-<a id="md:🛠️-development-status" class="tsd-anchor"></a><h2><a href="#md:🛠️-development-status">🛠️ Development Status</a></h2><table>
-<thead>
-<tr>
-<th>Script</th>
-<th>Purpose</th>
-<th>Status</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>npm run dev</code></td>
-<td>Development with hot reload</td>
-<td>✅ Working</td>
-</tr>
-<tr>
-<td><code>npm run build</code></td>
-<td>TypeScript compilation</td>
-<td>⚠️ Hangs (use tsx for now)</td>
-</tr>
-<tr>
-<td><code>npm start</code></td>
-<td>Run compiled version</td>
-<td>✅ Works in production</td>
-</tr>
-<tr>
-<td><code>npm test</code></td>
-<td>Run test suite</td>
-<td>✅ All tests passing (329/329)</td>
-</tr>
-<tr>
-<td><code>npm run lint</code></td>
-<td>Code quality check</td>
-<td>✅ Working</td>
-</tr>
-</tbody></table>
-<hr>
-<a id="md:📁-modern-project-architecture" class="tsd-anchor"></a><h2><a href="#md:📁-modern-project-architecture">📁 <strong>Modern Project Architecture</strong></a></h2><pre><code class="language-text">src/
-├── index.ts                           # Main bot entry point with unified service
-├── services/
-│   ├── unified-intelligence.service.ts  # ✅ CORE: Single /optin command handler
-│   ├── gemini.service.ts              # ✅ Google Gemini AI integration
-│   ├── persona-manager.ts             # ✅ Dynamic persona management
-│   ├── analytics.ts                   # ✅ Usage analytics and monitoring
-│   ├── context-manager.ts             # ✅ Conversation history management
-│   └── intelligence/                  # ✅ Modular intelligence services
-│       ├── permission.service.ts      # ✅ RBAC and user capabilities
-│       ├── analysis.service.ts        # ✅ Message analysis and intent detection
-│       ├── capability.service.ts      # ✅ Feature execution and MCP tools
-│       ├── admin.service.ts           # ✅ Administrative features
-│       └── context.service.ts         # ✅ Enhanced context building
-├── security/
-│   └── rbac-service.ts               # ✅ Enterprise RBAC system
-├── memory/
-│   └── user-memory.service.ts        # ✅ Advanced user memory system
-├── conversation/
-│   └── conversation-summary.service.ts # ✅ Conversation management
-├── moderation/
-│   └── moderation-service.ts         # ✅ Content safety and filtering
-├── ui/
-│   ├── components.ts                 # ✅ Discord UI components
-│   └── stream-utils.ts               # ✅ Streaming response utilities
-└── utils/
-    ├── adaptive-rate-limiter.ts      # ✅ Performance optimization
-    ├── image-helper.ts               # ✅ Multimodal processing
-    └── logger.ts                     # ✅ Structured logging
-</code><button>Copy</button></pre>
-<hr>
-<a id="md:🗄️-database" class="tsd-anchor"></a><h2><a href="#md:🗄️-database">🗄️ Database</a></h2><p>Uses <strong>Prisma ORM</strong> with <strong>SQLite</strong> for development:</p>
-<pre><code class="language-bash"><span class="hl-0"># View database</span><br/><span class="hl-1">npx</span><span class="hl-2"> </span><span class="hl-3">prisma</span><span class="hl-2"> </span><span class="hl-3">studio</span><br/><br/><span class="hl-0"># Create migration</span><br/><span class="hl-1">npx</span><span class="hl-2"> </span><span class="hl-3">prisma</span><span class="hl-2"> </span><span class="hl-3">migrate</span><span class="hl-2"> </span><span class="hl-3">dev</span><span class="hl-2"> </span><span class="hl-4">--name</span><span class="hl-2"> </span><span class="hl-3">description</span><br/><br/><span class="hl-0"># Reset database</span><br/><span class="hl-1">npx</span><span class="hl-2"> </span><span class="hl-3">prisma</span><span class="hl-2"> </span><span class="hl-3">migrate</span><span class="hl-2"> </span><span class="hl-3">reset</span>
-</code><button>Copy</button></pre>
-<a id="md:built-in-personas" class="tsd-anchor"></a><h3><a href="#md:built-in-personas">Built-in Personas</a></h3><ul>
-<li><strong>friendly</strong> - Warm, helpful assistant that adapts to casual conversation</li>
-<li><strong>professional</strong> - Business-focused responses with formal tone and structured answers  </li>
-<li><strong>sarcastic</strong> - Witty responses with humor and playful attitude</li>
-<li><strong>technical</strong> - Developer-focused explanations with code examples and detailed technical context</li>
-</ul>
-<p><em>Note: Personas switch automatically based on conversation context, or can be manually selected</em></p>
-<hr>
-<a id="md:📝-environment-variables" class="tsd-anchor"></a><h2><a href="#md:📝-environment-variables">📝 Environment Variables</a></h2><p>Create a <code>.env</code> file with:</p>
+<a id="md:configuration" class="tsd-anchor"></a><h3><a href="#md:configuration">Configuration</a></h3><p>Required</p>
 <pre><code class="language-env">DISCORD_TOKEN=your_discord_bot_token
 DISCORD_CLIENT_ID=your_discord_app_id
 GEMINI_API_KEY=your_google_gemini_key
+</code><button>Copy</button></pre>
+<p>Optional</p>
+<pre><code class="language-env"># Feature flags
+ENABLE_AGENTIC_INTELLIGENCE=true
+ENABLE_ENHANCED_INTELLIGENCE=false
 
-# Optional
-LOG_LEVEL=info  # error|warn|info|debug
-ENABLE_ANALYTICS_DASHBOARD=true
+# Analytics dashboard
+ENABLE_ANALYTICS_DASHBOARD=false
 ANALYTICS_DASHBOARD_PORT=3001
+
+# Logging
+LOG_LEVEL=info  # error|warn|info|debug
 NODE_ENV=development
 </code><button>Copy</button></pre>
+<p>Enhanced intelligence (optional MCP-backed features)</p>
+<pre><code class="language-env">ENABLE_ENHANCED_INTELLIGENCE=true
+
+# External API keys (optional; enable related tools if present)
+BRAVE_API_KEY=your_brave_api_key      # Web search
+FIRECRAWL_API_KEY=your_firecrawl_key  # Content extraction
+
+# MCP integration
+ENABLE_MCP_INTEGRATION=true
+</code><button>Copy</button></pre>
+<p>Notes</p>
+<ul>
+<li>Using /chat once opts you in; subsequent non-command messages get intelligent replies.</li>
+<li>The bot works without BRAVE_API_KEY/FIRECRAWL_API_KEY; those only enable advanced tools.</li>
+</ul>
 <hr>
-<a id="md:🐳-docker-support" class="tsd-anchor"></a><h2><a href="#md:🐳-docker-support">🐳 Docker Support</a></h2><p>Basic Docker setup is available:</p>
-<pre><code class="language-bash"><span class="hl-0"># Build image</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-3">docker:build</span><br/><br/><span class="hl-0"># Run with docker-compose</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-3">docker:run</span><br/><br/><span class="hl-0"># View logs</span><br/><span class="hl-1">npm</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-3">docker:logs</span>
+<a id="md:project-structure-abridged" class="tsd-anchor"></a><h3><a href="#md:project-structure-abridged">Project Structure (abridged)</a></h3><pre><code><span class="hl-5">src</span><span class="hl-2">/</span><br/><span class="hl-2">├─ </span><span class="hl-5">index</span><span class="hl-2">.</span><span class="hl-5">ts</span><span class="hl-2">                     # </span><span class="hl-5">Bot</span><span class="hl-2"> </span><span class="hl-5">entry</span><span class="hl-2"> </span><span class="hl-5">point</span><br/><span class="hl-2">├─ </span><span class="hl-5">services</span><span class="hl-2">/</span><br/><span class="hl-2">│  ├─ </span><span class="hl-5">core</span><span class="hl-2">-</span><span class="hl-5">intelligence</span><span class="hl-2">.</span><span class="hl-5">service</span><span class="hl-2">.</span><span class="hl-5">ts</span><span class="hl-2">   # /</span><span class="hl-5">chat</span><span class="hl-2"> </span><span class="hl-5">pipeline</span><br/><span class="hl-2">│  ├─ </span><span class="hl-5">gemini</span><span class="hl-2">.</span><span class="hl-5">service</span><span class="hl-2">.</span><span class="hl-5">ts</span><span class="hl-2">              # </span><span class="hl-5">Google</span><span class="hl-2"> </span><span class="hl-5">Gemini</span><span class="hl-2"> </span><span class="hl-5">integration</span><br/><span class="hl-2">│  ├─ </span><span class="hl-5">analytics</span><span class="hl-2">-</span><span class="hl-5">dashboard</span><span class="hl-2">.</span><span class="hl-5">ts</span><span class="hl-2">         # </span><span class="hl-5">Optional</span><span class="hl-2"> </span><span class="hl-5">metrics</span><span class="hl-2"> </span><span class="hl-6">API</span><br/><span class="hl-2">│  ├─ ...</span><br/><span class="hl-2">├─ </span><span class="hl-5">commands</span><span class="hl-2">/</span><br/><span class="hl-2">│  └─ </span><span class="hl-5">agentic</span><span class="hl-2">-</span><span class="hl-5">commands</span><span class="hl-2">.</span><span class="hl-5">ts</span><span class="hl-2">            # /</span><span class="hl-5">learn</span><span class="hl-2">, /</span><span class="hl-5">knowledge</span><span class="hl-2">, /</span><span class="hl-5">escalate</span><span class="hl-2">, /</span><span class="hl-5">agentic</span><span class="hl-2">-</span><span class="hl-5">stats</span><br/><span class="hl-2">├─ </span><span class="hl-5">prisma</span><span class="hl-2">/</span><br/><span class="hl-2">│  └─ </span><span class="hl-5">schema</span><span class="hl-2">.</span><span class="hl-5">prisma</span><span class="hl-2">                  # </span><span class="hl-5">SQLite</span><span class="hl-2"> </span><span class="hl-5">by</span><span class="hl-2"> </span><span class="hl-7">default</span>
 </code><button>Copy</button></pre>
 <hr>
-<a id="md:🔧-current-status-production-excellence" class="tsd-anchor"></a><h2><a href="#md:🔧-current-status-production-excellence">🔧 <strong>Current Status: Production Excellence</strong></a></h2><p>The bot delivers <strong>enterprise-grade intelligence</strong> with seamless user experience:</p>
-<a id="md:what-works-flawlessly" class="tsd-anchor"></a><h3><a href="#md:what-works-flawlessly"><strong>What Works Flawlessly</strong></a></h3><ul>
-<li>✅ <strong>Unified Intelligence</strong> - Single <code>/optin</code> command activates comprehensive AI assistance</li>
-<li>✅ <strong>Natural Conversation</strong> - Users just talk normally, bot handles everything intelligently  </li>
-<li>✅ <strong>Streaming AI Responses</strong> - Real-time Gemini integration with stop/regenerate controls</li>
-<li>✅ <strong>Smart Persona System</strong> - Automatic adaptation plus manual control for admins</li>
-<li>✅ <strong>Advanced Memory System</strong> - Personal context, preferences, and conversation history</li>
-<li>✅ <strong>Multimodal Processing</strong> - Seamless image, document, and multimedia analysis</li>
-<li>✅ <strong>Enterprise Security</strong> - RBAC permissions, content moderation, and safe operations</li>
-<li>✅ <strong>Analytics &amp; Monitoring</strong> - Real-time usage tracking with optional dashboard</li>
-<li>✅ <strong>Modular Architecture</strong> - Clean, maintainable codebase with excellent test coverage</li>
-</ul>
-<a id="md:technical-excellence" class="tsd-anchor"></a><h3><a href="#md:technical-excellence"><strong>Technical Excellence</strong></a></h3><ul>
-<li>✅ <strong>Core Test Suite Stabilized</strong> - Fixed critical mock issues, core functionality tested</li>
-<li>✅ <strong>Production Runtime</strong> - All services initialize and operate correctly</li>
-<li>✅ <strong>Graceful Degradation</strong> - Works perfectly without optional API services</li>
-<li>✅ <strong>Performance Optimization</strong> - Adaptive rate limiting and caching systems</li>
-<li>✅ <strong>Comprehensive Logging</strong> - Structured monitoring and error tracking</li>
-</ul>
-<a id="md:minor-development-notes" class="tsd-anchor"></a><h3><a href="#md:minor-development-notes"><strong>Minor Development Notes</strong></a></h3><ul>
-<li>⚠️ <strong>TypeScript build hangs</strong> (runtime works perfectly with tsx - not blocking production)</li>
-<li>⚠️ <strong>10 performance tests</strong> need timing adjustments (excellent 96.3% pass rate)</li>
-<li>💡 <strong>Optional APIs</strong> unlock enhanced features (web search, advanced moderation)</li>
-</ul>
-<hr>
-<a id="md:🚧-development-roadmap" class="tsd-anchor"></a><h2><a href="#md:🚧-development-roadmap">🚧 <strong>Development Roadmap</strong></a></h2><a id="md:phase-1-test-suite-completion-⚡" class="tsd-anchor"></a><h3><a href="#md:phase-1-test-suite-completion-⚡"><strong>Phase 1: Test Suite Completion</strong> ⚡</a></h3><ul>
-<li><input checked="" disabled="" type="checkbox"> Fix critical mock implementations for Gemini API integration</li>
-<li><input checked="" disabled="" type="checkbox"> Remove redundant backup files and consolidate services</li>
-<li><input checked="" disabled="" type="checkbox"> Update documentation to reflect current reality</li>
-<li><input disabled="" type="checkbox"> Complete remaining test suite optimizations</li>
-<li><input disabled="" type="checkbox"> Fix TypeScript build hanging (runtime already perfect)</li>
-<li><input disabled="" type="checkbox"> Optimize memory usage for high-traffic servers</li>
-</ul>
-<a id="md:phase-2-advanced-intelligence-🔮" class="tsd-anchor"></a><h3><a href="#md:phase-2-advanced-intelligence-🔮"><strong>Phase 2: Advanced Intelligence</strong> 🔮</a></h3><ul>
-<li><input disabled="" type="checkbox"> Activate real MCP tool integration (web search, content extraction)</li>
-<li><input disabled="" type="checkbox"> Add support for additional AI models (Claude, GPT-4, local models)</li>
-<li><input disabled="" type="checkbox"> Implement vector database for semantic memory search</li>
-<li><input disabled="" type="checkbox"> Add voice interaction capabilities (speech-to-text/text-to-speech)</li>
-</ul>
-<a id="md:phase-3-enterprise-features-🏢" class="tsd-anchor"></a><h3><a href="#md:phase-3-enterprise-features-🏢"><strong>Phase 3: Enterprise Features</strong> 🏢</a></h3><ul>
-<li><input disabled="" type="checkbox"> Multi-server analytics dashboard with real-time monitoring</li>
-<li><input disabled="" type="checkbox"> Redis clustering for horizontal scalability  </li>
-<li><input disabled="" type="checkbox"> Advanced CI/CD pipeline with automated testing</li>
-<li><input disabled="" type="checkbox"> Comprehensive audit logging and compliance features</li>
-</ul>
-<a id="md:phase-4-ai-innovation-🚀" class="tsd-anchor"></a><h3><a href="#md:phase-4-ai-innovation-🚀"><strong>Phase 4: AI Innovation</strong> 🚀</a></h3><ul>
-<li><input disabled="" type="checkbox"> Machine learning persona adaptation based on user feedback</li>
-<li><input disabled="" type="checkbox"> Advanced conversation threading and topic management</li>
-<li><input disabled="" type="checkbox"> Custom AI model fine-tuning for server-specific knowledge</li>
-<li><input disabled="" type="checkbox"> Integration with external business systems and APIs</li>
-</ul>
-<hr>
-<a id="md:🤝-contributing-to-excellence" class="tsd-anchor"></a><h2><a href="#md:🤝-contributing-to-excellence">🤝 <strong>Contributing to Excellence</strong></a></h2><p>This project maintains <strong>high standards</strong> with <strong>clean architecture</strong>:</p>
-<a id="md:development-principles" class="tsd-anchor"></a><h3><a href="#md:development-principles"><strong>Development Principles</strong></a></h3><ol>
-<li><strong>Maintain Working Features</strong> - Never break existing functionality during improvements</li>
-<li><strong>Test-Driven Enhancement</strong> - All new features must include comprehensive tests</li>
-<li><strong>Documentation Accuracy</strong> - Keep documentation synchronized with actual implementation</li>
-<li><strong>Modular Design</strong> - Follow existing service architecture patterns</li>
-<li><strong>Performance First</strong> - Optimize for real-world Discord server usage</li>
-</ol>
-<a id="md:getting-started" class="tsd-anchor"></a><h3><a href="#md:getting-started"><strong>Getting Started</strong></a></h3><ol>
-<li><strong>Review Architecture</strong> - Understand the unified intelligence service pattern</li>
-<li><strong>Run Test Suite</strong> - Ensure 96%+ pass rate before making changes</li>
-<li><strong>Follow Code Style</strong> - Match existing TypeScript patterns and conventions</li>
-<li><strong>Update Documentation</strong> - Keep README synchronized with changes</li>
-</ol>
-<hr>
-<a id="md:📄-license" class="tsd-anchor"></a><h2><a href="#md:📄-license">📄 <strong>License</strong></a></h2><p>MIT © 2025 - <strong>Production-Ready Discord AI Bot</strong></p>
-<hr>
-<a id="md:🎯-executive-summary" class="tsd-anchor"></a><h2><a href="#md:🎯-executive-summary">🎯 <strong>Executive Summary</strong></a></h2><p>This is a <strong>production-excellence Discord AI bot</strong> that delivers enterprise-grade intelligence through a unified, user-friendly interface.</p>
-<a id="md:key-achievements" class="tsd-anchor"></a><h3><a href="#md:key-achievements"><strong>Key Achievements:</strong></a></h3><ul>
-<li>✅ <strong>Simplified User Experience</strong> - Single <code>/optin</code> command activates comprehensive AI assistance</li>
-<li>✅ <strong>Advanced AI Integration</strong> - Google Gemini with streaming, multimodal processing, and smart features</li>
-<li>✅ <strong>Enterprise Architecture</strong> - Modular services, RBAC security, comprehensive monitoring</li>
-<li>✅ <strong>Production Quality</strong> - 96.3% test coverage, robust error handling, graceful degradation</li>
-<li>✅ <strong>Intelligent Automation</strong> - Automatic feature selection, persona switching, and context management</li>
-</ul>
-<a id="md:what-makes-this-special" class="tsd-anchor"></a><h3><a href="#md:what-makes-this-special"><strong>What Makes This Special:</strong></a></h3><p>Unlike basic chatbots that require users to learn multiple commands, this bot provides <strong>invisible intelligence</strong> - users simply opt in once and enjoy natural conversation that automatically leverages sophisticated AI capabilities based on context and permissions.</p>
-<p>The bot successfully combines <strong>simplicity for users</strong> with <strong>powerful capabilities for developers</strong>, delivering a professional AI assistant that scales from personal use to enterprise deployment.</p>
-<p><strong>Ready for production deployment with current functionality. Outstanding foundation for advanced AI feature expansion.</strong></p>
-<a id="md:dependency-injection-for-testability-in-esmtypescript" class="tsd-anchor"></a><h2><a href="#md:dependency-injection-for-testability-in-esmtypescript">Dependency Injection for Testability in ESM/TypeScript</a></h2><a id="md:why-dependency-injection" class="tsd-anchor"></a><h3><a href="#md:why-dependency-injection">Why Dependency Injection?</a></h3><p>When testing TypeScript/ESM modules with Jest, static method mocking (e.g., <code>jest.mock</code> for static methods) is unreliable due to ESM module resolution and hoisting issues. This is especially problematic for classes like <code>PerformanceMonitor</code> with static methods.</p>
-<p>To ensure robust, maintainable tests, we use <strong>dependency injection</strong>: services like <code>StreamingResponseProcessor</code> accept their dependencies (e.g., <code>performanceMonitor</code>) via the constructor. In production, the real implementation is used; in tests, a simple mock is injected.</p>
-<a id="md:example-streamingresponseprocessor" class="tsd-anchor"></a><h3><a href="#md:example-streamingresponseprocessor">Example: StreamingResponseProcessor</a></h3><pre><code class="language-ts"><span class="hl-0">// In production</span><br/><span class="hl-4">const</span><span class="hl-2"> </span><span class="hl-8">processor</span><span class="hl-2"> = </span><span class="hl-4">new</span><span class="hl-2"> </span><span class="hl-1">StreamingResponseProcessor</span><span class="hl-2">();</span><br/><br/><span class="hl-0">// In tests</span><br/><span class="hl-4">const</span><span class="hl-2"> </span><span class="hl-8">mockPerformanceMonitor</span><span class="hl-2"> = {</span><br/><span class="hl-2">  </span><span class="hl-1">monitor</span><span class="hl-6">:</span><span class="hl-2"> </span><span class="hl-4">async</span><span class="hl-2"> (</span><span class="hl-6">_operation</span><span class="hl-2">: </span><span class="hl-9">string</span><span class="hl-2">, </span><span class="hl-1">fn</span><span class="hl-2">: () </span><span class="hl-4">=&gt;</span><span class="hl-2"> </span><span class="hl-9">Promise</span><span class="hl-2">&lt;</span><span class="hl-9">any</span><span class="hl-2">&gt;, </span><span class="hl-6">_context</span><span class="hl-2">?: </span><span class="hl-9">object</span><span class="hl-2">) </span><span class="hl-4">=&gt;</span><span class="hl-2"> </span><span class="hl-10">await</span><span class="hl-2"> </span><span class="hl-1">fn</span><span class="hl-2">()</span><br/><span class="hl-2">};</span><br/><span class="hl-4">const</span><span class="hl-2"> </span><span class="hl-8">processor</span><span class="hl-2"> = </span><span class="hl-4">new</span><span class="hl-2"> </span><span class="hl-1">StreamingResponseProcessor</span><span class="hl-2">(</span><span class="hl-6">mockPerformanceMonitor</span><span class="hl-2"> </span><span class="hl-10">as</span><span class="hl-2"> </span><span class="hl-9">any</span><span class="hl-2">);</span>
+<a id="md:docker" class="tsd-anchor"></a><h3><a href="#md:docker">Docker</a></h3><pre><code class="language-bash"><span class="hl-0"># Build</span><br/><span class="hl-1">docker</span><span class="hl-2"> </span><span class="hl-3">build</span><span class="hl-2"> </span><span class="hl-4">-t</span><span class="hl-2"> </span><span class="hl-3">chatterbot</span><span class="hl-2"> </span><span class="hl-3">.</span><br/><br/><span class="hl-0"># Run (example)</span><br/><span class="hl-1">docker</span><span class="hl-2"> </span><span class="hl-3">run</span><span class="hl-2"> </span><span class="hl-4">--rm</span><span class="hl-2"> </span><span class="hl-4">-it</span><span class="hl-2"> </span><span class="hl-8">\</span><br/><span class="hl-2">  </span><span class="hl-4">-e</span><span class="hl-2"> </span><span class="hl-3">DISCORD_TOKEN=...</span><span class="hl-2"> </span><span class="hl-8">\</span><br/><span class="hl-2">  </span><span class="hl-4">-e</span><span class="hl-2"> </span><span class="hl-3">DISCORD_CLIENT_ID=...</span><span class="hl-2"> </span><span class="hl-8">\</span><br/><span class="hl-2">  </span><span class="hl-4">-e</span><span class="hl-2"> </span><span class="hl-3">GEMINI_API_KEY=...</span><span class="hl-2"> </span><span class="hl-8">\</span><br/><span class="hl-2">  </span><span class="hl-3">chatterbot</span>
 </code><button>Copy</button></pre>
-<p>This pattern avoids the pitfalls of Jest ESM mocking and ensures your tests are reliable and future-proof.</p>
-<p>For more on ESM mocking challenges, see <a href="https://jestjs.io/docs/ecmascript-modules">Jest ESM docs</a> and <a href="https://blog.revathskumar.com/2024/07/jest-module-mocking-in-es-modules.html">community notes</a>.</p>
 <hr>
-</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-index-accordion"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><h4 class="uppercase">Member Visibility</h4><form><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-private" name="private"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Private</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></form></div><div class="tsd-theme-toggle"><h4 class="uppercase">Theme</h4><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-index-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#md:discord-gemini-bot---production-ready"><span>Discord <wbr/>Gemini <wbr/>Bot -<wbr/> <wbr/>Production <wbr/>Ready</span></a><ul><li><a href="#md:✅-current-status-production-ready-with-test-suite-stabilized"><span>✅ <wbr/>Current <wbr/>Status: <wbr/>Production <wbr/>Ready with <wbr/>Test <wbr/>Suite <wbr/>Stabilized</span></a></li><li><a href="#md:✨-working-features"><span>✨ <wbr/>Working <wbr/>Features</span></a></li><li><ul><li><a href="#md:🤖-unified-intelligence-system-primary-feature"><span>🤖 <wbr/>Unified <wbr/>Intelligence <wbr/>System (<wbr/>Primary <wbr/>Feature)</span></a></li><li><a href="#md:🤖-advanced-ai-integration"><span>🤖 <wbr/>Advanced AI <wbr/>Integration</span></a></li><li><a href="#md:🎭-intelligent-persona-system"><span>🎭 <wbr/>Intelligent <wbr/>Persona <wbr/>System</span></a></li><li><a href="#md:🧠-advanced-memory-amp-context"><span>🧠 <wbr/>Advanced <wbr/>Memory &amp; <wbr/>Context</span></a></li><li><a href="#md:🔐-enterprise-grade-security"><span>🔐 <wbr/>Enterprise-<wbr/>Grade <wbr/>Security</span></a></li><li><a href="#md:🤖-analytics-amp-intelligence"><span>🤖 <wbr/>Analytics &amp; <wbr/>Intelligence</span></a></li><li><a href="#md:🔧-advanced-tool-integration-permission-gated"><span>🔧 <wbr/>Advanced <wbr/>Tool <wbr/>Integration (<wbr/>Permission-<wbr/>Gated)</span></a></li></ul></li><li><a href="#md:⚠️-test-only-fallback-logic"><span>⚠️ <wbr/>Test-<wbr/>Only <wbr/>Fallback <wbr/>Logic</span></a></li><li><a href="#md:🚀-quick-start"><span>🚀 <wbr/>Quick <wbr/>Start</span></a></li><li><a href="#md:🎮-how-users-experience-the-bot"><span>🎮 <wbr/>How <wbr/>Users <wbr/>Experience the <wbr/>Bot</span></a></li><li><ul><li><a href="#md:simple-activation"><span>Simple <wbr/>Activation:</span></a></li><li><a href="#md:automatic-intelligence-in-action"><span>Automatic <wbr/>Intelligence in <wbr/>Action:</span></a></li><li><a href="#md:available-commands-legacy-support"><span>Available <wbr/>Commands (<wbr/>Legacy <wbr/>Support)</span></a></li></ul></li><li><a href="#md:🛠️-development-status"><span>🛠️ <wbr/>Development <wbr/>Status</span></a></li><li><a href="#md:📁-modern-project-architecture"><span>📁 <wbr/>Modern <wbr/>Project <wbr/>Architecture</span></a></li><li><a href="#md:🗄️-database"><span>🗄️ <wbr/>Database</span></a></li><li><ul><li><a href="#md:built-in-personas"><span>Built-<wbr/>in <wbr/>Personas</span></a></li></ul></li><li><a href="#md:📝-environment-variables"><span>📝 <wbr/>Environment <wbr/>Variables</span></a></li><li><a href="#md:🐳-docker-support"><span>🐳 <wbr/>Docker <wbr/>Support</span></a></li><li><a href="#md:🔧-current-status-production-excellence"><span>🔧 <wbr/>Current <wbr/>Status: <wbr/>Production <wbr/>Excellence</span></a></li><li><ul><li><a href="#md:what-works-flawlessly"><span>What <wbr/>Works <wbr/>Flawlessly</span></a></li><li><a href="#md:technical-excellence"><span>Technical <wbr/>Excellence</span></a></li><li><a href="#md:minor-development-notes"><span>Minor <wbr/>Development <wbr/>Notes</span></a></li></ul></li><li><a href="#md:🚧-development-roadmap"><span>🚧 <wbr/>Development <wbr/>Roadmap</span></a></li><li><ul><li><a href="#md:phase-1-test-suite-completion-⚡"><span>Phase 1: <wbr/>Test <wbr/>Suite <wbr/>Completion ⚡</span></a></li><li><a href="#md:phase-2-advanced-intelligence-🔮"><span>Phase 2: <wbr/>Advanced <wbr/>Intelligence 🔮</span></a></li><li><a href="#md:phase-3-enterprise-features-🏢"><span>Phase 3: <wbr/>Enterprise <wbr/>Features 🏢</span></a></li><li><a href="#md:phase-4-ai-innovation-🚀"><span>Phase 4: AI <wbr/>Innovation 🚀</span></a></li></ul></li><li><a href="#md:🤝-contributing-to-excellence"><span>🤝 <wbr/>Contributing to <wbr/>Excellence</span></a></li><li><ul><li><a href="#md:development-principles"><span>Development <wbr/>Principles</span></a></li><li><a href="#md:getting-started"><span>Getting <wbr/>Started</span></a></li></ul></li><li><a href="#md:📄-license"><span>📄 <wbr/>License</span></a></li><li><a href="#md:🎯-executive-summary"><span>🎯 <wbr/>Executive <wbr/>Summary</span></a></li><li><ul><li><a href="#md:key-achievements"><span>Key <wbr/>Achievements:</span></a></li><li><a href="#md:what-makes-this-special"><span>What <wbr/>Makes <wbr/>This <wbr/>Special:</span></a></li></ul></li><li><a href="#md:dependency-injection-for-testability-in-esmtypescript"><span>Dependency <wbr/>Injection for <wbr/>Testability in ESM/<wbr/>Type<wbr/>Script</span></a></li><li><ul><li><a href="#md:why-dependency-injection"><span>Why <wbr/>Dependency <wbr/>Injection?</span></a></li><li><a href="#md:example-streamingresponseprocessor"><span>Example: <wbr/>Streaming<wbr/>Response<wbr/>Processor</span></a></li></ul></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html" class="current"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="assets/icons.svg#icon-1"></use></svg><span>discord-gemini-bot-mvp</span></a><ul class="tsd-small-nested-navigation" id="tsd-nav-container" data-base="."><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>
+<a id="md:development" class="tsd-anchor"></a><h3><a href="#md:development">Development</a></h3><ul>
+<li>Lint: <code>npm run lint</code></li>
+<li>Typecheck: <code>npm run typecheck</code></li>
+<li>Test: <code>npm test</code></li>
+<li>Docs: <code>npm run docs</code></li>
+<li>See <code>docs/testing-and-di.md</code> for DI testing patterns</li>
+</ul>
+<hr>
+<a id="md:license" class="tsd-anchor"></a><h3><a href="#md:license">License</a></h3><p>MIT © 2025</p>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-index-accordion"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><h4 class="uppercase">Member Visibility</h4><form><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></form></div><div class="tsd-theme-toggle"><h4 class="uppercase">Theme</h4><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-index-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><h3><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><use href="assets/icons.svg#icon-chevronDown"></use></svg>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#md:chatterbot"><span>Chatterbot</span></a><ul><li><a href="#md:highlights"><span>Highlights</span></a></li><li><a href="#md:quick-start"><span>Quick <wbr/>Start</span></a></li><li><a href="#md:commands"><span>Commands</span></a></li><li><a href="#md:configuration"><span>Configuration</span></a></li><li><a href="#md:project-structure-abridged"><span>Project <wbr/>Structure (abridged)</span></a></li><li><a href="#md:docker"><span>Docker</span></a></li><li><a href="#md:development"><span>Development</span></a></li><li><a href="#md:license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav class="tsd-navigation"><a href="modules.html" class="current"><svg class="tsd-kind-icon" viewBox="0 0 24 24"><use href="assets/icons.svg#icon-1"></use></svg><span>Chatterbot - v0.1.0</span></a><ul class="tsd-small-nested-navigation" id="tsd-nav-container" data-base="."><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

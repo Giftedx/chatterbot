@@ -70,13 +70,17 @@ npm run dev
 ### ✅ Docker Deployment
 ```bash
 # Build production image
-npm run docker:build
+docker build -t chatterbot .
 
-# Start production containers
-npm run docker:run
+# Run container
+docker run --rm -d --name chatterbot \
+  -e DISCORD_TOKEN=... \
+  -e DISCORD_CLIENT_ID=... \
+  -e GEMINI_API_KEY=... \
+  chatterbot
 
 # Verify container health
-docker-compose logs discord-bot
+docker logs -f chatterbot | sed -n '1,120p'
 ```
 
 ### ✅ Direct Production Deployment
@@ -233,7 +237,7 @@ npm run deploy:analytics
 ps aux | grep node
 
 # Check Discord connection
-docker-compose logs discord-bot | grep "Logged in"
+docker logs chatterbot | grep "Logged in"
 
 # Check environment variables
 echo $DISCORD_TOKEN | head -c 10
