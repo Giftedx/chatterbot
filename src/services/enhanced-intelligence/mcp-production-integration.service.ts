@@ -283,7 +283,7 @@ export class MCPProductionIntegrationService {
         thoughtNumber: 1,
         totalThoughts: 5
       });
-      const stepsRaw = (result as { steps?: Array<{ stepNumber: number; thought: string; analysis?: string; reasoning?: string; conclusion: string }>; finalAnswer?: string; completed?: boolean }).steps ?? [];
+      const stepsRaw = (result as SequentialThinkingResult).steps ?? [];
 const steps = stepsRaw.map((step) => ({
   stepNumber: step.stepNumber,
   thought: step.thought,
