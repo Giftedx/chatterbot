@@ -263,7 +263,7 @@ export class MCPSecurityManager {
     const sanitizedParameters = this.sanitizeParameters(context.parameters);
 
     // Check rate limits
-    if (!this.checkRateLimit()) {
+    if (!this.checkRateLimit(context.userId, context.serverName, context.toolName)) {
       return {
         allowed: false,
         reason: 'Rate limit exceeded for this tool'
