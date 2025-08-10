@@ -9,7 +9,8 @@ import {
   braveWebSearch,
   contentScrape,
   sequentialThinking,
-  playwrightNavigate
+  playwrightNavigate,
+  type SequentialThinkingResult
 } from '../../mcp/index.js';
 
 // ---------- Public result interfaces ----------
@@ -284,7 +285,7 @@ export class MCPProductionIntegrationService {
         totalThoughts: 5
       });
       const stepsRaw = (result as SequentialThinkingResult).steps ?? [];
-const steps = stepsRaw.map((step) => ({
+const steps = stepsRaw.map((step: any) => ({
   stepNumber: step.stepNumber,
   thought: step.thought,
   analysis: step.analysis ?? step.reasoning ?? '',
