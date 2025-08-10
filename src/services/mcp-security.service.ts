@@ -71,7 +71,7 @@ export class MCPSecurityManager {
 
     // Check database for persistent consent decisions
     try {
-              const storedConsent = await this.getStoredConsent();
+              const storedConsent = await this.getStoredConsent(context.userId, context.serverName, context.toolName);
       if (storedConsent) {
         this.consentCache.set(cacheKey, storedConsent);
         
