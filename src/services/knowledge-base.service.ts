@@ -120,7 +120,7 @@ export class KnowledgeBaseService {
       const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
 
       // Simple keyword-based search (can be enhanced with vector embeddings)
-      const whereClause: any = {
+      const whereClause: Record<string, unknown> = {
         confidence: { gte: minConfidence }
       };
 
@@ -143,7 +143,7 @@ export class KnowledgeBaseService {
       });
 
       // Filter by relevance (simple keyword matching for now)
-      const relevantEntries = entries.filter((entry: any) => 
+      const relevantEntries = entries.filter((entry: { content: string }) => 
         this.calculateRelevance(searchQuery, entry.content) > 0.3
       );
 

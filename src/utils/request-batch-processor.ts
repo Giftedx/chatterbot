@@ -20,6 +20,7 @@ export interface BatchRequest {
     options?: Record<string, unknown>;
     attachments?: Array<{ type: string; data: string | Buffer }>;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   callback: (result: any, error?: Error) => void;
   timeoutMs: number;
   retryCount: number;

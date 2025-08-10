@@ -6,6 +6,8 @@
 import { CoreIntelligenceService } from '../core-intelligence.service.js';
 import { UnifiedMCPOrchestratorService } from '../core/mcp-orchestrator.service.js';
 import { UnifiedAnalyticsService } from '../core/unified-analytics.service.js';
+import { UnifiedMessageAnalysisService } from '../core/message-analysis.service.js';
+import { GeminiService } from '../gemini.service.js';
 import type { Message, ChatInputCommandInteraction } from 'discord.js';
 
 // Mock dependencies
@@ -51,6 +53,8 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   let coreIntelligenceService: CoreIntelligenceService;
   let mockMCPOrchestrator: jest.Mocked<UnifiedMCPOrchestratorService>;
   let mockAnalyticsService: jest.Mocked<UnifiedAnalyticsService>;
+  let mockMessageAnalysisService: jest.Mocked<UnifiedMessageAnalysisService>;
+  let mockGeminiService: jest.Mocked<GeminiService>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -73,12 +77,51 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
     mockAnalyticsService = new mockUnifiedAnalytics() as jest.Mocked<UnifiedAnalyticsService>;
     mockAnalyticsService.logInteraction = jest.fn().mockResolvedValue(undefined);
     
+    // Message analysis mock
+    mockMessageAnalysisService = {
+      analyzeMessage: jest.fn().mockResolvedValue({
+        hasAttachments: false,
+        hasUrls: false,
+        attachmentTypes: [],
+        urls: [],
+        complexity: 'simple',
+        intents: [],
+        requiredTools: ['memory'],
+        needsPersonaSwitch: false,
+        needsAdminFeatures: false,
+        adminCommands: [],
+        needsMultimodal: false,
+        attachmentAnalysis: [],
+        needsConversationManagement: false,
+        conversationActions: [],
+        needsMemoryOperation: false,
+        memoryActions: [],
+        needsMCPTools: false,
+        mcpRequirements: [],
+        confidence: 0.8,
+        processingRecommendations: []
+      })
+    } as unknown as jest.Mocked<UnifiedMessageAnalysisService>;
+
+    // Gemini mock
+    mockGeminiService = {
+      generateResponse: jest.fn().mockResolvedValue('OK'),
+      generateMultimodalResponse: jest.fn().mockResolvedValue('OK')
+    } as unknown as jest.Mocked<GeminiService>;
+    
     coreIntelligenceService = new CoreIntelligenceService({
       enableAgenticFeatures: true,
       enablePersonalization: false,
       enableEnhancedMemory: false,
       enableEnhancedUI: false,
       enableResponseCache: false
+    ,
+      dependencies: {
+        mcpOrchestrator: mockMCPOrchestrator,
+        analyticsService: mockAnalyticsService,
+        messageAnalysisService: mockMessageAnalysisService as unknown as any,
+        geminiService: mockGeminiService as unknown as any
+      }
     });
   });
 
@@ -88,18 +131,8 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
   describe('Unified Service Failure Scenarios', () => {
     test('should handle MCP orchestrator service failure gracefully', async () => {
-      // Mock MCP orchestrator to fail
-      const mockMCPOrchestrator = await import('../core/mcp-orchestrator.service.js');
-      
-      // Create a mock for the MCP orchestrator service if it doesn't exist
-      if (!mockMCPOrchestrator.mcpOrchestratorService) {
-        mockMCPOrchestrator.mcpOrchestratorService = {
-          processMessage: jest.fn()
-        };
-      }
-      
-      ;(mockMCPOrchestrator.mcpOrchestratorService as any).processMessage = jest.fn()
-        .mockRejectedValue(new Error('MCP orchestrator failed'));
+      // Mock MCP orchestrator to fail on orchestration
+      mockMCPOrchestrator.orchestrateIntelligentResponse.mockRejectedValue(new Error('MCP orchestrator failed'));
 
       const mockMessage: MockMessage = {
         id: 'mcp-error-test',
@@ -120,18 +153,11 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
       ).resolves.not.toThrow();
 
       expect(mockMessage.reply).toHaveBeenCalled();
-      // The service now uses logger.error instead of console.error
-      // expect(console.error).toHaveBeenCalledWith(
-      //   expect.stringContaining('Error processing message'),
-      //   expect.any(Error)
-      // );
     });
 
     test('should handle analytics service failure gracefully', async () => {
       // Mock analytics service to fail
-      const mockAnalytics = await import('../core/unified-analytics.service.js');
-      ;(mockAnalytics.unifiedAnalyticsService as any).logMessage = jest.fn()
-        .mockRejectedValue(new Error('Analytics service failed'));
+      mockAnalyticsService.logInteraction.mockRejectedValue(new Error('Analytics service failed'));
 
       const mockMessage: MockMessage = {
         id: 'analytics-error-test',
@@ -156,9 +182,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle message analysis service failure gracefully', async () => {
       // Mock message analysis service to fail
-      const mockAnalysis = await import('../core/message-analysis.service.js');
-      ;(mockAnalysis.unifiedMessageAnalysisService as any).analyzeMessage = jest.fn()
-        .mockRejectedValue(new Error('Message analysis failed'));
+      (mockMessageAnalysisService.analyzeMessage as jest.Mock).mockRejectedValue(new Error('Message analysis failed'));
 
       const mockMessage: MockMessage = {
         id: 'analysis-error-test',
@@ -241,17 +265,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Gemini API Failure Scenarios', () => {
     test('should handle Gemini API timeout gracefully', async () => {
       // Mock Gemini service to timeout
-      const mockGemini = await import('../gemini.service.js');
-      
-      // Create a mock for the GeminiService class if it doesn't exist
-      if (!mockGemini.geminiService) {
-        mockGemini.geminiService = ({
-          generateResponse: jest.fn()
-        } as unknown) as any;
-      }
-      
-      ;(mockGemini.geminiService as any).generateResponse = jest.fn()
-        .mockRejectedValue(new Error('Request timeout'));
+      (mockGeminiService.generateResponse as jest.Mock).mockRejectedValue(new Error('Request timeout'));
 
       const mockMessage: MockMessage = {
         id: 'gemini-timeout-test',
@@ -281,17 +295,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
 
     test('should handle Gemini API rate limiting gracefully', async () => {
       // Mock Gemini service to return rate limit error
-      const mockGemini = await import('../gemini.service.js');
-      
-      // Create a mock for the GeminiService class if it doesn't exist
-      if (!mockGemini.geminiService) {
-        mockGemini.geminiService = ({
-          generateResponse: jest.fn()
-        } as unknown) as any;
-      }
-      
-      ;(mockGemini.geminiService as any).generateResponse = jest.fn()
-        .mockRejectedValue(new Error('Rate limit exceeded'));
+      (mockGeminiService.generateResponse as jest.Mock).mockRejectedValue(new Error('Rate limit exceeded'));
 
       const mockMessage: MockMessage = {
         id: 'gemini-ratelimit-test',
@@ -371,45 +375,10 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Multiple Service Failure Scenarios', () => {
     test('should handle cascade failures gracefully', async () => {
       // Mock multiple services to fail
-      const mockAnalysis = await import('../core/message-analysis.service.js');
-      const mockMCPOrchestrator = await import('../core/mcp-orchestrator.service.js');
-      const mockAnalytics = await import('../core/unified-analytics.service.js');
-      const mockGemini = await import('../gemini.service.js');
-
-      // Create mocks for services if they don't exist
-      if (!mockAnalysis.unifiedMessageAnalysisService) {
-        (mockAnalysis as any).unifiedMessageAnalysisService = {
-          analyzeMessage: jest.fn()
-        } as any;
-      }
-      
-      if (!mockMCPOrchestrator.mcpOrchestratorService) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (mockMCPOrchestrator as any).mcpOrchestratorService = {
-          processMessage: jest.fn()
-        } as any;
-      }
-      
-      if (!mockAnalytics.unifiedAnalyticsService) {
-        (mockAnalytics as any).unifiedAnalyticsService = {
-          logMessage: jest.fn()
-        } as any;
-      }
-      
-      if (!mockGemini.geminiService) {
-        mockGemini.geminiService = ({
-          generateResponse: jest.fn()
-        } as unknown) as any;
-      }
-
-      ;(mockAnalysis.unifiedMessageAnalysisService as any).analyzeMessage = jest.fn()
-        .mockRejectedValue(new Error('Analysis failed'));
-      ;(mockMCPOrchestrator.mcpOrchestratorService as any).processMessage = jest.fn()
-        .mockRejectedValue(new Error('MCP failed'));
-      ;(mockAnalytics.unifiedAnalyticsService as any).logMessage = jest.fn()
-        .mockRejectedValue(new Error('Analytics failed'));
-      ;(mockGemini.geminiService as any).generateResponse = jest.fn()
-        .mockRejectedValue(new Error('Gemini failed'));
+      (mockMessageAnalysisService.analyzeMessage as jest.Mock).mockRejectedValue(new Error('Analysis failed'));
+      mockMCPOrchestrator.orchestrateIntelligentResponse.mockRejectedValue(new Error('MCP failed'));
+      mockAnalyticsService.logInteraction.mockRejectedValue(new Error('Analytics failed'));
+      (mockGeminiService.generateResponse as jest.Mock).mockRejectedValue(new Error('Gemini failed'));
 
       const mockMessage: MockMessage = {
         id: 'cascade-error-test',
@@ -437,24 +406,14 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Recovery and Retry Logic', () => {
     test('should attempt retry on transient failures', async () => {
       // Mock Gemini service to fail once then succeed
-      const mockGemini = await import('../gemini.service.js');
-      
-      // Create a mock for the GeminiService class if it doesn't exist
-      if (!mockGemini.geminiService) {
-        mockGemini.geminiService = ({
-          generateResponse: jest.fn()
-        } as unknown) as any;
-      }
-      
       let callCount = 0;
-      ;(mockGemini.geminiService as any).generateResponse = jest.fn()
-        .mockImplementation(() => {
-          callCount++;
-          if (callCount === 1) {
-            return Promise.reject(new Error('Transient error'));
-          }
-          return Promise.resolve('Success after retry');
-        });
+      (mockGeminiService.generateResponse as jest.Mock).mockImplementation(() => {
+        callCount++;
+        if (callCount === 1) {
+          return Promise.reject(new Error('Transient error'));
+        }
+        return Promise.resolve('Success after retry');
+      });
 
       const mockMessage: MockMessage = {
         id: 'retry-test',
@@ -480,17 +439,7 @@ describe('Core Intelligence Service - Error Handling Tests', () => {
   describe('Error Message Quality', () => {
     test('should provide helpful error messages to users', async () => {
       // Mock Gemini service to fail
-      const mockGemini = await import('../gemini.service.js');
-      
-      // Create a mock for the GeminiService class if it doesn't exist  
-      if (!mockGemini.geminiService) {
-        mockGemini.geminiService = ({
-          generateResponse: jest.fn()
-        } as unknown) as any;
-      }
-      
-      ;(mockGemini.geminiService as any).generateResponse = jest.fn()
-        .mockRejectedValue(new Error('Service unavailable'));
+      (mockGeminiService.generateResponse as jest.Mock).mockRejectedValue(new Error('Service unavailable'));
 
       const mockMessage: MockMessage = {
         id: 'error-message-test',

@@ -1392,5 +1392,5 @@ export class UnifiedMCPOrchestratorService {
   }
 }
 
-// Export singleton instance
-export const unifiedMCPOrchestrator = new UnifiedMCPOrchestratorService();
+// Legacy convenience path for tests expecting a module-level singleton
+export const mcpOrchestratorService = new UnifiedMCPOrchestratorService();

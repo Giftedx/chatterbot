@@ -8,7 +8,7 @@
 
 // Unified core services
 export { UnifiedMessageAnalysisService, unifiedMessageAnalysisService } from './message-analysis.service.js';
-export { UnifiedMCPOrchestratorService, unifiedMCPOrchestrator } from './mcp-orchestrator.service.js';
+export { UnifiedMCPOrchestratorService, mcpOrchestratorService } from './mcp-orchestrator.service.js';
 export { UnifiedCacheService, unifiedCacheService } from './cache.service.js';
 export { UnifiedAnalyticsService, unifiedAnalyticsService } from './unified-analytics.service.js';
 

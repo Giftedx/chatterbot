@@ -171,7 +171,7 @@ export class UnifiedMessageAnalysisService {
     const name = attachment.name;
     const contentType = 'contentType' in attachment 
       ? attachment.contentType 
-      : (attachment as any).contentType;
+      : (attachment as unknown as { contentType?: string }).contentType;
     
     const ext = name?.split('.').pop()?.toLowerCase();
     const type = contentType?.toLowerCase() || '';
@@ -492,5 +492,5 @@ export class UnifiedMessageAnalysisService {
   }
 }
 
-// Export singleton instance (mutable for testing)
-export let unifiedMessageAnalysisService = new UnifiedMessageAnalysisService();
+// Legacy convenience path: default singleton instance
+export const unifiedMessageAnalysisService = new UnifiedMessageAnalysisService();

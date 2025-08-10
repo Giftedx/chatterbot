@@ -106,8 +106,8 @@ export class GeminiService {
       };
 
       // Evaluate caching policy for this content (defensive fallback)
-      const policy = typeof (this.cachePolicyManager as any)?.evaluatePolicy === 'function'
-        ? (this.cachePolicyManager as any).evaluatePolicy(content, { userId, guildId })
+      const policy = typeof (this.cachePolicyManager as unknown as { evaluatePolicy?: (c: CacheableContent, ctx: Record<string, unknown>) => { ttl: number; name: string } }).evaluatePolicy === 'function'
+        ? (this.cachePolicyManager as unknown as { evaluatePolicy: (c: CacheableContent, ctx: Record<string, unknown>) => { ttl: number; name: string } }).evaluatePolicy(content, { userId, guildId })
         : { ttl: 0, name: 'no-cache' };
       const shouldCache = policy.ttl > 0; // Cache if TTL is positive
       
@@ -448,7 +448,7 @@ export class GeminiService {
         return RetryUtility.withRetry(async () => {
           try {
             // Apply persona and use actual user prompt
-            const persona = getActivePersona(guildId) ?? { name: 'Unknown Persona', systemPrompt: '' } as any;
+            const persona = getActivePersona(guildId) ?? ({ name: 'Unknown Persona', systemPrompt: '' } as { name: string; systemPrompt: string });
             
             const model = this.genAI!.getGenerativeModel({ model: 'gemini-1.5-flash' });
             
@@ -510,5 +510,5 @@ export class GeminiService {
   }
 }
 
-// Export singleton instance for tests that expect a module-level service (mutable for tests)
-export let geminiService = new GeminiService();
+// Legacy convenience path: default singleton instance
+export const geminiService = new GeminiService();

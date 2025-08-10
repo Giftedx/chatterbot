@@ -122,7 +122,10 @@ export class IntelligenceAdminService {
    */
   private handlePersonaList(): AdminFeatureResult {
     try {
-      const personas = listPersonas().map(p => `• **${p.name}**: ${(p as any).description || 'No description'}`).join('\n');
+      const personas = listPersonas().map(p => {
+        const desc = (p as unknown as { [k: string]: unknown })['description'];
+        return `• **${p.name}**: ${typeof desc === 'string' ? desc : 'No description'}`;
+      }).join('\n');
       
       return {
         handled: true,

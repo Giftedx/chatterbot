@@ -3,7 +3,7 @@
  * Provides system status for monitoring and deployment verification
  */
 
-import { createServer } from 'http';
+import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'http';
 import { logger } from './utils/logger.js';
 
 interface HealthStatus {
@@ -26,7 +26,7 @@ interface HealthStatus {
 }
 
 export class HealthCheck {
-  private server: any;
+  private server: HttpServer;
   private port: number;
 
   constructor(port = 3000) {
@@ -34,7 +34,7 @@ export class HealthCheck {
     this.server = createServer(this.handleRequest.bind(this));
   }
 
-  private async handleRequest(req: any, res: any) {
+  private async handleRequest(req: IncomingMessage, res: ServerResponse) {
     if (req.url === '/health' && req.method === 'GET') {
       try {
         const healthStatus = await this.getHealthStatus();
