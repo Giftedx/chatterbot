@@ -546,5 +546,6 @@ export class IntelligenceCapabilityService {
 
 // Export singleton instance
 export const intelligenceCapabilityService = new IntelligenceCapabilityService();
-// Provide alias on singleton for compatibility as well
-(intelligenceCapabilityService as any).executeDetectedCapabilities = intelligenceCapabilityService.executeDetectedCapabilities.bind(intelligenceCapabilityService);
+
+// For backward compatibility, export the method separately (bound to the singleton)
+export const executeDetectedCapabilities = intelligenceCapabilityService.executeDetectedCapabilities.bind(intelligenceCapabilityService);
