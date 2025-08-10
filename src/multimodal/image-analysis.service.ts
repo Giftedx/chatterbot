@@ -7,9 +7,6 @@ import {
   MediaFile,
   VisionAnalysisResult,
   FileProcessingOptions,
-  ImageMetadata,
-  ContentSafetyResult,
-  SafetyCategory,
   ProcessingStatus
 } from './types.js';
 import { prisma } from '../db/prisma.js';
@@ -607,7 +604,7 @@ export class ImageAnalysisService {
   ): Promise<MediaFile[]> {
     try {
       const limit = options.limit || 10;
-      const minConfidence = options.minConfidence || 0.7;
+      // const minConfidence = options.minConfidence || 0.7; // Not currently used in search logic
 
       // Search in vision analysis results
       const files = await prisma.mediaFile.findMany({

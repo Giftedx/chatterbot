@@ -135,7 +135,7 @@ export class ConversationThreadService {
         tokenCount: thread.tokenCount,
         createdAt: thread.createdAt,
         lastActivity: thread.lastActivity,
-        messages: thread.messages.map((msg: any) => ({
+        messages: thread.messages.map((msg: { id: string; threadId?: string; channelId: string; userId: string; content: string; role: string; tokens: number; topicTags?: string; importance: number; contextRelevant: boolean; hasAttachments: boolean; attachmentData?: string; createdAt: Date }) => ({
           id: msg.id,
           threadId: msg.threadId || undefined,
           channelId: msg.channelId,
@@ -459,21 +459,21 @@ export class ConversationThreadService {
       if (!thread) return null;
 
       const messages = thread.messages;
-      const userMessages = messages.filter((m: any) => m.role === 'user');
-      const assistantMessages = messages.filter((m: any) => m.role === 'assistant');
+      const userMessages = messages.filter((m: { role: string }) => m.role === 'user');
+      const assistantMessages = messages.filter((m: { role: string }) => m.role === 'assistant');
 
       // Calculate participation patterns
       const participationPattern = {
         userMessageCount: userMessages.length,
         assistantMessageCount: assistantMessages.length,
         averageUserMessageLength: userMessages.length > 0 
-          ? userMessages.reduce((sum: any, m: any) => sum + m.content.length, 0) / userMessages.length
+          ? userMessages.reduce((sum: number, m: { content: string }) => sum + m.content.length, 0) / userMessages.length
           : 0,
         averageResponseTime: this.calculateAverageResponseTime(messages)
       };
 
       // Analyze topic evolution
-      const topicEvolution = thread.topics.map((tt: any) => ({
+      const topicEvolution = thread.topics.map((tt: { topic: { displayName: string }; firstSeen: Date; lastSeen: Date; relevance: number }) => ({
         topic: tt.topic.displayName,
         timeFirst: tt.firstSeen,
         timeLast: tt.lastSeen,
@@ -504,7 +504,7 @@ export class ConversationThreadService {
         totalMessages: messages.length,
         userMessages: userMessages.length,
         assistantMessages: assistantMessages.length,
-        averageImportance: messages.length > 0 ? messages.reduce((sum: any, m: any) => sum + m.importance, 0) / messages.length : 0,
+        averageImportance: messages.length > 0 ? messages.reduce((sum: number, m: { importance: number }) => sum + m.importance, 0) / messages.length : 0,
         durationHours: sessionDuration / (1000 * 60 * 60),
         topicCount: thread.topics.length,
         keyPointCount: 0,

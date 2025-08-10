@@ -428,8 +428,8 @@ export class InteractiveMonitoringDashboard {
    * Get dashboard status
    */
   getStatus(): {
-    server: any;
-    realtime: any;
+    server: Record<string, unknown>;
+    realtime: Record<string, unknown>;
     layouts: number;
     connections: number;
   } {

@@ -267,7 +267,7 @@ describe('Core Intelligence Service - Performance Benchmarks', () => {
   describe('Error Handling Performance', () => {
     test('should handle errors quickly without hanging', async () => {
       // Mock services to throw errors
-      const mockMessageAnalysis = require('../core/message-analysis.service.js');
+      const mockMessageAnalysis = await import('../core/message-analysis.service.js');
       mockMessageAnalysis.unifiedMessageAnalysisService.analyzeMessage = jest.fn()
         .mockRejectedValue(new Error('Test error'));
 

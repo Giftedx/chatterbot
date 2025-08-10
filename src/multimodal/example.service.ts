@@ -367,7 +367,7 @@ export class ExampleMultimodalService {
 
   private generateSearchExplanation(
     result: any,
-    query: string
+    _query: string
   ): string {
     const matchType = result.matchDetails.type;
     const confidence = Math.round(result.matchDetails.confidence * 100);

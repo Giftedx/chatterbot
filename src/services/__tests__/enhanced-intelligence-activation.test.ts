@@ -18,8 +18,8 @@ jest.mock('../enhanced-intelligence/direct-mcp-executor.service.js');
 describe('Enhanced Intelligence Activation Service', () => {
   let service: EnhancedIntelligenceActivationService;
   let mockMCPManager: jest.Mocked<MCPManager>;
-  let mockPersonalizationEngine: jest.Mocked<PersonalizationEngine>;
-  let mockContextOrchestrator: jest.Mocked<SmartContextOrchestratorService>;
+  // let mockPersonalizationEngine: jest.Mocked<PersonalizationEngine>; // Not used in tests
+  // let mockContextOrchestrator: jest.Mocked<SmartContextOrchestratorService>; // Not used in tests
   let mockDirectExecutor: jest.Mocked<DirectMCPExecutor>;
 
   beforeEach(() => {

@@ -4,7 +4,6 @@
  */
 
 import { MetricSnapshot, MetricAggregation, PerformanceMetrics, AnalyticsEvent } from './types.js';
-import { logger } from '../logger.js';
 
 export class AnalyticsMetricsService {
   private metricsHistory: MetricSnapshot[] = [];
@@ -207,7 +206,7 @@ export class AnalyticsMetricsService {
     anomalies: number;
   }> {
     const history = this.getMetricsHistory(undefined, hours);
-    const summary: Record<string, any> = {};
+    const summary: Record<string, { category: string; metricCount: number; avgValue: number; trend: 'up' | 'down' | 'stable'; anomalies: number }> = {};
 
     // Group by category
     const categories = [...new Set(history.map(h => h.category))];

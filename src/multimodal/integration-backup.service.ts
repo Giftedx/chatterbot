@@ -955,10 +955,10 @@ export class MultimodalIntegrationService {
     return null;
   }
 
-  private async suggestMissingModalities(files: MediaFile[]): Promise<any> {
-    const hasImages = files.some(f => f.fileType === 'image');
-    const hasAudio = files.some(f => f.fileType === 'audio');
-    const hasDocs = files.some(f => f.fileType === 'document');
+  private async suggestMissingModalities(_files: MediaFile[]): Promise<any> {
+    const hasImages = _files.some(f => f.fileType === 'image');
+    const hasAudio = _files.some(f => f.fileType === 'audio');
+    const hasDocs = _files.some(f => f.fileType === 'document');
 
     if (hasImages && hasDocs && !hasAudio) {
       return {
@@ -973,7 +973,7 @@ export class MultimodalIntegrationService {
     return null;
   }
 
-  private async suggestQualityImprovements(files: MediaFile[]): Promise<any[]> {
+  private async suggestQualityImprovements(_files: MediaFile[]): Promise<any[]> {
     // Mock quality improvement suggestions
     return [
       {
@@ -986,7 +986,7 @@ export class MultimodalIntegrationService {
     ];
   }
 
-  private async suggestWorkflowOptimizations(files: MediaFile[]): Promise<any[]> {
+  private async suggestWorkflowOptimizations(_files: MediaFile[]): Promise<any[]> {
     return [
       {
         type: 'workflow_optimization',
@@ -998,14 +998,14 @@ export class MultimodalIntegrationService {
     ];
   }
 
-  private async suggestRelatedContent(files: MediaFile[], userId: string): Promise<any[]> {
+  private async suggestRelatedContent(_files: MediaFile[], _userId: string): Promise<any[]> {
     return [
       {
         type: 'related_content',
         priority: 'low' as const,
         title: 'Related Files Found',
         description: 'Found files with similar content themes.',
-        suggestedFiles: files.slice(0, 3),
+        suggestedFiles: _files.slice(0, 3),
         confidenceScore: 0.7
       }
     ];

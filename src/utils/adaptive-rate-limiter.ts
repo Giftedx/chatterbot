@@ -59,8 +59,8 @@ export interface AdaptiveMetrics {
   adaptationHistory: Array<{
     timestamp: number;
     reason: string;
-    oldLimits: any;
-    newLimits: any;
+    oldLimits: Record<string, unknown>;
+    newLimits: Record<string, unknown>;
     performanceMetrics: {
       avgResponseTime: number;
       successRate: number;
@@ -484,7 +484,7 @@ export class AdaptiveRateLimiter {
   /**
    * Determine if rate limits should be adapted
    */
-  private shouldAdaptLimits(performance: any): {
+  private shouldAdaptLimits(performance: { avgResponseTime: number; successRate: number; throughput: number }): {
     adapt: boolean;
     direction: 'increase' | 'decrease';
     reason: string;
@@ -521,7 +521,7 @@ export class AdaptiveRateLimiter {
   private adaptRateLimits(
     direction: 'increase' | 'decrease',
     reason: string,
-    performance: any
+    performance: { avgResponseTime: number; successRate: number; throughput: number }
   ): void {
     const oldLimits = { ...this.currentLimits };
     const factor = direction === 'increase' 
@@ -665,7 +665,7 @@ export class AdaptiveRateLimiter {
     globalUsage: { requests: number; tokens: number; minute: number };
     adaptiveMetrics: AdaptiveMetrics;
     connectionMetrics: ConnectionMetrics;
-    recentPerformance: any;
+    recentPerformance: { avgResponseTime: number; successRate: number; throughput: number; trend: string };
   } {
     const currentMinute = Math.floor(Date.now() / 60000);
     const globalWindow = this.globalWindows.get(currentMinute) || this.createNewWindow(currentMinute);

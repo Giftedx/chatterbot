@@ -278,7 +278,7 @@ export class CoreIntelligenceService {
             const capabilities = await this._fetchUserCapabilities(userId, channelId, guildId, analyticsData);
             const unifiedAnalysis = await this._analyzeInput(messageForPipeline, commonAttachments, capabilities, analyticsData);
 
-            let mcpOrchestrationResult = await this._executeMcpPipeline(messageForPipeline, unifiedAnalysis, capabilities, analyticsData);
+            const mcpOrchestrationResult = await this._executeMcpPipeline(messageForPipeline, unifiedAnalysis, capabilities, analyticsData);
             if (!mcpOrchestrationResult.success) {
                 logger.warn(`[CoreIntelSvc] MCP Pipeline indicated failure or partial success. Tools executed: ${mcpOrchestrationResult.toolsExecuted.join(', ')}. Fallbacks: ${mcpOrchestrationResult.fallbacksUsed.join(', ')}`, analyticsData);
             }
@@ -297,7 +297,7 @@ export class CoreIntelligenceService {
             const history = await getHistory(channelId);
             const agenticContextData = await this._aggregateAgenticContext(messageForPipeline, unifiedAnalysis, capabilities, mcpOrchestrationResult, history, analyticsData);
 
-            let { fullResponseText } = await this._generateAgenticResponse(
+            const { fullResponseText } = await this._generateAgenticResponse(
                 agenticContextData, userId, channelId, guildId, commonAttachments,
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );

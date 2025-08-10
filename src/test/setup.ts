@@ -24,7 +24,7 @@ global.console = {
 };
 
 // Mock fetch globally with proper typing
-(global as any).fetch = jest.fn();
+(global as { fetch: jest.Mock }).fetch = jest.fn();
 
 // Mock Prisma Client - commented out for now due to type issues
 // Will be re-enabled once Prisma client is properly generated
@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 // Global test utilities with proper typing
-(global as any).testUtils = {
+(global as { testUtils: Record<string, unknown> }).testUtils = {
   mockDiscordMessage: (content: string, author = 'test-user') => ({
     content,
     author: { id: author, username: author },
@@ -60,7 +60,7 @@ afterEach(() => {
     }
   }),
   
-  mockDiscordInteraction: (commandName: string, options: any = {}) => ({
+  mockDiscordInteraction: (commandName: string, options: Record<string, unknown> = {}) => ({
     commandName,
     options,
     user: { id: 'test-user', username: 'test-user' },
@@ -88,14 +88,14 @@ afterEach(() => {
     }]
   }),
   
-  mockOpenAIResponse: (flagged: boolean, categories: any = {}) => ({
+  mockOpenAIResponse: (flagged: boolean, categories: Record<string, boolean> = {}) => ({
     results: [{
       flagged,
       categories,
       category_scores: Object.keys(categories).reduce((acc, key) => {
         acc[key] = categories[key] ? 0.9 : 0.1;
         return acc;
-      }, {} as any)
+      }, {} as Record<string, number>)
     }]
   })
 }; 

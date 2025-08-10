@@ -246,7 +246,7 @@ export const agenticCommands = [
         const enableEscalation = interaction.options.getBoolean('enable_escalation');
         const confidenceThreshold = interaction.options.getNumber('confidence_threshold');
 
-        const config: any = {};
+        const config: { enableAutoEscalation?: boolean; escalationThreshold?: number } = {};
         if (enableEscalation !== null) config.enableAutoEscalation = enableEscalation;
         if (confidenceThreshold !== null) config.escalationThreshold = confidenceThreshold;
 

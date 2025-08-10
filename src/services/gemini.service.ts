@@ -92,8 +92,7 @@ export class GeminiService {
       return 'TEST RESPONSE STRING';
     }
 
-    let result: string | undefined;
-    result = await PerformanceMonitor.monitor('generate-response-cached', async () => {
+    const result: string | undefined = await PerformanceMonitor.monitor('generate-response-cached', async () => {
       // Create cache-friendly content representation
       const content: CacheableContent = {
         type: 'text',

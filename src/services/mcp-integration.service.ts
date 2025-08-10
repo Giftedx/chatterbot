@@ -249,7 +249,7 @@ export class MCPIntegrationService {
   /**
    * Get available MCP capabilities for a user
    */
-  public async getAvailableCapabilities(userId: string): Promise<MCPCapability[]> {
+  public async getAvailableCapabilities(_userId: string): Promise<MCPCapability[]> {
     const status = this.mcpManager.getStatus();
     const capabilities: MCPCapability[] = [];
 
@@ -284,7 +284,7 @@ export class MCPIntegrationService {
 
   // Private helper methods
 
-  private isConsentRequired(serverName: string, toolName: string): boolean {
+  private isConsentRequired(serverName: string, _toolName: string): boolean {
     // Define which tools require explicit user consent
     const consentRequiredServers = [
       'brave_search', 'firecrawl', 'postgres', 'sqlite', 'github', 'playwright'
@@ -302,7 +302,7 @@ export class MCPIntegrationService {
     });
 
     // Store pending execution for later completion
-    const pendingKey = `${context.userId}:${context.serverName}:${context.toolName}`;
+    // const pendingKey = `${context.userId}:${context.serverName}:${context.toolName}`; // Not currently used
     // Note: In a real implementation, we'd need to handle the promise resolution differently
     // This is a simplified version for demonstration
   }

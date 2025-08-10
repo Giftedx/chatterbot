@@ -33,7 +33,7 @@ async function initializePrisma() {
 if (process.env.NODE_ENV === 'test') {
   // For tests, always use mock - don't try real client
   console.log('⚠️ Using mock Prisma client for tests');
-  const { mockPrisma } = require('./prisma-mock.js');
+  const { mockPrisma } = await import('./prisma-mock.js');
   prisma = mockPrisma;
 } else {
   try {

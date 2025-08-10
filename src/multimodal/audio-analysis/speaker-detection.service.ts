@@ -3,7 +3,7 @@
  * Handles speaker identification and diarization
  */
 
-import type { MediaFile, TranscriptionSegment, DetectedSpeaker, SpeakerSegment } from './types.js';
+import type { MediaFile, TranscriptionSegment, DetectedSpeaker } from './types.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -121,7 +121,7 @@ export class SpeakerDetectionService {
       }
 
       const currentSpeaker = speakers[currentSpeakerIndex];
-      const speakingTime = segment.endTime - segment.startTime;
+      // const speakingTime = segment.endTime - segment.startTime; // Not currently used
 
       // Add segment to speaker's segments
       currentSpeaker.segments.push({
@@ -268,7 +268,7 @@ export class SpeakerDetectionService {
     speakers: DetectedSpeaker[];
     segments: Array<TranscriptionSegment & { speakerId: string }>;
   }): string {
-    const { speakerCount, speakers, segments } = speakerResults;
+    const { speakerCount, speakers } = speakerResults;
     
     if (speakerCount === 1) {
       return `Single speaker detected.`;

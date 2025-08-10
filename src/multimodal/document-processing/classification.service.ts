@@ -342,7 +342,7 @@ export class DocumentClassificationService {
     return formatMap[mimeType] || 'Unknown';
   }
 
-  private determineDocumentType(mediaFile: MediaFile, textContent?: TextExtractionResult): string {
+  private determineDocumentType(mediaFile: MediaFile, _textContent?: TextExtractionResult): string {
     const filename = mediaFile.originalName.toLowerCase();
     const format = this.getDocumentFormat(mediaFile.mimeType);
     

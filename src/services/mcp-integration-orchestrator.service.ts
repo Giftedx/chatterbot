@@ -287,7 +287,7 @@ export class MCPIntegrationOrchestratorService {
       priority: 'critical',
       capabilities: ['discord', 'messaging', 'channel-management'],
       requiredEnvVars: ['DISCORD_TOKEN'],
-      executorFunction: async (params) => {
+      executorFunction: async (_params) => {
         // Use the existing Discord.js integration
         return { success: true, data: { action: 'discord-native' }, toolUsed: 'discord-integration' };
       },

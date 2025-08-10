@@ -20,7 +20,7 @@ export interface BatchRequest {
     options?: Record<string, unknown>;
     attachments?: Array<{ type: string; data: string | Buffer }>;
   };
-  callback: (result: any, error?: Error) => void;
+  callback: (result: unknown, error?: Error) => void;
   timeoutMs: number;
   retryCount: number;
   maxRetries: number;
@@ -457,7 +457,7 @@ export class RequestBatchProcessor {
   /**
    * Simulate API call (replace with actual Gemini API integration)
    */
-  private async simulateAPICall(request: BatchRequest): Promise<any> {
+  private async simulateAPICall(request: BatchRequest): Promise<unknown> {
     // Simulate processing time based on request complexity
     const baseTime = 100;
     const complexityMultiplier = request.type === 'multimodal' ? 3 : 1;
