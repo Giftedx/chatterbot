@@ -382,9 +382,15 @@ export class AdaptiveRateLimiter {
     const window = this.globalWindows.get(minute) || this.createNewWindow(minute);
     
     // Update running averages
-    const totalRequests = Math.max(window.requests, 1);
-    window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
-    window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    const totalRequests = window.requests;
+    if (totalRequests > 0) {
+      window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
+      window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    } else {
+      // This is the first request in this window, initialize metrics.
+      window.avgResponseTime = responseTime;
+      window.successRate = success ? 1 : 0;
+    }
     
     if (!success) {
       window.errors++;
