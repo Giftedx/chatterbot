@@ -91,6 +91,16 @@ export class UnifiedAnalyticsService {
     };
   }
 
+  // Backward-compatibility shim for tests expecting logMessage
+  async logMessage(params: { guildId?: string | null; userId: string; command: string; isSuccess: boolean }): Promise<void> {
+    return this.logInteraction({
+      guildId: params.guildId ?? null,
+      userId: params.userId,
+      command: params.command,
+      isSuccess: params.isSuccess
+    });
+  }
+
   /**
    * Log interaction event (core analytics functionality)
    */
@@ -442,4 +452,4 @@ export class UnifiedAnalyticsService {
 }
 
 // Singleton instance for easy import
-export const unifiedAnalyticsService = new UnifiedAnalyticsService();
+export let unifiedAnalyticsService = new UnifiedAnalyticsService();

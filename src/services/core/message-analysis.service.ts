@@ -492,5 +492,5 @@ export class UnifiedMessageAnalysisService {
   }
 }
 
-// Export singleton instance
-export const unifiedMessageAnalysisService = new UnifiedMessageAnalysisService();
+// Export singleton instance (mutable for testing)
+export let unifiedMessageAnalysisService = new UnifiedMessageAnalysisService();
