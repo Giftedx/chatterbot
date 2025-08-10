@@ -70,7 +70,7 @@ export class MCPIntegrationService {
       serverName,
       toolName,
       parameters,
-              requiresConsent: this.isConsentRequired(serverName)
+      requiresConsent: this.isConsentRequired(serverName)
     };
 
     try {
