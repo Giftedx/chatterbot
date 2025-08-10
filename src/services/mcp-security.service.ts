@@ -386,7 +386,7 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(userId: string, serverName: string, toolName: string): boolean {
+  private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
     void userId;
     void serverName;
     void toolName;
