@@ -509,3 +509,6 @@ export class GeminiService {
     }, { userId, guildId, operation });
   }
 }
+
+// Export singleton instance for tests that expect a module-level service (mutable for tests)
+export let geminiService = new GeminiService();

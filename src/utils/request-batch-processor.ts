@@ -20,7 +20,7 @@ export interface BatchRequest {
     options?: Record<string, unknown>;
     attachments?: Array<{ type: string; data: string | Buffer }>;
   };
-  callback: (result: unknown, error?: Error) => void;
+  callback: (result: any, error?: Error) => void;
   timeoutMs: number;
   retryCount: number;
   maxRetries: number;

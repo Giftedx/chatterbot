@@ -269,6 +269,11 @@ export class IntelligenceCapabilityService {
     }
   }
 
+  // Backward-compatibility alias expected by some tests
+  public async executeDetectedCapabilities(analysis: IntelligenceAnalysis, message: Message): Promise<CapabilityExecutionResult> {
+    return this.executeCapabilities(analysis, message);
+  }
+
   /**
    * Execute MCP tools based on requirements
    */
@@ -541,3 +546,6 @@ export class IntelligenceCapabilityService {
 
 // Export singleton instance
 export const intelligenceCapabilityService = new IntelligenceCapabilityService();
+
+// For backward compatibility, export the method separately (bound to the singleton)
+export const executeDetectedCapabilities = intelligenceCapabilityService.executeDetectedCapabilities.bind(intelligenceCapabilityService);

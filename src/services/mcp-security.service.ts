@@ -155,26 +155,25 @@ export class MCPSecurityManager {
     context: MCPToolExecutionContext;
   }> {
     const customId = interaction.customId;
-    let parsedId;
-    
-    try {
-      parsedId = JSON.parse(customId);
-    } catch (error) {
-      throw new Error('Invalid consent button interaction: malformed customId');
+    // Expected format: mcp_consent_{action}_{userId}_{serverName}_{toolName}
+    if (!customId.startsWith('mcp_consent_')) {
+      throw new Error('Invalid consent button interaction: missing mcp_consent prefix');
     }
 
-    if (!parsedId || parsedId.type !== 'mcp_consent' || !parsedId.action || !parsedId.userId || !parsedId.serverName || !parsedId.toolName) {
+    const parts = customId.split('mcp_consent_')[1]?.split('_');
+    if (!parts || parts.length < 4) {
       throw new Error('Invalid consent button interaction: missing required fields');
     }
 
-    const action = parsedId.action === 'allow_once' ? 'allow_once' :
-                   parsedId.action === 'always_allow' ? 'always_allow' :
-                   parsedId.action === 'deny' ? 'deny' :
-                   parsedId.action === 'always_deny' ? 'always_deny' : 'deny';
-    
-    const userId = parsedId.userId;
-    const serverName = parsedId.serverName;
-    const toolName = parsedId.toolName;
+    const rawAction = parts[0];
+    const action = rawAction === 'allow_once' ? 'allow_once' :
+                   rawAction === 'always_allow' ? 'always_allow' :
+                   rawAction === 'deny' ? 'deny' :
+                   rawAction === 'always_deny' ? 'always_deny' : 'deny';
+
+    const userId = parts[1];
+    const serverName = parts[2];
+    const toolName = parts.slice(3).join('_');
 
     const consent: MCPConsentDecision = {
       userId,
@@ -315,7 +314,7 @@ export class MCPSecurityManager {
     return (now - consentTime) < this.consentCacheTTL;
   }
 
-  private async getStoredConsent(): Promise<MCPConsentDecision | null> {
+  private async getStoredConsent(_userId: string, _serverName: string, _toolName: string): Promise<MCPConsentDecision | null> {
     // In a real implementation, this would query the database
     // For now, return null (no stored consent)
     return null;
@@ -384,7 +383,10 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(): boolean {
+  private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
+    void userId;
+    void serverName;
+    void toolName;
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;
