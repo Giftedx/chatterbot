@@ -410,7 +410,6 @@ describe('Core Intelligence Service - Unified Architecture', () => {
 
   describe('Performance and Monitoring', () => {
     test('should track processing times through analytics', async () => {
-      const startTime = Date.now();
       
       const mockInteraction = {
         id: 'test-interaction',

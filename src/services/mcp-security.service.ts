@@ -263,7 +263,7 @@ export class MCPSecurityManager {
     const sanitizedParameters = this.sanitizeParameters(context.parameters);
 
     // Check rate limits
-    if (!this.checkRateLimit(context.userId, context.serverName, context.toolName)) {
+    if (!this.checkRateLimit()) {
       return {
         allowed: false,
         reason: 'Rate limit exceeded for this tool'
@@ -384,7 +384,7 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
+  private checkRateLimit(): boolean {
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;

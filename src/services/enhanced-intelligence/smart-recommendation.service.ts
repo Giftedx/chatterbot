@@ -235,7 +235,9 @@ export class SmartRecommendationService {
         name: 'behavioral-patterns',
         description: 'Recommends based on user behavior patterns',
         weight: 0.8,
-        generateRecommendations: this.generateBehavioralRecommendations.bind(this)
+        generateRecommendations: async (context: RecommendationContext, behaviorSummary?: UserBehaviorSummary) => {
+          return await this.generateBehavioralRecommendations(behaviorSummary);
+        }
       },
       {
         name: 'learning-path',
@@ -262,8 +264,7 @@ export class SmartRecommendationService {
    * Generate contextual tool recommendations
    */
   private async generateContextualToolRecommendations(
-    context: RecommendationContext,
-    _behaviorSummary?: UserBehaviorSummary
+    context: RecommendationContext
   ): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
     const message = context.currentMessage?.toLowerCase() || '';
@@ -330,7 +331,6 @@ export class SmartRecommendationService {
    * Generate behavioral pattern recommendations
    */
   private async generateBehavioralRecommendations(
-    _context: RecommendationContext,
     behaviorSummary?: UserBehaviorSummary
   ): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
@@ -440,10 +440,7 @@ export class SmartRecommendationService {
   /**
    * Generate discovery recommendations
    */
-  private async generateDiscoveryRecommendations(
-    _context: RecommendationContext,
-    _behaviorSummary?: UserBehaviorSummary
-  ): Promise<SmartRecommendation[]> {
+  private async generateDiscoveryRecommendations(): Promise<SmartRecommendation[]> {
     const recommendations: SmartRecommendation[] = [];
 
     // Recommend new features based on time and usage

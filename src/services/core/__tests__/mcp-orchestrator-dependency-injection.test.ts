@@ -9,7 +9,6 @@
 import { UnifiedMCPOrchestratorService } from '../mcp-orchestrator.service.js';
 import { MCPManager } from '../../mcp-manager.service.js';
 import { DirectMCPExecutor } from '../../enhanced-intelligence/direct-mcp-executor.service.js';
-import { MCPToolResult } from '../../enhanced-intelligence/types.js';
 
 // Mock dependencies
 jest.mock('../../mcp-manager.service.js');

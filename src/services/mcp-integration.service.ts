@@ -70,7 +70,7 @@ export class MCPIntegrationService {
       serverName,
       toolName,
       parameters,
-      requiresConsent: this.isConsentRequired(serverName, toolName)
+              requiresConsent: this.isConsentRequired(serverName)
     };
 
     try {
@@ -249,7 +249,7 @@ export class MCPIntegrationService {
   /**
    * Get available MCP capabilities for a user
    */
-  public async getAvailableCapabilities(_userId: string): Promise<MCPCapability[]> {
+  public async getAvailableCapabilities(): Promise<MCPCapability[]> {
     const status = this.mcpManager.getStatus();
     const capabilities: MCPCapability[] = [];
 
@@ -273,7 +273,7 @@ export class MCPIntegrationService {
   }> {
     const mcpStatus = this.mcpManager.getStatus();
     const securityMetrics = await this.securityManager.getSecurityMetrics();
-    const capabilities = await this.getAvailableCapabilities('system');
+    const capabilities = await this.getAvailableCapabilities();
 
     return {
       mcpStatus,
@@ -284,7 +284,7 @@ export class MCPIntegrationService {
 
   // Private helper methods
 
-  private isConsentRequired(serverName: string, _toolName: string): boolean {
+  private isConsentRequired(serverName: string): boolean {
     // Define which tools require explicit user consent
     const consentRequiredServers = [
       'brave_search', 'firecrawl', 'postgres', 'sqlite', 'github', 'playwright'

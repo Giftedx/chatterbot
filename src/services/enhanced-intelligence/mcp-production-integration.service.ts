@@ -59,17 +59,7 @@ interface MCPContentExtractionResponse {
   success?: boolean;
 }
 
-interface MCPSequentialThinkingResponse {
-  steps?: MCPSequentialThinkingResult['steps'];
-  finalAnswer?: string;
-  completed?: boolean;
-}
 
-interface MCPBrowserAutomationResponse {
-  actions?: MCPBrowserAutomationResult['actions'];
-  screenshots?: string[];
-  data?: MCPBrowserAutomationResult['data'];
-}
 
 export class MCPProductionIntegrationService {
   private isProductionMCPEnabled = false;

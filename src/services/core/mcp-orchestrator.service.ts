@@ -1272,10 +1272,7 @@ export class UnifiedMCPOrchestratorService {
    * Get tool recommendations based on content
    * Consolidated from MCPToolRegistrationService
    */
-  getToolRecommendations(content: string, context: { 
-    userId: string; 
-    priority: 'low' | 'medium' | 'high' | 'critical';
-  }): Array<{
+  getToolRecommendations(content: string): Array<{
     id: string;
     name: string;
     confidence: number;

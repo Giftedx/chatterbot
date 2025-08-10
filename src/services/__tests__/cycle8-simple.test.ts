@@ -19,7 +19,7 @@ jest.mock('../../utils/logger.js', () => ({
 jest.mock('../../utils/resilience.js', () => ({
   PerformanceMonitor: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    monitor: jest.fn(async (operation: string, fn: () => Promise<any>, context?: any) => {
+    monitor: jest.fn(async (operation: string, fn: () => Promise<any>) => {
       return await fn();
     })
   }
@@ -140,15 +140,13 @@ describe('Cycle 8: Performance Optimization - Basic Tests', () => {
     });
 
     it('should accept and queue requests', async () => {
-      let callbackResult: unknown = null;
-      
       const requestId = await batchProcessor.addRequest({
         userId: 'test-user',
         priority: 'medium',
         type: 'text',
         data: { prompt: 'test prompt' },
         callback: (result: unknown) => {
-          callbackResult = result;
+          // Callback executed but result not used in this test
         },
         timeoutMs: 5000,
         maxRetries: 1
@@ -271,13 +269,14 @@ describe('Cycle 8: Performance Optimization - Basic Tests', () => {
       expect(streamMetrics.totalBytes).toBeGreaterThan(0);
 
       // Test batch processing
-      let batchResult: unknown = null;
       await batchProcessor.addRequest({
         userId: 'integration-user',
         priority: 'high',
         type: 'text',
         data: { prompt: 'integration test' },
-        callback: (result: unknown) => { batchResult = result; },
+        callback: (result: unknown) => { 
+          // Callback executed but result not used in this test
+        },
         timeoutMs: 5000,
         maxRetries: 1
       });

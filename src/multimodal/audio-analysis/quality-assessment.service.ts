@@ -84,7 +84,7 @@ export class QualityAssessmentService {
     // Calculate individual quality components
     const clarity = this.assessClarity(mediaFile, metadata);
     const background = this.assessBackground(mediaFile, metadata);
-    const consistency = this.assessConsistency(mediaFile, metadata);
+    // const consistency = this.assessConsistency(mediaFile, metadata); // Unused for now
     const technical = this.assessTechnicalQuality(mediaFile, metadata);
 
     // Calculate weighted overall score (commented out as not used in return)

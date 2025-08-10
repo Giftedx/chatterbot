@@ -179,20 +179,20 @@ export class PersonalizationEngine {
         const recommendations: PersonalizedRecommendation[] = [];
 
         // Tool recommendations based on usage patterns
-        const toolRecommendations = await this.generateToolRecommendations(pattern, insights);
+        const toolRecommendations = await this.generateToolRecommendations(pattern);
         recommendations.push(...toolRecommendations);
 
         // Learning path recommendations
-        const learningRecommendations = this.generateLearningRecommendations(pattern, insights);
+        const learningRecommendations = this.generateLearningRecommendations(pattern);
         recommendations.push(...learningRecommendations);
 
         // Workflow optimization recommendations
-        const workflowRecommendations = this.generateWorkflowRecommendations(pattern, insights);
+        const workflowRecommendations = this.generateWorkflowRecommendations(pattern);
         recommendations.push(...workflowRecommendations);
 
         // Context-specific recommendations
         if (context) {
-          const contextualRecommendations = this.generateContextualRecommendations(pattern, insights, context);
+          const contextualRecommendations = this.generateContextualRecommendations(pattern, context);
           recommendations.push(...contextualRecommendations);
         }
 
@@ -401,8 +401,7 @@ export class PersonalizationEngine {
    * Generate tool recommendations based on patterns and MCP availability
    */
   private async generateToolRecommendations(
-    pattern: UserInteractionPattern, 
-    _insights: LearningInsight[]
+    pattern: UserInteractionPattern
   ): Promise<PersonalizedRecommendation[]> {
     const recommendations: PersonalizedRecommendation[] = [];
 
@@ -544,16 +543,12 @@ export class PersonalizationEngine {
    * Generate learning path recommendations
    */
   private generateLearningRecommendations(
-    pattern: UserInteractionPattern,
-    _insights: LearningInsight[]
+    pattern: UserInteractionPattern
   ): PersonalizedRecommendation[] {
     const recommendations: PersonalizedRecommendation[] = [];
 
     // Analyze user's proficiency level
     const totalInteractions = pattern.behaviorMetrics.commonQuestionTypes.length;
-    const avgSatisfaction = pattern.behaviorMetrics.feedbackScores.length > 0 
-      ? pattern.behaviorMetrics.feedbackScores.reduce((a, b) => a + b, 0) / pattern.behaviorMetrics.feedbackScores.length
-      : 3;
 
     if (totalInteractions < 10) {
       recommendations.push({
@@ -579,8 +574,7 @@ export class PersonalizationEngine {
    * Generate workflow optimization recommendations
    */
   private generateWorkflowRecommendations(
-    pattern: UserInteractionPattern,
-    _insights: LearningInsight[]
+    pattern: UserInteractionPattern
   ): PersonalizedRecommendation[] {
     const recommendations: PersonalizedRecommendation[] = [];
 
@@ -621,7 +615,6 @@ export class PersonalizationEngine {
    */
   private generateContextualRecommendations(
     pattern: UserInteractionPattern,
-    _insights: LearningInsight[],
     context: string
   ): PersonalizedRecommendation[] {
     const recommendations: PersonalizedRecommendation[] = [];

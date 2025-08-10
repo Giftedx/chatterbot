@@ -11,8 +11,7 @@ import {
   ProcessingStatus,
   IntelligentSearchOptions,
   IntelligentSearchResult,
-  SearchMatchType,
-  CrossModalInsight
+  SearchMatchType
 } from './types.js';
 import { FileAnalysisService } from './analysis.service.js';
 import { CrossModalService } from './cross-modal.service.js';

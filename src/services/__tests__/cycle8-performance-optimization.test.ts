@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 /**
  * Comprehensive Test Suite for Cycle 8: Advanced Performance Optimization
  * Tests streaming processor, request batching, and adaptive rate limiting
@@ -54,7 +52,6 @@ describe('Cycle 8: Advanced Performance Optimization', () => {
     });
 
     it('should process streaming response with default options', async () => {
-      const streamId = 'test-stream-1';
       const testData = ['chunk1', 'chunk2', 'chunk3'];
       
       async function* responseGenerator() {
@@ -68,7 +65,7 @@ describe('Cycle 8: Advanced Performance Optimization', () => {
       const chunks: any[] = [];
       let totalBytes = 0;
       let sequenceNumber = 0;
-      let backpressureEvents = 0;
+      const backpressureEvents = 0;
 
       // Process streaming data directly
       for await (const data of responseGenerator()) {
@@ -112,7 +109,6 @@ describe('Cycle 8: Advanced Performance Optimization', () => {
     });
 
     it('should handle adaptive chunking optimization', async () => {
-      const streamId = 'test-stream-adaptive';
       const largeData = ['x'.repeat(5000), 'y'.repeat(3000), 'z'.repeat(2000)];
       
       async function* responseGenerator() {
@@ -128,7 +124,7 @@ describe('Cycle 8: Advanced Performance Optimization', () => {
       };
 
       const metrics = await processor.processStreamingResponse(
-        streamId,
+        'test-stream-adaptive',
         responseGenerator(),
         options
       );
@@ -780,7 +776,7 @@ describe('Cycle 8: Advanced Performance Optimization', () => {
 
 jest.mock('../../utils/resilience.js', () => ({
   PerformanceMonitor: {
-    monitor: jest.fn(async (_operation: string, fn: () => Promise<any>, _context?: object) => {
+    monitor: jest.fn(async (_operation: string, fn: () => Promise<any>) => {
       return await fn();
     })
   }
