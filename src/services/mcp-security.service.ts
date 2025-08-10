@@ -315,7 +315,7 @@ export class MCPSecurityManager {
     return (now - consentTime) < this.consentCacheTTL;
   }
 
-  private async getStoredConsent(): Promise<MCPConsentDecision | null> {
+  private async getStoredConsent(userId: string, serverName: string, toolName: string): Promise<MCPConsentDecision | null> {
     // In a real implementation, this would query the database
     // For now, return null (no stored consent)
     return null;
@@ -384,7 +384,7 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(): boolean {
+  private checkRateLimit(userId: string, serverName: string, toolName: string): boolean {
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;
