@@ -484,12 +484,12 @@ export class AdaptiveRateLimiter {
   /**
    * Determine if rate limits should be adapted
    */
-  private shouldAdaptLimits(performance: { avgResponseTime: number; successRate: number; throughput: number }): {
+  private shouldAdaptLimits(performance: { avgResponseTime: number; successRate: number; throughput: number; trend?: 'improving' | 'degrading' | 'stable' }): {
     adapt: boolean;
     direction: 'increase' | 'decrease';
     reason: string;
   } {
-    const { avgResponseTime, successRate, trend } = performance;
+    const { avgResponseTime, successRate, trend = 'stable' } = performance;
 
     // Performance is degraded - decrease limits
     if (avgResponseTime > (this.config.adaptive?.performanceThreshold ?? 2000) ||

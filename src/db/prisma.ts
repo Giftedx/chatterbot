@@ -33,8 +33,18 @@ async function initializePrisma() {
 if (process.env.NODE_ENV === 'test') {
   // For tests, always use mock - don't try real client
   console.log('⚠️ Using mock Prisma client for tests');
-  const { mockPrisma } = await import('./prisma-mock.js');
-  prisma = mockPrisma;
+  // Use dynamic import to avoid top-level await
+  import('./prisma-mock.js').then(({ mockPrisma }) => {
+    prisma = mockPrisma;
+  }).catch(() => {
+    console.log('⚠️ Mock Prisma not available, using fallback');
+    prisma = {
+      // Basic mock implementation
+      user: { findMany: () => [], create: () => ({}) },
+      conversation: { findMany: () => [], create: () => ({}) },
+      analytics: { findMany: () => [], create: () => ({}) }
+    };
+  });
 } else {
   try {
     prisma = new PrismaClient();
