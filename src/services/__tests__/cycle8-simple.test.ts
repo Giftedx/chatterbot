@@ -30,31 +30,38 @@ let StreamingResponseProcessor: any;
 let RequestBatchProcessor: any;
 let AdaptiveRateLimiter: any;
 
-try {
-  const streamingModule = await import('../../utils/streaming-processor.js');
-  StreamingResponseProcessor = streamingModule.default;
-  console.log('StreamingResponseProcessor imported:', !!StreamingResponseProcessor);
-} catch (error) {
-  console.error('Failed to import StreamingResponseProcessor:', error);
-}
+// Import modules synchronously or handle in beforeEach
+const loadModules = async () => {
+  try {
+    const streamingModule = await import('../../utils/streaming-processor.js');
+    StreamingResponseProcessor = streamingModule.default;
+    console.log('StreamingResponseProcessor imported:', !!StreamingResponseProcessor);
+  } catch (error) {
+    console.error('Failed to import StreamingResponseProcessor:', error);
+  }
 
-try {
-  const batchModule = await import('../../utils/request-batch-processor.js');
-  RequestBatchProcessor = batchModule.default;
-  console.log('RequestBatchProcessor imported:', !!RequestBatchProcessor);
-} catch (error) {
-  console.error('Failed to import RequestBatchProcessor:', error);
-}
+  try {
+    const batchModule = await import('../../utils/request-batch-processor.js');
+    RequestBatchProcessor = batchModule.default;
+    console.log('RequestBatchProcessor imported:', !!RequestBatchProcessor);
+  } catch (error) {
+    console.error('Failed to import RequestBatchProcessor:', error);
+  }
 
-try {
-  const rateLimiterModule = await import('../../utils/adaptive-rate-limiter.js');
-  AdaptiveRateLimiter = rateLimiterModule.default;
-  console.log('AdaptiveRateLimiter imported:', !!AdaptiveRateLimiter);
-} catch (error) {
-  console.error('Failed to import AdaptiveRateLimiter:', error);
-}
+  try {
+    const rateLimiterModule = await import('../../utils/adaptive-rate-limiter.js');
+    AdaptiveRateLimiter = rateLimiterModule.default;
+    console.log('AdaptiveRateLimiter imported:', !!AdaptiveRateLimiter);
+  } catch (error) {
+    console.error('Failed to import AdaptiveRateLimiter:', error);
+  }
+};
 
 describe('Cycle 8: Performance Optimization - Basic Tests', () => {
+  beforeAll(async () => {
+    await loadModules();
+  });
+
   describe('StreamingResponseProcessor', () => {
     let processor: any;
     

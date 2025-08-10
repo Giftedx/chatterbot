@@ -458,13 +458,10 @@ export class CoreIntelligenceService {
                 // Note: AgenticQuery doesn't support attachments - they would need to be passed separately
             };
 
-            let agenticResponse: AgenticResponse;
-            let fullResponseText: string;
-
             // Streaming not currently available in AgenticIntelligenceService
             logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
-            agenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
-            fullResponseText = agenticResponse.response;
+            const agenticResponse: AgenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
+            const fullResponseText: string = agenticResponse.response;
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
             return { agenticResponse, fullResponseText };
         } catch (error: unknown) {
