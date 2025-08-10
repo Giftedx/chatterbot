@@ -228,7 +228,7 @@ export class EnhancedIntelligenceActivationService {
       // Test Brave Search API (run regardless of API key to allow fallbacks in tests)
       if (this.directExecutor) {
         const testSearch = await this.directExecutor.executeWebSearch('test query', 1);
-        validations.braveSearch = !!testSearch && (testSearch as any).success === true;
+        validations.braveSearch = this.isSuccessResult(testSearch) && testSearch.success === true;
       }
     } catch (error) {
       logger.warn('Brave Search API validation failed', { error: String(error) });
