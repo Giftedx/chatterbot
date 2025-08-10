@@ -383,8 +383,14 @@ export class AdaptiveRateLimiter {
     
     // Update running averages
     const totalRequests = window.requests;
-    window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
-    window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    if (totalRequests > 0) {
+      window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
+      window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    } else {
+      // This is the first request in this window, initialize metrics.
+      window.avgResponseTime = responseTime;
+      window.successRate = success ? 1 : 0;
+    }
     
     if (!success) {
       window.errors++;
@@ -403,9 +409,14 @@ export class AdaptiveRateLimiter {
     const window = userWindows.get(minute);
     if (!window) return;
 
-    const totalRequests = window.requests;
-    window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
-    window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    if (window.requests === 0) {
+      window.avgResponseTime = 0;
+      window.successRate = 0;
+    } else {
+      const totalRequests = window.requests;
+      window.avgResponseTime = (window.avgResponseTime * (totalRequests - 1) + responseTime) / totalRequests;
+      window.successRate = (window.successRate * (totalRequests - 1) + (success ? 1 : 0)) / totalRequests;
+    }
     
     if (!success) {
       window.errors++;

@@ -29,7 +29,7 @@ export class HealthCheck {
   private server: HttpServer;
   private port: number;
 
-  constructor(port = 3000) {
+  constructor(port = Number(process.env.HEALTH_CHECK_PORT ?? 3000)) {
     this.port = port;
     this.server = createServer(this.handleRequest.bind(this));
   }
