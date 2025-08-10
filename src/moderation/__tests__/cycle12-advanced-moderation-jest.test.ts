@@ -30,7 +30,7 @@ jest.mock('../../utils/logger', () => ({
 
 jest.mock('../../utils/resilience.js', () => ({
   PerformanceMonitor: {
-    monitor: jest.fn(async (_operation: string, fn: () => Promise<any>, _context?: object) => {
+    monitor: jest.fn(async (_operation: string, fn: () => Promise<any>) => {
       return await fn();
     })
   }

@@ -71,7 +71,7 @@ export class MCPSecurityManager {
 
     // Check database for persistent consent decisions
     try {
-      const storedConsent = await this.getStoredConsent(context.userId, context.serverName, context.toolName);
+              const storedConsent = await this.getStoredConsent(context.userId, context.serverName, context.toolName);
       if (storedConsent) {
         this.consentCache.set(cacheKey, storedConsent);
         
@@ -315,7 +315,7 @@ export class MCPSecurityManager {
     return (now - consentTime) < this.consentCacheTTL;
   }
 
-  private async getStoredConsent(userId: string, serverName: string, toolName: string): Promise<MCPConsentDecision | null> {
+  private async getStoredConsent(): Promise<MCPConsentDecision | null> {
     // In a real implementation, this would query the database
     // For now, return null (no stored consent)
     return null;
@@ -384,7 +384,7 @@ export class MCPSecurityManager {
     return sanitized;
   }
 
-  private checkRateLimit(_userId: string, _serverName: string, _toolName: string): boolean {
+  private checkRateLimit(): boolean {
     // Simple rate limiting - in real implementation would use Redis or similar
     // For now, always allow
     return true;

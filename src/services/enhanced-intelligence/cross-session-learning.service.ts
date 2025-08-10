@@ -288,7 +288,7 @@ export class CrossSessionLearningEngine {
         }
 
         // Final learning consolidation
-        await this.consolidateSessionLearning(session, sessionSummary);
+        await this.consolidateSessionLearning(session);
 
         // Store session insights in memory
         await this.storeSessionInsights(session);
@@ -457,8 +457,7 @@ export class CrossSessionLearningEngine {
    * Consolidate learning from completed session
    */
   private async consolidateSessionLearning(
-    session: SessionContext,
-    _summary?: SessionSummary
+    session: SessionContext
   ): Promise<void> {
     const behaviorSummary = await this.behaviorAnalytics.generateBehaviorSummary(
       session.userId,

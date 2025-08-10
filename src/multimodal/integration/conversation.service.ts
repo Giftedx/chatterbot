@@ -59,7 +59,7 @@ export class MultimodalConversationService {
         crossModalInsights: batchResult.crossModalInsights,
         conversationSummary: await this.analysisService.generateConversationSummary(batchResult, conversationText),
         topicDetection: await this.detectConversationTopics(batchResult, conversationText),
-        entityMentions: await this.extractConversationEntities(batchResult, conversationText),
+        entityMentions: await this.extractConversationEntities(batchResult),
         sentimentAnalysis: await this.analyzeConversationSentiment(batchResult, conversationText),
         actionableItems: await this.extractActionableItems(batchResult, conversationText),
         confidenceScores: this.analysisService.calculateContextConfidence(batchResult)
@@ -105,7 +105,7 @@ export class MultimodalConversationService {
     return Array.from(topics).slice(0, 10);
   }
 
-  private async extractConversationEntities(batchResult: BatchProcessingResult, _conversationText?: string): Promise<Array<{ entity: string; type: string; confidence: number }>> {
+  private async extractConversationEntities(batchResult: BatchProcessingResult): Promise<Array<{ entity: string; type: string; confidence: number }>> {
     const entities: Array<{ entity: string; type: string; confidence: number }> = [];
     
     // Add file-based entities

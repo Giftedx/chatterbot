@@ -132,7 +132,7 @@ export class UserBehaviorAnalyticsService {
         }
 
         const patterns = this.identifyBehaviorPatterns(metrics);
-        const insights = this.generateBehaviorInsights(metrics, patterns);
+        const insights = this.generateBehaviorInsights(metrics);
         const recommendations = this.generateBehaviorRecommendations(patterns, insights);
         const confidence = this.calculateAnalysisConfidence(metrics);
         const dataQuality = this.assessDataQuality(metrics);
@@ -179,9 +179,9 @@ export class UserBehaviorAnalyticsService {
 
         const toolPreferences = this.analyzeToolPreferences(metrics);
         const communicationPatterns = this.analyzeCommunicationPatterns(metrics);
-        const learningPatterns = this.analyzeLearningPatterns(metrics);
+        const learningPatterns = this.analyzeLearningPatterns();
         const engagementMetrics = this.analyzeEngagementMetrics(metrics);
-        const predictiveInsights = this.generatePredictiveInsights(metrics);
+        const predictiveInsights = this.generatePredictiveInsights();
 
         const summary: UserBehaviorSummary = {
           userId,
@@ -220,19 +220,19 @@ export class UserBehaviorAnalyticsService {
     learningTrend: Array<{ date: Date; newTopics: string[]; proficiency: number }>;
   }> {
     try {
-      const userKey = `${userId}_${guildId || ''}`;
-      const metrics = this.behaviorData.get(userKey) || [];
+      // const userKey = `${userId}_${guildId || ''}`; // Not used in current implementation
+      // const metrics = this.behaviorData.get(userKey) || []; // Not used in current implementation
       const periodStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
       const periodEnd = new Date();
-      const recentMetrics = metrics.filter(m => m.timestamp >= periodStart);
+      // const recentMetrics = metrics.filter(m => m.timestamp >= periodStart); // Not used in return
 
       return {
         periodStart,
         periodEnd,
-        toolUsageTrend: this.calculateToolUsageTrend(recentMetrics),
-        satisfactionTrend: this.calculateSatisfactionTrend(recentMetrics),
-        engagementTrend: this.calculateEngagementTrend(recentMetrics),
-        learningTrend: this.calculateLearningTrend(recentMetrics)
+        toolUsageTrend: this.calculateToolUsageTrend(),
+        satisfactionTrend: this.calculateSatisfactionTrend(),
+        engagementTrend: this.calculateEngagementTrend(),
+        learningTrend: this.calculateLearningTrend()
       };
 
     } catch (error) {
@@ -292,7 +292,7 @@ export class UserBehaviorAnalyticsService {
   /**
    * Generate insights from patterns
    */
-  private generateBehaviorInsights(metrics: BehaviorMetric[], _patterns: string[]): string[] {
+  private generateBehaviorInsights(metrics: BehaviorMetric[]): string[] {
     const insights: string[] = [];
 
     // Satisfaction analysis
@@ -425,7 +425,7 @@ export class UserBehaviorAnalyticsService {
   /**
    * Analyze learning patterns
    */
-  private analyzeLearningPatterns(_metrics: BehaviorMetric[]): UserBehaviorSummary['learningPatterns'] {
+  private analyzeLearningPatterns(): UserBehaviorSummary['learningPatterns'] {
     return {
       topicProgression: [],
       learningVelocity: 0.5,
@@ -456,7 +456,7 @@ export class UserBehaviorAnalyticsService {
   /**
    * Generate predictive insights
    */
-  private generatePredictiveInsights(_metrics: BehaviorMetric[]): UserBehaviorSummary['predictiveInsights'] {
+  private generatePredictiveInsights(): UserBehaviorSummary['predictiveInsights'] {
     return {
       likelyNextQuestions: [],
       recommendedTools: [],
@@ -468,20 +468,20 @@ export class UserBehaviorAnalyticsService {
   /**
    * Utility functions for trend calculations
    */
-  private calculateToolUsageTrend(_metrics: BehaviorMetric[]): Array<{ date: Date; tool: string; count: number }> {
+  private calculateToolUsageTrend(): Array<{ date: Date; tool: string; count: number }> {
     // Simplified implementation
     return [];
   }
 
-  private calculateSatisfactionTrend(_metrics: BehaviorMetric[]): Array<{ date: Date; score: number }> {
+  private calculateSatisfactionTrend(): Array<{ date: Date; score: number }> {
     return [];
   }
 
-  private calculateEngagementTrend(_metrics: BehaviorMetric[]): Array<{ date: Date; questions: number; sessionLength: number }> {
+  private calculateEngagementTrend(): Array<{ date: Date; questions: number; sessionLength: number }> {
     return [];
   }
 
-  private calculateLearningTrend(_metrics: BehaviorMetric[]): Array<{ date: Date; newTopics: string[]; proficiency: number }> {
+  private calculateLearningTrend(): Array<{ date: Date; newTopics: string[]; proficiency: number }> {
     return [];
   }
 

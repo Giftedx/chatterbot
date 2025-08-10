@@ -15,7 +15,7 @@ export class MCPManager {
   /**
    * Connect to a specific MCP server
    */
-  private async connectServer(_name: string, _config: MCPServerConfig): Promise<void> {
+  private async connectServer(): Promise<void> {
     // ...existing code for connecting a server...
   }
 

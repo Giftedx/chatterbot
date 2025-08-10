@@ -176,7 +176,7 @@ export class ExampleMultimodalService {
       const enhancedResults = results.map(result => ({
         file: result.file,
         relevanceScore: result.relevanceScore,
-        explanation: this.generateSearchExplanation(result, query),
+        explanation: this.generateSearchExplanation(result),
         relatedFiles: result.crossModalConnections
           .slice(0, 3)
           .map(conn => ({ id: conn.connectedFileId } as MediaFile))
@@ -366,8 +366,7 @@ export class ExampleMultimodalService {
   }
 
   private generateSearchExplanation(
-    result: any,
-    _query: string
+    result: any
   ): string {
     const matchType = result.matchDetails.type;
     const confidence = Math.round(result.matchDetails.confidence * 100);

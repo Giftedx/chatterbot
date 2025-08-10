@@ -17,7 +17,7 @@ export class AnalyticsDashboardService {
   /**
    * Generate comprehensive dashboard data
    */
-  generateDashboard(events: AnalyticsEvent[], _timeRange: number = 24): AnalyticsDashboard {
+  generateDashboard(events: AnalyticsEvent[]): AnalyticsDashboard {
     try {
       const performanceMetrics = this.metricsService.processPerformanceEvents(events);
       

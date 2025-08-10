@@ -13,7 +13,7 @@ describe('AdaptiveRateLimiter (isolation)', () => {
 
     // Temporarily replace the checkRateLimit method with a simple version
     // const originalMethod = rateLimiter.checkRateLimit; // Not used in this test
-    rateLimiter.checkRateLimit = async function(_userId: string, _estimatedTokens: number = 1000, _requestType: 'standard' | 'burst' = 'standard') {
+    rateLimiter.checkRateLimit = async function() {
       console.log('[DEBUG] isolation test: checkRateLimit called');
       // Simple implementation that just returns success
       const result = { allowed: true };

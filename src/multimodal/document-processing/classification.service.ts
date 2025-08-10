@@ -17,14 +17,13 @@ export class DocumentClassificationService {
   ): Promise<DocumentClassification> {
     try {
       const format = this.getDocumentFormat(mediaFile.mimeType);
-      const documentType = this.determineDocumentType(mediaFile, textContent);
+      const documentType = this.determineDocumentType(mediaFile);
       const contentType = this.determineContentType(textContent);
       const categories = this.generateContentCategories(documentType, contentType, textContent);
       const confidence = this.calculateClassificationConfidence(
         mediaFile,
         textContent,
-        documentType,
-        contentType
+        documentType
       );
 
       const classification: DocumentClassification = {
@@ -342,7 +341,7 @@ export class DocumentClassificationService {
     return formatMap[mimeType] || 'Unknown';
   }
 
-  private determineDocumentType(mediaFile: MediaFile, _textContent?: TextExtractionResult): string {
+  private determineDocumentType(mediaFile: MediaFile): string {
     const filename = mediaFile.originalName.toLowerCase();
     const format = this.getDocumentFormat(mediaFile.mimeType);
     
@@ -432,8 +431,7 @@ export class DocumentClassificationService {
   private calculateClassificationConfidence(
     mediaFile: MediaFile,
     textContent?: TextExtractionResult,
-    documentType?: string,
-    contentType?: ContentType
+    documentType?: string
   ): number {
     let confidence = 0.5; // Base confidence
 

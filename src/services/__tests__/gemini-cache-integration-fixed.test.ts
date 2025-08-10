@@ -13,14 +13,14 @@ import { ChatMessage } from '../context-manager.js';
 
 // Create a simple object mock (no Jest functions)
 const mockGenAI = {
-  getGenerativeModel: (config: any) => ({
-    generateContent: async (prompt: string) => ({
+  getGenerativeModel: () => ({
+    generateContent: async () => ({
       response: {
         text: () => 'Generated response from Gemini API'
       }
     }),
-    startChat: (options?: any) => ({
-      sendMessage: async (message: string | any[]) => ({
+    startChat: () => ({
+      sendMessage: async () => ({
         response: {
           text: () => 'Generated response from Gemini API'
         }

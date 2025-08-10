@@ -5,8 +5,6 @@
 
 import { EnhancedIntelligenceActivationService } from '../enhanced-intelligence-activation.service.js';
 import { MCPManager } from '../mcp-manager.service.js';
-import { PersonalizationEngine } from '../enhanced-intelligence/personalization-engine.service.js';
-import { SmartContextOrchestratorService } from '../enhanced-intelligence/smart-context-orchestrator.service.js';
 import { DirectMCPExecutor } from '../enhanced-intelligence/direct-mcp-executor.service.js';
 
 // Mock dependencies
@@ -41,11 +39,11 @@ describe('Enhanced Intelligence Activation Service', () => {
       shutdown: jest.fn().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<MCPManager>;
 
-    // Mock PersonalizationEngine
-    const mockPersonalizationEngine = {} as jest.Mocked<PersonalizationEngine>;
+    // Mock PersonalizationEngine (unused in this test)
+    // const mockPersonalizationEngine = {} as jest.Mocked<PersonalizationEngine>;
 
-    // Mock SmartContextOrchestratorService
-    const mockContextOrchestrator = {} as jest.Mocked<SmartContextOrchestratorService>;
+    // Mock SmartContextOrchestratorService (unused in this test)
+    // const mockContextOrchestrator = {} as jest.Mocked<SmartContextOrchestratorService>;
 
     // Mock DirectMCPExecutor
     mockDirectExecutor = {

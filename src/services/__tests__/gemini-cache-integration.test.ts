@@ -13,19 +13,19 @@ import { ChatMessage } from '../context-manager.js';
 
 // Create a simple object mock (no Jest functions)
 const mockGenAI = {
-  getGenerativeModel: (config: any) => ({
-    generateContent: async (prompt: string) => ({
+  getGenerativeModel: () => ({
+    generateContent: async () => ({
       response: {
         text: () => 'Generated response from Gemini API'
       }
     }),
-    startChat: (options?: any) => ({
-      sendMessage: async (message: string | any[]) => ({
+    startChat: () => ({
+      sendMessage: async () => ({
         response: {
           text: () => 'Generated response from Gemini API'
         }
       }),
-      sendMessageStream: async (message: string | any[]) => {
+      sendMessageStream: async () => {
         // Mock stream that yields one chunk
         return {
           stream: (async function* () {
@@ -106,7 +106,7 @@ describe('GeminiService Cache Integration', () => {
     // Test the mock directly first
     const model = mockGenAI.getGenerativeModel({ model: 'test' });
     const chat = model.startChat();
-    const mockResult = await chat.sendMessage([imagePart, { text: prompt }]);
+    await chat.sendMessage([imagePart, { text: prompt }]);
     
     // Call the service directly
     const response = await geminiService.generateMultimodalResponse(prompt, imagePart, history, userId, guildId);

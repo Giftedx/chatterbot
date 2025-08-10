@@ -19,8 +19,7 @@ import type {
   IBehaviorAnalyticsService,
   ISmartRecommendationService
 } from '../interfaces.js';
-import { ProcessingContext } from '../types.js';
-import { ChatInputCommandInteraction } from 'discord.js';
+
 
 describe('EnhancedInvisibleIntelligenceService - Dependency Injection', () => {
   let mockDependencies: IEnhancedIntelligenceServiceDependencies;
@@ -167,7 +166,6 @@ describe('EnhancedInvisibleIntelligenceService - Dependency Injection', () => {
     it('should use response service to generate enhanced response', async () => {
       const testUserId = 'test-user';
       const testChannelId = 'test-channel';
-      const testContent = 'test message';
       
       const result = await service.handleRegenerateEnhanced(testUserId, testChannelId, null);
       

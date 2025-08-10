@@ -152,7 +152,7 @@ export class SpeakerDetectionService {
       dominantSpeaker: this.findDominantSpeaker(speakers),
       speakingTimeDistribution: this.calculateSpeakingTimeDistribution(speakers),
       turnTaking: this.analyzeTurnTaking(segments),
-      interactionStyle: this.determineInteractionStyle(speakers, segments)
+      interactionStyle: this.determineInteractionStyle(speakers)
     };
 
     return patterns;
@@ -239,8 +239,7 @@ export class SpeakerDetectionService {
    * Determine interaction style based on speaking patterns
    */
   private determineInteractionStyle(
-    speakers: DetectedSpeaker[],
-    _segments: Array<TranscriptionSegment & { speakerId: string }>
+    speakers: DetectedSpeaker[]
   ): string {
     if (speakers.length === 1) {
       return 'monologue';
