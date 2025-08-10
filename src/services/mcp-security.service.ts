@@ -314,7 +314,7 @@ export class MCPSecurityManager {
     return (now - consentTime) < this.consentCacheTTL;
   }
 
-  private async getStoredConsent(userId: string, serverName: string, toolName: string): Promise<MCPConsentDecision | null> {
+  private async getStoredConsent(_userId: string, _serverName: string, _toolName: string): Promise<MCPConsentDecision | null> {
     void userId;
     void serverName;
     void toolName;
