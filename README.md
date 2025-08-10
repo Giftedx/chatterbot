@@ -119,7 +119,7 @@ src/
 ### Observability
 - Health: GET `/health` on `HEALTH_CHECK_PORT` (default 3000)
 - Metrics: GET `/metrics` (Prometheus exposition format)
-- Analytics dashboard (optional): enable with `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:${ANALYTICS_DASHBOARD_PORT||3001}`
+- Analytics dashboard (optional): enable with `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001` (configurable via `ANALYTICS_DASHBOARD_PORT`)
 
 ---
 
