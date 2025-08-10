@@ -1392,11 +1392,5 @@ export class UnifiedMCPOrchestratorService {
   }
 }
 
-// Backward-compatibility shim for tests that mock a module-level service
-// Provides a minimal shape with processMessage that delegates to a temporary instance
-export let mcpOrchestratorService: {
-  processMessage?: (...args: any[]) => Promise<any>;
-} = {};
-
 // Export singleton instance
 export const unifiedMCPOrchestrator = new UnifiedMCPOrchestratorService();
