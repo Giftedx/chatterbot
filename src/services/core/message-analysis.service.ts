@@ -248,6 +248,17 @@ export class UnifiedMessageAnalysisService {
     if (lower.includes('summary') || lower.includes('summarize') || lower.includes('thread')) {
       intents.push('conversation-management');
     }
+
+    // Media generation intents
+    if (/(draw|make|generate).*(image|picture|logo|icon|poster|art)/.test(lower) || lower.includes('image of ')) {
+      intents.push('image-generation');
+    }
+    if (lower.includes('gif') || lower.includes('reaction gif')) {
+      intents.push('gif-search');
+    }
+    if (lower.includes('tts') || lower.includes('text to speech') || /\b(say|speak|read) this\b/.test(lower)) {
+      intents.push('text-to-speech');
+    }
     
     return intents;
   }
@@ -301,6 +312,11 @@ export class UnifiedMessageAnalysisService {
     if (intents.includes('analysis') || intents.includes('comparison')) tools.add('complex-reasoning');
     if (intents.includes('problem-solving')) tools.add('complex-reasoning');
     if (intents.includes('conversation-management')) tools.add('conversation-thread');
+
+    // Media tools
+    if (intents.includes('image-generation')) tools.add('image-generation');
+    if (intents.includes('gif-search')) tools.add('gif-search');
+    if (intents.includes('text-to-speech')) tools.add('text-to-speech');
     
     // Content-based tools
     if (attachmentTypes.length > 0) tools.add('multimodal');
