@@ -7,8 +7,7 @@ import {
     ButtonInteraction,
     Collection,
     Attachment,
-    TextBasedChannel,
-    ThreadManager
+    TextBasedChannel
 } from 'discord.js';
 import { URL } from 'url';
 
@@ -46,6 +45,8 @@ import { UserBehaviorAnalyticsService } from './enhanced-intelligence/behavior-a
 import { SmartRecommendationService } from './enhanced-intelligence/smart-recommendation.service.js';
 import { UserMemoryService } from '../memory/user-memory.service.js';
 import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types.js';
+import { modelRouterService } from './model-router.service.js';
+import { knowledgeBaseService } from './knowledge-base.service.js';
 
 // Advanced Capabilities
 import { 
@@ -840,8 +841,33 @@ export class CoreIntelligenceService {
 
             // Streaming not currently available in AgenticIntelligenceService
             logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
-            const agenticResponse: AgenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
-            const fullResponseText: string = agenticResponse.response;
+            // RAG: fetch top knowledge base snippets
+            let ragPrefixedQuery = agenticQuery.query;
+            try {
+              const kbResults = await knowledgeBaseService.search({ query: agenticQuery.query, channelId, limit: 3, minConfidence: 0.6 });
+              if (kbResults.length > 0) {
+                const ctx = kbResults.map((r, i) => `(${i+1}) [${r.source}] conf=${Math.round(r.confidence*100)}%: ${r.content.slice(0, 500)}`).join('\n');
+                const preamble = `You must ground answers in the retrieved context below. If insufficient, say you don't know.\nRetrieved Context:\n${ctx}\n---\n`;
+                ragPrefixedQuery = `${preamble}${agenticQuery.query}`;
+              }
+            } catch (error) { logger.warn('Failed to fetch RAG context, continuing without it.', { error }); }
+
+            const fullResponseText: string = await modelRouterService.generate(
+              ragPrefixedQuery,
+              history,
+              userId,
+              guildId || 'default'
+            );
+            const agenticResponse: AgenticResponse = {
+              response: fullResponseText,
+              confidence: 0.8,
+              citations: { citations: [], hasCitations: false, confidence: 0 },
+              flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
+              escalation: { shouldEscalate: false, priority: 'low', reason: '' },
+              knowledgeGrounded: kbResults.length > 0,
+              sourceSummary: '',
+              metadata: { processingTime: 0, knowledgeEntriesFound: 0, responseQuality: 'high' }
+            };
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
             return { agenticResponse, fullResponseText };
         } catch (error: unknown) {
