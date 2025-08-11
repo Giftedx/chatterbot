@@ -4,6 +4,8 @@ import { CoreIntelligenceService, CoreIntelligenceConfig } from './services/core
 import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard.js';
 import { healthCheck } from './health.js';
 import { agenticCommands } from './commands/agentic-commands.js';
+import { privacyCommands, handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './commands/privacy-commands.js';
+import { memoryCommands } from './commands/memory-commands.js';
 import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
 // Import AgenticIntelligenceService if its direct command handling is to be preserved outside CoreIntelligenceService
@@ -57,8 +59,12 @@ const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list
 const coreCommands = coreIntelligenceService.buildCommands().map(cmd => cmd.toJSON());
+const privacyCommandsJson = privacyCommands.map(cmd => cmd.data.toJSON());
+const memoryCommandsJson = memoryCommands.map(cmd => cmd.data.toJSON());
 const allCommands = [
   ...coreCommands,
+  ...privacyCommandsJson,
+  ...memoryCommandsJson,
   ...(enableAgenticFeatures ? agenticCommands.map(cmd => cmd.data.toJSON()) : [])
 ];
 
@@ -109,6 +115,8 @@ client.once('ready', async () => {
     await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), { body: allCommands });
     console.log(`✅ Registered ${allCommands.length} commands:`);
     coreCommands.forEach(cmd => console.log(`   - /${cmd.name} (Core Intelligence)`));
+    privacyCommandsJson.forEach(cmd => console.log(`   - /${cmd.name} (Privacy & Data Control)`));
+    memoryCommandsJson.forEach(cmd => console.log(`   - /${cmd.name} (Memory Management)`));
     if (enableAgenticFeatures) {
       agenticCommands.forEach(cmd => console.log(`   - /${cmd.data.name} (Agentic System)`));
     }
@@ -120,6 +128,22 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
+  // Handle privacy modal submissions
+  if (interaction.isModalSubmit()) {
+    if (interaction.customId.startsWith('forget_me_confirm') || interaction.customId.startsWith('privacy_')) {
+      await handlePrivacyModalSubmit(interaction);
+      return;
+    }
+  }
+
+  // Handle privacy button interactions
+  if (interaction.isButton()) {
+    if (interaction.customId.startsWith('privacy_') || interaction.customId.startsWith('data_') || interaction.customId.startsWith('delete_')) {
+      await handlePrivacyButtonInteraction(interaction);
+      return;
+    }
+  }
+
   // Handle MCP consent button interactions
   if (interaction.isButton() && interaction.customId.startsWith('mcp_consent_')) {
     try {
@@ -136,6 +160,36 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       }
     }
     return;
+  }
+
+  // Handle privacy commands
+  if (interaction.isChatInputCommand()) {
+    const privacyCommand = privacyCommands.find(cmd => cmd.data.name === interaction.commandName);
+    if (privacyCommand) {
+      try {
+        await privacyCommand.execute(interaction);
+      } catch (error) {
+        logger.error('Error executing privacy command:', { commandName: interaction.commandName, error });
+        const errReply = { content: 'An error occurred with this privacy command.', ephemeral: true };
+        if (interaction.replied || interaction.deferred) await interaction.followUp(errReply).catch(e => logger.error("FollowUp Error", e));
+        else await interaction.reply(errReply).catch(e => logger.error("Reply Error", e));
+      }
+      return;
+    }
+
+    // Handle memory commands
+    const memoryCommand = memoryCommands.find(cmd => cmd.data.name === interaction.commandName);
+    if (memoryCommand) {
+      try {
+        await memoryCommand.execute(interaction);
+      } catch (error) {
+        logger.error('Error executing memory command:', { commandName: interaction.commandName, error });
+        const errReply = { content: 'An error occurred with this memory command.', ephemeral: true };
+        if (interaction.replied || interaction.deferred) await interaction.followUp(errReply).catch(e => logger.error("FollowUp Error", e));
+        else await interaction.reply(errReply).catch(e => logger.error("Reply Error", e));
+      }
+      return;
+    }
   }
 
   // Agentic commands can be handled separately if they are not integrated into CoreIntelligenceService's command map.

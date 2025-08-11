@@ -49,6 +49,8 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 // Utilities and Others
 import { logger } from '../utils/logger.js';
 import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from './context-manager.js';
+import { createPrivacyConsentEmbed, createPrivacyConsentButtons } from '../ui/privacy-consent.js';
+import { UserConsentService } from '../services/user-consent.service.js';
 import { ModerationService } from '../moderation/moderation-service.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
 import { urlToGenerativePart } from '../utils/image-helper.js';
@@ -97,6 +99,7 @@ export class CoreIntelligenceService {
     private readonly capabilityService: typeof intelligenceCapabilityService;
     private readonly messageAnalysisService: typeof unifiedMessageAnalysisService;
     private readonly userMemoryService: UserMemoryService;
+    private readonly userConsentService: UserConsentService;
 
     private enhancedMemoryService?: EnhancedMemoryService;
     private enhancedUiService?: EnhancedUIService;
@@ -122,6 +125,7 @@ export class CoreIntelligenceService {
         this.adminService = intelligenceAdminService;
         this.capabilityService = intelligenceCapabilityService;
         this.userMemoryService = new UserMemoryService();
+        this.userConsentService = UserConsentService.getInstance();
 
         if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
         if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
@@ -222,11 +226,38 @@ export class CoreIntelligenceService {
         const promptText = interaction.options.getString('prompt', true);
         const discordAttachment = interaction.options.getAttachment('attachment');
         const userId = interaction.user.id;
+        const username = interaction.user.username;
 
-        if (!this.optedInUsers.has(userId)) {
-             this.optedInUsers.add(userId);
-             await this.saveOptedInUsers();
+        // Check if user has given privacy consent
+        const userConsent = await this.userConsentService.getUserConsent(userId);
+        
+        if (!userConsent || !userConsent.privacyAccepted || userConsent.optedOut) {
+            // Show privacy consent modal for first-time users
+            const embed = createPrivacyConsentEmbed();
+            const buttons = createPrivacyConsentButtons();
+            
+            await interaction.reply({
+                embeds: [embed],
+                components: [buttons],
+                ephemeral: true
+            });
+            return;
         }
+
+        // Check if user is paused
+        const isPaused = await this.userConsentService.isUserPaused(userId);
+        if (isPaused) {
+            await interaction.reply({
+                content: '⏸️ Your interactions are currently paused. Use `/resume` to resume or wait for the pause to expire.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        // Update user activity and ensure they're in our legacy opted-in set for compatibility
+        await this.userConsentService.updateUserActivity(userId);
+        this.optedInUsers.add(userId);
+        
         await interaction.deferReply();
         const commonAttachments: CommonAttachment[] = [];
         if (discordAttachment) {
@@ -238,9 +269,28 @@ export class CoreIntelligenceService {
 
     public async handleMessage(message: Message): Promise<void> {
         try {
-            if (message.author.bot || !this.optedInUsers.has(message.author.id) || message.content.startsWith('/') || (message.content.length < 3 && message.attachments.size === 0)) {
+            if (message.author.bot || message.content.startsWith('/') || (message.content.length < 3 && message.attachments.size === 0)) {
                 return;
             }
+
+            const userId = message.author.id;
+            
+            // Check if user has proper consent and is opted in
+            const isOptedIn = await this.userConsentService.isUserOptedIn(userId);
+            if (!isOptedIn) {
+                return; // Silently ignore messages from non-opted-in users
+            }
+
+            // Check if user is paused
+            const isPaused = await this.userConsentService.isUserPaused(userId);
+            if (isPaused) {
+                return; // Silently ignore messages from paused users
+            }
+
+            // Update user activity and add to legacy opted-in set for compatibility
+            await this.userConsentService.updateUserActivity(userId);
+            this.optedInUsers.add(userId);
+
             if ('sendTyping' in message.channel) await message.channel.sendTyping();
             const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
             const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
