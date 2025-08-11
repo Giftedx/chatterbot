@@ -267,7 +267,7 @@ export class CoreIntelligenceService {
             // Ensure a personal thread exists in this guild/channel
             if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
               const parent = interaction.channel;
-              const thread = await (parent as any).threads.create({
+              const thread = await (parent as TextChannel).threads.create({
                 name: `chat-${interaction.user.username}`.slice(0, 90),
                 autoArchiveDuration: 1440,
                 reason: 'Personal chat thread',
