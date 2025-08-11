@@ -3,9 +3,9 @@
 // Discord bot process, a simple singleton is sufficient.
 
 import { PrismaClient } from '@prisma/client';
-import type { MockPrismaClient } from './prisma-mock.js';
 
-let prisma: PrismaClient | MockPrismaClient;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let prisma: PrismaClient | any;
 
 // Initialize Prisma client synchronously 
 async function initializePrisma() {
@@ -44,7 +44,7 @@ if (process.env.NODE_ENV === 'test') {
       user: { findMany: () => [], create: () => ({}) },
       conversation: { findMany: () => [], create: () => ({}) },
       analytics: { findMany: () => [], create: () => ({}) }
-    } as unknown as MockPrismaClient;
+    };
   });
 } else {
   try {

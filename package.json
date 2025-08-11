@@ -11,6 +11,7 @@
     "dev:health": "tsx src/dev/health-dev.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
+    "check:all": "npm run typecheck && npm run lint && npm test",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
