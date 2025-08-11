@@ -572,7 +572,7 @@ export class CoreIntelligenceService {
                 logger.warn('[CoreIntelSvc] Failed attaching media outputs', { error: String(e) });
             }
 
-            const responsePayload: any = { content: fullResponseText, components: finalComponents };
+            const responsePayload: InteractionReplyOptions = { content: fullResponseText, components: finalComponents };
             if (embeds.length > 0) responsePayload.embeds = embeds;
             if (files.length > 0) responsePayload.files = files;
             return responsePayload;
