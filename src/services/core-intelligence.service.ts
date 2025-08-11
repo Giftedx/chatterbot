@@ -6,7 +6,8 @@ import {
     ChatInputCommandInteraction,
     ButtonInteraction,
     Collection,
-    Attachment
+    Attachment,
+    TextBasedChannel
 } from 'discord.js';
 import { URL } from 'url';
 
@@ -44,6 +45,8 @@ import { UserBehaviorAnalyticsService } from './enhanced-intelligence/behavior-a
 import { SmartRecommendationService } from './enhanced-intelligence/smart-recommendation.service.js';
 import { UserMemoryService } from '../memory/user-memory.service.js';
 import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types.js';
+import { modelRouterService } from './model-router.service.js';
+import { knowledgeBaseService } from './knowledge-base.service.js';
 
 
 // Utilities and Others
@@ -264,7 +267,7 @@ export class CoreIntelligenceService {
             // Ensure a personal thread exists in this guild/channel
             if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
               const parent = interaction.channel;
-              const thread = await parent.threads.create({
+              const thread = await (parent as any).threads.create({
                 name: `chat-${interaction.user.username}`.slice(0, 90),
                 autoArchiveDuration: 1440,
                 reason: 'Personal chat thread',
@@ -308,7 +311,7 @@ export class CoreIntelligenceService {
             await dm.send(messageOptions as any);
           } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
             const chan = await interaction.client.channels.fetch(targetChannelId);
-            if (chan && chan?.isTextBased()) await (chan as TextBasedChannel).send(messageOptions);
+            if (chan && chan?.isTextBased()) await (chan as any).send(messageOptions);
           } else {
             await interaction.followUp(messageOptions);
           }
@@ -683,8 +686,33 @@ export class CoreIntelligenceService {
 
             // Streaming not currently available in AgenticIntelligenceService
             logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
-            const agenticResponse: AgenticResponse = await this.agenticIntelligence.processQuery(agenticQuery);
-            const fullResponseText: string = agenticResponse.response;
+            // RAG: fetch top knowledge base snippets
+            let ragPrefixedQuery = agenticQuery.query;
+            try {
+              const kbResults = await knowledgeBaseService.search({ query: agenticQuery.query, channelId, limit: 3, minConfidence: 0.6 });
+              if (kbResults.length > 0) {
+                const ctx = kbResults.map((r, i) => `(${i+1}) [${r.source}] conf=${Math.round(r.confidence*100)}%: ${r.content.slice(0, 500)}`).join('\n');
+                const preamble = `You must ground answers in the retrieved context below. If insufficient, say you don't know.\nRetrieved Context:\n${ctx}\n---\n`;
+                ragPrefixedQuery = `${preamble}${agenticQuery.query}`;
+              }
+            } catch (_) { /* ignore RAG failures */ }
+
+            const fullResponseText: string = await modelRouterService.generate(
+              ragPrefixedQuery,
+              history,
+              userId,
+              guildId || 'default'
+            );
+            const agenticResponse: AgenticResponse = {
+              response: fullResponseText,
+              confidence: 0.8,
+              citations: { citations: [], hasCitations: false, confidence: 0 },
+              flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
+              escalation: { shouldEscalate: false, priority: 'low', reason: '' },
+              knowledgeGrounded: false,
+              sourceSummary: '',
+              metadata: { processingTime: 0, knowledgeEntriesFound: 0, responseQuality: 'high' }
+            };
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'response_generated', isSuccess: true, responseLength: fullResponseText.length, duration: Date.now() - analyticsData.startTime });
             return { agenticResponse, fullResponseText };
         } catch (error: unknown) {

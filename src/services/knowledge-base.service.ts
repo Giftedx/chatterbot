@@ -119,6 +119,9 @@ export class KnowledgeBaseService {
     try {
       const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
 
+      // If we have embeddings stored, prefer semantic retrieval by cosine similarity approximation
+      // Note: Prisma doesn't support vector ops natively on sqlite; this is a placeholder for future pgvector/milvus.
+      // For now, we fallback to keyword search and confidence ordering.
       // Simple keyword-based search (can be enhanced with vector embeddings)
       const whereClause: Record<string, unknown> = {
         confidence: { gte: minConfidence }
@@ -139,13 +142,16 @@ export class KnowledgeBaseService {
           { confidence: 'desc' },
           { updatedAt: 'desc' }
         ],
-        take: limit
+        take: limit * 3
       });
 
       // Filter by relevance (simple keyword matching for now)
-      const relevantEntries = entries.filter((entry: { content: string }) => 
-        this.calculateRelevance(searchQuery, entry.content) > 0.3
-      );
+      const relevantEntries = (entries as KnowledgeEntry[])
+        .map((entry) => ({ entry, score: this.calculateRelevance(searchQuery, entry.content) }))
+        .filter((e) => e.score > 0.2)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map((e) => e.entry);
 
       logger.info('Knowledge base search completed', {
         query: searchQuery,
@@ -153,7 +159,7 @@ export class KnowledgeBaseService {
         totalSearched: entries.length
       });
 
-      return relevantEntries;
+      return relevantEntries as any;
     } catch (error) {
       logger.error('Failed to search knowledge base', error);
       return [];

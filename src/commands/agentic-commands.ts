@@ -317,5 +317,53 @@ export const agenticCommands = [
 
       await interaction.reply({ embeds: [embed] });
     }
+  },
+  // Model routing configuration
+  {
+    data: new SlashCommandBuilder()
+      .setName('model-provider')
+      .setDescription('Set default model provider for this bot (server-wide)')
+      .addStringOption(option =>
+        option.setName('provider')
+          .setDescription('Choose provider')
+          .setRequired(true)
+          .addChoices(
+            { name: 'Gemini', value: 'gemini' },
+            { name: 'OpenAI', value: 'openai' },
+            { name: 'Anthropic', value: 'anthropic' }
+          )
+      ),
+
+    async execute(interaction: ChatInputCommandInteraction) {
+      try {
+        await interaction.deferReply({ ephemeral: true });
+        const provider = interaction.options.getString('provider', true);
+        process.env.DEFAULT_PROVIDER = provider; // simple runtime toggle; persist later if needed
+        await interaction.editReply(`✅ Default provider set to: ${provider}`);
+      } catch (error) {
+        logger.error('Failed to set model provider', error);
+        await interaction.editReply('❌ Failed to set provider.');
+      }
+    }
+  },
+
+  // Voice placeholders
+  {
+    data: new SlashCommandBuilder()
+      .setName('voice-join')
+      .setDescription('Join your current voice channel (preview)')
+    ,
+    async execute(interaction: ChatInputCommandInteraction) {
+      await interaction.reply({ content: '🔊 Voice join preview: feature coming soon.', ephemeral: true });
+    }
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName('voice-leave')
+      .setDescription('Leave voice channel (preview)')
+    ,
+    async execute(interaction: ChatInputCommandInteraction) {
+      await interaction.reply({ content: '👋 Voice leave preview: feature coming soon.', ephemeral: true });
+    }
   }
 ]; 

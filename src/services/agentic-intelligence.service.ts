@@ -10,6 +10,7 @@ import { escalationService, EscalationDecision } from './escalation.service.js';
 import { logger } from '../utils/logger.js';
 import { GeminiService } from './gemini.service.js';
 import { ChatMessage } from './context-manager.js';
+import { modelRouterService } from './model-router.service.js';
 
 export interface AgenticResponse {
   response: string;
@@ -347,10 +348,8 @@ I am operating at peak performance.
       channelType?: string;
     }
   ): Promise<string> {
-    // This is a placeholder - integrate with your existing Gemini service
-    // For now, return a simple response
     const history = context?.previousMessages || [];
-    return this.geminiService.generateResponse(query, history, userId, guildId);
+    return modelRouterService.generate(query, history, userId, guildId);
   }
 
   /**
