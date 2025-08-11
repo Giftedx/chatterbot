@@ -6,6 +6,7 @@
  */
 
 import { createHash, randomBytes, createHmac } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { logger } from '../utils/logger.js';
 import { securityAuditLogger, SecurityEventType } from './audit-logger.js';
 
@@ -618,7 +619,9 @@ export class AuthenticationManager {
   }
 
   private hashApiKey(key: string): string {
-    return createHash('sha256').update(key + this.JWT_SECRET).digest('hex');
+    // Use bcrypt with a cost factor of 12 (industry standard)
+    const salt = bcrypt.genSaltSync(12);
+    return bcrypt.hashSync(key, salt);
   }
 
   private generateId(): string {
