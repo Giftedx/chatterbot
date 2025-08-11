@@ -21,6 +21,10 @@ export interface UserConsent {
   lastActivity: Date;
   dataExportedAt?: Date;
   scheduledDeletion?: Date;
+  // Routing and controls
+  dmPreferred?: boolean;
+  lastThreadId?: string | null;
+  pauseUntil?: Date | null;
 }
 
 export interface DataExportPayload {
@@ -71,7 +75,10 @@ export class UserConsentService {
         consentToPersonalize: user.consentToPersonalize,
         lastActivity: user.lastActivity,
         dataExportedAt: user.dataExportedAt || undefined,
-        scheduledDeletion: user.scheduledDeletion || undefined
+        scheduledDeletion: user.scheduledDeletion || undefined,
+        dmPreferred: user.dmPreferred,
+        lastThreadId: user.lastThreadId || null,
+        pauseUntil: user.pauseUntil || null
       };
     } catch (error) {
       logger.error('Failed to get user consent', {
@@ -141,7 +148,8 @@ export class UserConsentService {
           consentToStore: consents.consentToStore ?? true,
           consentToAnalyze: consents.consentToAnalyze ?? false,
           consentToPersonalize: consents.consentToPersonalize ?? false,
-          lastActivity: now
+          lastActivity: now,
+          dmPreferred: false
         }
       });
 
@@ -206,7 +214,7 @@ export class UserConsentService {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          scheduledDeletion: resumeAt, // Repurpose this field for pause functionality
+          pauseUntil: resumeAt,
           lastActivity: new Date()
         }
       });
@@ -237,7 +245,7 @@ export class UserConsentService {
       await prisma.user.update({
         where: { id: userId },
         data: {
-          scheduledDeletion: null,
+          pauseUntil: null,
           lastActivity: new Date()
         }
       });
@@ -264,10 +272,9 @@ export class UserConsentService {
   public async isUserPaused(userId: string): Promise<boolean> {
     try {
       const consent = await this.getUserConsent(userId);
-      if (!consent || !consent.scheduledDeletion) return false;
+      if (!consent || !consent.pauseUntil) return false;
       
-      // If scheduled deletion time is in the future, user is paused
-      return consent.scheduledDeletion > new Date();
+      return consent.pauseUntil > new Date();
     } catch (error) {
       logger.error('Failed to check user pause status', {
         operation: 'check-pause-status',
@@ -491,5 +498,37 @@ export class UserConsentService {
       });
       return [];
     }
+  }
+
+  /** Lightweight ensure user exists and is opted in */
+  public async ensureOptedIn(userId: string, username?: string): Promise<void> {
+    const consent = await this.getUserConsent(userId);
+    if (!consent || !consent.privacyAccepted || consent.optedOut) {
+      await this.optInUser(userId, username);
+    }
+  }
+
+  /** Set DM preference */
+  public async setDmPreference(userId: string, dmPreferred: boolean): Promise<void> {
+    try {
+      await prisma.user.update({ where: { id: userId }, data: { dmPreferred } });
+    } catch (error) {
+      logger.error('Failed to set DM preference', { userId, dmPreferred, error: String(error) });
+    }
+  }
+
+  /** Set last personal thread ID */
+  public async setLastThreadId(userId: string, threadId: string | null): Promise<void> {
+    try {
+      await prisma.user.update({ where: { id: userId }, data: { lastThreadId: threadId } });
+    } catch (error) {
+      logger.error('Failed to set last thread ID', { userId, threadId, error: String(error) });
+    }
+  }
+
+  /** Get routing preferences */
+  public async getRouting(userId: string): Promise<{ dmPreferred: boolean; lastThreadId: string | null }> {
+    const consent = await this.getUserConsent(userId);
+    return { dmPreferred: consent?.dmPreferred ?? false, lastThreadId: consent?.lastThreadId ?? null };
   }
 }

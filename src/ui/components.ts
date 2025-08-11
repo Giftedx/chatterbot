@@ -34,3 +34,12 @@ export const stopButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents
  * ```
  */
 export const streamControlRows = [regenerateButtonRow, stopButtonRow];
+
+// One-time Move to DM button for onboarding
+export const MOVE_DM_BUTTON_ID = 'move_to_dm';
+export const moveDmButtonRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  new ButtonBuilder()
+    .setCustomId(MOVE_DM_BUTTON_ID)
+    .setLabel('Move to DM?')
+    .setStyle(ButtonStyle.Secondary)
+);
