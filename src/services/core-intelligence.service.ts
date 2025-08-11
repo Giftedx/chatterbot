@@ -279,11 +279,11 @@ export class CoreIntelligenceService {
         }
 
         // Acknowledge ephemerally
-        const moveDmRow = routing.dmPreferred ? undefined : [moveDmButtonRow];
+        const moveDmRow = routing.dmPreferred ? [] : [moveDmButtonRow];
         const ack = movedToDm
           ? 'DM opened. Chat with me there anytime.'
           : 'You’re all set. I’ll reply in your personal thread/DM.';
-        await interaction.reply({ content: ack, components: moveDmRow as any, ephemeral: true });
+        await interaction.reply({ content: ack, components: moveDmRow, ephemeral: true });
 
         // If prompt provided, process and send to destination
         const commonAttachments: CommonAttachment[] = [];
