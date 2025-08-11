@@ -1099,9 +1099,9 @@ export class UnifiedMCPOrchestratorService {
   ): Promise<void> {
     // Heuristics: generate media if user asked for it
     const content = context.messageContent.toLowerCase();
-    const wantsImage = /draw|image|illustration|logo|icon|poster|art|picture|generate an image/.test(content);
-    const wantsGif = /gif|reaction gif|funny gif|meme/.test(content);
-    const wantsTts = /read this|say this|tts|text to speech|speak this|audio reply|voice note|voice message/.test(content);
+    const wantsImage = IMAGE_REQUEST_REGEX.test(content);
+    const wantsGif = GIF_REQUEST_REGEX.test(content);
+    const wantsTts = TTS_REQUEST_REGEX.test(content);
 
     if (wantsImage && this.tools.has('image-generation')) {
       const imageResult = await this.executeTool('image-generation', { prompt: context.messageContent }, context);
