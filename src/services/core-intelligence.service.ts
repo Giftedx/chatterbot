@@ -263,7 +263,7 @@ export class CoreIntelligenceService {
           } else {
             // Ensure a personal thread exists in this guild/channel
             if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
-              const parent: any = interaction.channel;
+              const parent = interaction.channel;
               const thread = await parent.threads.create({
                 name: `chat-${interaction.user.username}`.slice(0, 90),
                 autoArchiveDuration: 1440,
