@@ -522,7 +522,8 @@ export class DirectMCPExecutor {
       }
 
       // Fallback: fetch placeholder image with prompt text
-      const placeholderUrl = `https://dummyimage.com/1024x1024/1e1e1e/ffffff.png&text=${encodeURIComponent(prompt.substring(0, 40))}`;
+      const safePrompt = sanitizePromptForUrl(prompt.substring(0, 40));
+      const placeholderUrl = `https://dummyimage.com/1024x1024/1e1e1e/ffffff.png&text=${encodeURIComponent(safePrompt)}`;
       const imgResp = await axios.get(placeholderUrl, { responseType: 'arraybuffer', timeout: 20000 });
       const base64 = Buffer.from(imgResp.data).toString('base64');
       return {
