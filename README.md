@@ -13,6 +13,7 @@
 - Automatic memory, summarization, and RAG over shared files/links
 - Strong moderation, graceful degradation, model fallback
 - Observability: health, metrics, analytics dashboard (optional)
+- New: Smart media generation (images, GIFs) and speech replies (TTS)
 
 ---
 
@@ -24,6 +25,7 @@ npm install
 # 2) Configure environment
 cp env.example .env
 # Set: DISCORD_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
+# Optional: STABILITY_API_KEY (images), TENOR_API_KEY (GIFs), ELEVENLABS_API_KEY (TTS)
 
 # 3) Initialize database (SQLite by default)
 npx prisma migrate dev --name init  # first time
@@ -65,10 +67,17 @@ ANALYTICS_DASHBOARD_PORT=3001
 # Logging
 LOG_LEVEL=info
 NODE_ENV=development
+
+# Media providers
+STABILITY_API_KEY=your_stability_ai_api_key_here
+TENOR_API_KEY=your_tenor_api_key_here
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 ```
 
 Notes
 - Default DB is SQLite. Set `DATABASE_URL` to switch (e.g., Postgres). If Postgres+pgvector is available, embeddings can be stored there; otherwise remain in SQLite bytes fields or external stores.
+- Media generation and TTS gracefully degrade when provider keys are missing (placeholders or disable feature).
 
 ---
 
@@ -79,6 +88,7 @@ Notes
 - Guild Knowledge Base (RAG): auto-ingests shared files/links, chunks+embeds, ranks by recency and relevance
 - Moderation: pre/post filters, safe-complete
 - Observability: metrics, traces, transcripts (sampling), feature flags, A/B harness
+- Media: Phase 4 tools for image generation, GIF search, and TTS with intelligent triggers
 
 Key models (Prisma)
 - `User` with `dmPreferred`, `lastThreadId`, `pauseUntil`

@@ -297,14 +297,16 @@ export class CoreIntelligenceService {
           } else {
             // Ensure a personal thread exists in this guild/channel
             if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
-              const parent = interaction.channel;
-              const thread = await (parent as TextChannel).threads.create({
-                name: `chat-${interaction.user.username}`.slice(0, 90),
-                autoArchiveDuration: 1440,
-                reason: 'Personal chat thread',
-              });
-              targetChannelId = thread.id;
-              await this.userConsentService.setLastThreadId(userId, thread.id);
+              const parent = interaction.channel as any;
+              if (parent && parent.threads && typeof parent.threads.create === 'function') {
+                const thread = await parent.threads.create({
+                  name: `chat-${interaction.user.username}`.slice(0, 90),
+                  autoArchiveDuration: 1440,
+                  reason: 'Personal chat thread',
+                });
+                targetChannelId = thread.id;
+                await this.userConsentService.setLastThreadId(userId, thread.id);
+              }
             }
           }
         } catch (e) {
@@ -342,7 +344,7 @@ export class CoreIntelligenceService {
             await dm.send(messageOptions as any);
           } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
             const chan = await interaction.client.channels.fetch(targetChannelId);
-            if (chan && chan?.isTextBased() && 'send' in chan) {
+            if (chan?.isTextBased()) {
               await chan.send(messageOptions);
             }
           } else {
@@ -653,42 +655,44 @@ export class CoreIntelligenceService {
             // Prepare final response with advanced capabilities attachments
             const finalComponents = (this.config.enableEnhancedUI && this.enhancedUiService && !(uiContext instanceof ChatInputCommandInteraction && this.activeStreams.has(`${userId}-${channelId}`)))
                 ? [this.enhancedUiService.createResponseActionRow()] : [];
-            
-            const responseOptions: any = { content: fullResponseText, components: finalComponents };
-            
-            // Add generated files/attachments if available
-            if (advancedCapabilitiesResult && advancedCapabilitiesResult.attachments.length > 0) {
-                responseOptions.files = [];
-                
-                for (const attachment of advancedCapabilitiesResult.attachments) {
-                    if (attachment.buffer) {
-                        responseOptions.files.push({
-                            attachment: attachment.buffer,
-                            name: attachment.filename,
-                            description: attachment.description
-                        });
-                    } else if (attachment.url) {
-                        // For URLs, we could embed them or add them to the message
-                        if (attachment.type === 'image' || attachment.type === 'gif') {
-                            responseOptions.embeds = responseOptions.embeds || [];
-                            responseOptions.embeds.push({
-                                image: { url: attachment.url },
-                                description: attachment.description
-                            });
-                        }
+
+            // Attach media if produced by tools
+            const files: any[] = [];
+            const embeds: any[] = [];
+            try {
+                if (mcpOrchestrationResult?.results?.has('image-generation')) {
+                    const imgRes = mcpOrchestrationResult.results.get('image-generation');
+                    const images = (imgRes?.data as any)?.images as Array<{ mimeType: string; base64: string }> | undefined;
+                    if (imgRes?.success && images && images.length > 0) {
+                        const first = images[0];
+                        const buffer = Buffer.from(first.base64, 'base64');
+                        files.push({ attachment: buffer, name: `image.png` });
                     }
                 }
-                
-                // Log what we're sending
-                if (responseOptions.files?.length > 0) {
-                    logger.info(`[CoreIntelSvc] Sending response with ${responseOptions.files.length} generated files`, {
-                        userId,
-                        fileTypes: advancedCapabilitiesResult.attachments.map(a => a.type)
-                    });
+                if (mcpOrchestrationResult?.results?.has('gif-search')) {
+                    const gifRes = mcpOrchestrationResult.results.get('gif-search');
+                    const gifs = (gifRes?.data as any)?.gifs as Array<{ url: string; previewUrl?: string }> | undefined;
+                    if (gifRes?.success && gifs && gifs.length > 0) {
+                        const url = gifs[0].url;
+                        embeds.push({ image: { url } });
+                    }
                 }
+                if (mcpOrchestrationResult?.results?.has('text-to-speech')) {
+                    const ttsRes = mcpOrchestrationResult.results.get('text-to-speech');
+                    const audio = (ttsRes?.data as any)?.audio as { mimeType: string; base64: string } | undefined;
+                    if (ttsRes?.success && audio?.base64) {
+                        const buffer = Buffer.from(audio.base64, 'base64');
+                        files.push({ attachment: buffer, name: `voice.mp3` });
+                    }
+                }
+            } catch (e) {
+                logger.warn('[CoreIntelSvc] Failed attaching media outputs', { error: String(e) });
             }
-            
-            return responseOptions;
+
+            const responsePayload: InteractionReplyOptions = { content: fullResponseText, components: finalComponents };
+            if (embeds.length > 0) responsePayload.embeds = embeds;
+            if (files.length > 0) responsePayload.files = files;
+            return responsePayload;
 
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });

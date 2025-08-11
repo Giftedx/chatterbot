@@ -224,6 +224,11 @@ export class UnifiedMCPOrchestratorService {
         await this.executePhase3Tools(context, results, toolsExecuted, fallbacksUsed);
       }
 
+      // Phase 4: Media Output (Always safe, heuristic-triggered)
+      if (this.isPhaseEnabled(4)) {
+        await this.executePhase4Tools(context, results, toolsExecuted, fallbacksUsed);
+      }
+
       const executionTime = Date.now() - startTime;
       const confidence = this.calculateConfidence(toolsExecuted, fallbacksUsed, results);
       const recommendations = this.generateRecommendations(analysis, results);
@@ -694,6 +699,16 @@ export class UnifiedMCPOrchestratorService {
       requiredEnvVars: ['GEMINI_API_KEY'],
       enabled: process.env.ENABLE_AGENTIC_INTELLIGENCE === 'true'
     });
+
+    // Phase 4: Media Output
+    this.phases.set(4, {
+      phase: 4,
+      name: 'Media Output',
+      priority: 'low',
+      tools: ['image-generation', 'gif-search', 'text-to-speech'],
+      requiredEnvVars: [],
+      enabled: true
+    });
   }
 
   /**
@@ -717,6 +732,9 @@ export class UnifiedMCPOrchestratorService {
     
     // Register communication tools
     this.registerCommunicationTools();
+
+    // Register media tools
+    this.registerMediaTools();
 
     logger.info('All MCP tools registered', {
       operation: 'tool-registration',
@@ -917,6 +935,77 @@ export class UnifiedMCPOrchestratorService {
   }
 
   /**
+   * Register media generation and speech tools
+   */
+  private registerMediaTools(): void {
+    const imageGenTool: MCPToolDefinition = {
+      id: 'image-generation',
+      name: 'Image Generation',
+      category: 'ai',
+      priority: 'medium',
+      capabilities: ['image-generation', 'multimodal'],
+      requiredEnvVars: [],
+      executorFunction: async (params) => {
+        const prompt = (params.prompt as string) || '';
+        return this.directExecutor.executeImageGeneration(prompt);
+      },
+      metadata: {
+        description: 'Generate images from text prompts using Stability AI or fallback.',
+        version: '1.0.0',
+        author: 'Enhanced Intelligence System',
+        installComplexity: 'medium',
+        performance: { avgResponseTime: 6000, reliability: 0.9 }
+      }
+    };
+
+    const gifSearchTool: MCPToolDefinition = {
+      id: 'gif-search',
+      name: 'GIF Search',
+      category: 'content',
+      priority: 'low',
+      capabilities: ['gif-search', 'multimodal'],
+      requiredEnvVars: [],
+      executorFunction: async (params) => {
+        const query = (params.query as string) || '';
+        const limit = Number(params.limit ?? 1);
+        return this.directExecutor.executeGifSearch(query, limit);
+      },
+      metadata: {
+        description: 'Search GIFs via Tenor API with fallback.',
+        version: '1.0.0',
+        author: 'Enhanced Intelligence System',
+        installComplexity: 'easy',
+        performance: { avgResponseTime: 800, reliability: 0.95 }
+      }
+    };
+
+    const ttsTool: MCPToolDefinition = {
+      id: 'text-to-speech',
+      name: 'Text To Speech',
+      category: 'communication',
+      priority: 'medium',
+      capabilities: ['text-to-speech', 'audio'],
+      requiredEnvVars: [],
+      executorFunction: async (params) => {
+        const text = (params.text as string) || '';
+        const voiceId = params.voiceId as string | undefined;
+        return this.directExecutor.executeTextToSpeech(text, voiceId);
+      },
+      metadata: {
+        description: 'Convert text to audio using ElevenLabs.',
+        version: '1.0.0',
+        author: 'Enhanced Intelligence System',
+        installComplexity: 'easy',
+        performance: { avgResponseTime: 3000, reliability: 0.92 }
+      }
+    };
+
+    this.registerTool(imageGenTool);
+    this.registerTool(gifSearchTool);
+    this.registerTool(ttsTool);
+  }
+
+  /**
    * Execute Phase 1 tools (Critical Foundation)
    */
   private async executePhase1Tools(
@@ -996,6 +1085,43 @@ export class UnifiedMCPOrchestratorService {
       if (thinkingResult.fallbackMode) {
         fallbacks.push('sequential-thinking');
       }
+    }
+  }
+
+  /**
+   * Execute Phase 4 tools (Media Output)
+   */
+  private async executePhase4Tools(
+    context: MCPExecutionContext,
+    results: Map<string, MCPToolResult>,
+    executed: string[],
+    fallbacks: string[]
+  ): Promise<void> {
+    // Heuristics: generate media if user asked for it
+    const content = context.messageContent.toLowerCase();
+    const wantsImage = IMAGE_REQUEST_REGEX.test(content);
+    const wantsGif = GIF_REQUEST_REGEX.test(content);
+    const wantsTts = TTS_REQUEST_REGEX.test(content);
+
+    if (wantsImage && this.tools.has('image-generation')) {
+      const imageResult = await this.executeTool('image-generation', { prompt: context.messageContent }, context);
+      results.set('image-generation', imageResult);
+      executed.push('image-generation');
+      if (imageResult.fallbackMode) fallbacks.push('image-generation');
+    }
+
+    if (wantsGif && this.tools.has('gif-search')) {
+      const gifResult = await this.executeTool('gif-search', { query: context.messageContent, limit: 1 }, context);
+      results.set('gif-search', gifResult);
+      executed.push('gif-search');
+      if (gifResult.fallbackMode) fallbacks.push('gif-search');
+    }
+
+    if (wantsTts && this.tools.has('text-to-speech')) {
+      const ttsResult = await this.executeTool('text-to-speech', { text: context.messageContent }, context);
+      results.set('text-to-speech', ttsResult);
+      executed.push('text-to-speech');
+      if (ttsResult.fallbackMode) fallbacks.push('text-to-speech');
     }
   }
 

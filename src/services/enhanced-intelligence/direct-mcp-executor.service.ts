@@ -16,6 +16,10 @@ export class DirectMCPExecutor {
   private firecrawlApiKey?: string;
   private geminiApiKey?: string;
   private genAI?: GoogleGenerativeAI;
+  private stabilityApiKey?: string;
+  private tenorApiKey?: string;
+  private elevenLabsApiKey?: string;
+  private elevenLabsVoiceId?: string;
   
   constructor() {
     console.log('🚀 DirectMCPExecutor initialized with real API integrations');
@@ -24,6 +28,10 @@ export class DirectMCPExecutor {
     this.braveApiKey = process.env.BRAVE_API_KEY;
     this.firecrawlApiKey = process.env.FIRECRAWL_API_KEY;
     this.geminiApiKey = process.env.GEMINI_API_KEY;
+    this.stabilityApiKey = process.env.STABILITY_API_KEY;
+    this.tenorApiKey = process.env.TENOR_API_KEY;
+    this.elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+    this.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || '21m00Tcm4TlvDq8ikWAM';
     
     // Initialize Gemini for AI reasoning
     if (this.geminiApiKey) {
@@ -32,10 +40,13 @@ export class DirectMCPExecutor {
     }
     
     // Log available APIs
-    const availableApis = [];
+    const availableApis = [] as string[];
     if (this.braveApiKey) availableApis.push('Brave Search');
     if (this.firecrawlApiKey) availableApis.push('Firecrawl');
     if (this.geminiApiKey) availableApis.push('Gemini AI');
+    if (this.stabilityApiKey) availableApis.push('Stability AI Images');
+    if (this.tenorApiKey) availableApis.push('Tenor GIF');
+    if (this.elevenLabsApiKey) availableApis.push('ElevenLabs TTS');
     
     if (availableApis.length > 0) {
       console.log(`✅ Available APIs: ${availableApis.join(', ')}`);
@@ -462,6 +473,191 @@ export class DirectMCPExecutor {
   }
 
   /**
+   * Execute image generation using Stability AI or fallback placeholder
+   */
+  async executeImageGeneration(prompt: string): Promise<MCPToolResult> {
+    try {
+      console.log(`🎨 Image Generation: ${prompt.substring(0, 80)}...`);
+      if (this.stabilityApiKey) {
+        try {
+          const response = await axios.post(
+            'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image',
+            {
+              text_prompts: [{ text: prompt }],
+              cfg_scale: 7,
+              clip_guidance_preset: 'FAST_BLUE',
+              height: 1024,
+              width: 1024,
+              samples: 1,
+              steps: 30
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${this.stabilityApiKey}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              },
+              timeout: 60000
+            }
+          );
+
+          const artifacts = (response.data?.artifacts || []) as Array<{ base64: string; finishReason?: string; seed?: number }>;
+          if (artifacts.length > 0 && artifacts[0].base64) {
+            return {
+              success: true,
+              data: {
+                images: [
+                  { mimeType: 'image/png', base64: artifacts[0].base64 }
+                ],
+                promptUsed: prompt,
+                apiUsed: 'stability_ai'
+              },
+              toolUsed: 'mcp-image-generation',
+              requiresExternalMCP: false
+            };
+          }
+        } catch (apiError) {
+          console.warn('Stability AI image generation failed, using fallback:', apiError);
+        }
+      }
+
+      // Fallback: fetch placeholder image with prompt text
+      const safePrompt = sanitizePromptForUrl(prompt.substring(0, 40));
+      const placeholderUrl = `https://dummyimage.com/1024x1024/1e1e1e/ffffff.png&text=${encodeURIComponent(safePrompt)}`;
+      const imgResp = await axios.get(placeholderUrl, { responseType: 'arraybuffer', timeout: 20000 });
+      const base64 = Buffer.from(imgResp.data).toString('base64');
+      return {
+        success: true,
+        data: {
+          images: [ { mimeType: 'image/png', base64 } ],
+          promptUsed: prompt,
+          apiUsed: 'placeholder'
+        },
+        toolUsed: 'mcp-image-generation',
+        requiresExternalMCP: false,
+        fallbackMode: true
+      };
+    } catch (error) {
+      console.error('Image generation failed:', error);
+      return {
+        success: false,
+        error: `Image generation failed: ${error}`,
+        toolUsed: 'mcp-image-generation',
+        requiresExternalMCP: false
+      };
+    }
+  }
+
+  /**
+   * Execute GIF search using Tenor API or fallback
+   */
+  async executeGifSearch(query: string, limit: number = 1): Promise<MCPToolResult> {
+    try {
+      console.log(`🖼️ GIF Search: ${query.substring(0, 80)}...`);
+      if (this.tenorApiKey) {
+        try {
+          const resp = await axios.get('https://tenor.googleapis.com/v2/search', {
+            params: {
+              key: this.tenorApiKey,
+              q: query,
+              limit,
+              media_filter: 'gif',
+              contentfilter: 'high'
+            },
+            timeout: 15000
+          });
+          const items = resp.data?.results || resp.data?.items || [];
+          const gifs = items.map((it: any) => ({
+            url: it?.media_formats?.gif?.url || it?.url || '',
+            previewUrl: it?.media_formats?.tinygif?.url || it?.media_formats?.nanogif?.url || ''
+          })).filter((g: any) => g.url);
+          if (gifs.length > 0) {
+            return {
+              success: true,
+              data: { gifs, query, apiUsed: 'tenor' },
+              toolUsed: 'mcp-gif-search',
+              requiresExternalMCP: false
+            };
+          }
+        } catch (apiError) {
+          console.warn('Tenor GIF search failed, using fallback:', apiError);
+        }
+      }
+      // Fallback GIF
+      const fallbackGif = { url: 'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif', previewUrl: '' };
+      return {
+        success: true,
+        data: { gifs: [fallbackGif], query, apiUsed: 'fallback' },
+        toolUsed: 'mcp-gif-search',
+        requiresExternalMCP: false,
+        fallbackMode: true
+      };
+    } catch (error) {
+      console.error('GIF search failed:', error);
+      return {
+        success: false,
+        error: `GIF search failed: ${error}`,
+        toolUsed: 'mcp-gif-search',
+        requiresExternalMCP: false
+      };
+    }
+  }
+
+  /**
+   * Execute text-to-speech using ElevenLabs
+   */
+  async executeTextToSpeech(text: string, voiceId?: string): Promise<MCPToolResult> {
+    try {
+      console.log(`🗣️ TTS: ${text.substring(0, 80)}...`);
+      const vId = voiceId || this.elevenLabsVoiceId;
+      if (this.elevenLabsApiKey) {
+        try {
+          const resp = await axios.post(
+            `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(vId)}`,
+            {
+              text,
+              model_id: 'eleven_multilingual_v2',
+              voice_settings: { stability: 0.35, similarity_boost: 0.75 }
+            },
+            {
+              headers: {
+                'xi-api-key': this.elevenLabsApiKey,
+                'Accept': 'audio/mpeg',
+                'Content-Type': 'application/json'
+              },
+              responseType: 'arraybuffer',
+              timeout: 60000
+            }
+          );
+          const base64 = Buffer.from(resp.data).toString('base64');
+          return {
+            success: true,
+            data: { audio: { mimeType: 'audio/mpeg', base64 }, textSpoken: text, voiceId: vId, apiUsed: 'elevenlabs' },
+            toolUsed: 'mcp-text-to-speech',
+            requiresExternalMCP: false
+          };
+        } catch (apiError) {
+          console.warn('ElevenLabs TTS failed:', apiError);
+        }
+      }
+      return {
+        success: false,
+        error: 'No TTS provider configured. Set ELEVENLABS_API_KEY to enable speech replies.',
+        toolUsed: 'mcp-text-to-speech',
+        requiresExternalMCP: false
+      };
+    } catch (error) {
+      console.error('TTS failed:', error);
+      return {
+        success: false,
+        error: `TTS failed: ${error}`,
+        toolUsed: 'mcp-text-to-speech',
+        requiresExternalMCP: false
+      };
+    }
+  }
+
+  /**
    * Check if real MCP capabilities are available
    */
   isRealMCPAvailable(): boolean {
@@ -502,6 +698,9 @@ export class DirectMCPExecutor {
     if (this.braveApiKey) apis.push('Brave Search API');
     if (this.firecrawlApiKey) apis.push('Firecrawl API');
     if (this.geminiApiKey) apis.push('Gemini AI');
+    if (this.stabilityApiKey) apis.push('Stability AI');
+    if (this.tenorApiKey) apis.push('Tenor GIF');
+    if (this.elevenLabsApiKey) apis.push('ElevenLabs TTS');
     return apis;
   }
 }
