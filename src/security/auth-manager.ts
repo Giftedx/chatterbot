@@ -621,7 +621,7 @@ export class AuthenticationManager {
   private hashApiKey(key: string): string {
     // Use bcrypt with a cost factor of 12 (industry standard)
     const salt = bcrypt.genSaltSync(12);
-    return bcrypt.hashSync(key, salt);
+    return bcrypt.hashSync(key + this.JWT_SECRET, salt);
   }
 
   private generateId(): string {
