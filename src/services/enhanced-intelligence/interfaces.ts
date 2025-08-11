@@ -9,6 +9,34 @@ import { PersonalizedRecommendation, AdaptiveResponse } from './personalization-
 import { BehaviorMetric } from './behavior-analytics.service.js';
 import { SmartRecommendation } from './smart-recommendation.service.js';
 import { MemoryContext } from '../../memory/types.js';
+import { 
+  AdvancedMemoryConfig, 
+  SocialProfile, 
+  MemoryQuery,
+  MemorySearchResult 
+} from '../advanced-memory/types.js';
+import { MemoryProcessingContext, MemoryEnhancementResult } from '../advanced-memory/advanced-memory-manager.service.js';
+
+export interface IAdvancedMemoryManager {
+  initialize(): Promise<void>;
+  
+  storeConversationMemory(context: MemoryProcessingContext): Promise<void>;
+  
+  enhanceResponse(
+    originalResponse: string,
+    context: MemoryProcessingContext
+  ): Promise<MemoryEnhancementResult>;
+  
+  getSocialProfile(userId: string): Promise<SocialProfile>;
+  
+  getMemoryStatistics(userId: string): Record<string, any>;
+  
+  searchMemories(query: MemoryQuery): Promise<MemorySearchResult[]>;
+  
+  updatePersonality(userId: string, observedTraits: any): Promise<void>;
+  
+  consolidateMemories(userId?: string): Promise<void>;
+}
 
 export interface IMCPToolsService {
   processWithAllTools(
@@ -183,6 +211,7 @@ export interface IEnhancedIntelligenceServiceDependencies {
   responseService: IResponseService;
   cacheService: ICacheService;
   userMemoryService: IUserMemoryService;
+  advancedMemoryManager?: IAdvancedMemoryManager;
   personalizationEngine?: IPersonalizationEngine;
   behaviorAnalytics?: IBehaviorAnalyticsService;
   smartRecommendations?: ISmartRecommendationService;

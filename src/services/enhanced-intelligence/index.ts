@@ -37,6 +37,10 @@ import { SmartRecommendationService } from './smart-recommendation.service.js';
 import { ProcessingContext } from './types.js';
 import type { MCPManager } from '../mcp-manager.service.js';
 
+// Import Advanced Memory System
+import { AdvancedMemoryManager } from '../advanced-memory/advanced-memory-manager.service.js';
+import type { AdvancedMemoryConfig } from '../advanced-memory/types.js';
+
 // Import interfaces for dependency injection
 import type {
   IEnhancedIntelligenceServiceDependencies,
@@ -46,6 +50,7 @@ import type {
   IResponseService,
   ICacheService,
   IUserMemoryService,
+  IAdvancedMemoryManager,
   IPersonalizationEngine,
   IBehaviorAnalyticsService,
   ISmartRecommendationService
@@ -60,6 +65,7 @@ export class EnhancedInvisibleIntelligenceService {
   private responseService: IResponseService;
   private cacheService: ICacheService;
   private userMemoryService: IUserMemoryService;
+  private advancedMemoryManager?: IAdvancedMemoryManager;
 
   // Personalization intelligence services (optional features)
   private personalizationEngine?: IPersonalizationEngine;
@@ -75,6 +81,7 @@ export class EnhancedInvisibleIntelligenceService {
     this.responseService = dependencies.responseService;
     this.cacheService = dependencies.cacheService;
     this.userMemoryService = dependencies.userMemoryService;
+    this.advancedMemoryManager = dependencies.advancedMemoryManager;
     
     // Initialize personalization intelligence services
     try {
@@ -84,14 +91,21 @@ export class EnhancedInvisibleIntelligenceService {
       // this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
       this.personalizationEngine = dependencies.personalizationEngine;
       
+      // Initialize Advanced Memory Manager if available
+      if (this.advancedMemoryManager) {
+        this.advancedMemoryManager.initialize().catch(error => {
+          console.warn('⚠️ Advanced Memory Manager initialization failed:', error);
+        });
+      }
+      
       // Initialize MCP tools service
       this.mcpToolsService.initialize().catch(error => {
         console.warn('⚠️ MCP Tools Service initialization failed:', error);
       });
       
-      console.log('🧠 Enhanced Intelligence Service initialized with personalization capabilities and MCP integration');
+      console.log('🧠 Enhanced Intelligence Service initialized with advanced memory, personalization capabilities and MCP integration');
     } catch (personalizationError) {
-      console.error('⚠️ Personalization services failed to initialize:', personalizationError);
+      console.error('⚠️ Advanced services failed to initialize:', personalizationError);
       // Initialize with fallback implementations if needed
       console.log('📝 Enhanced Intelligence Service initialized with API integrations');
     }
@@ -214,15 +228,50 @@ export class EnhancedInvisibleIntelligenceService {
         context.errors.push('Processing timeout - using basic response');
       }
       
-      // Step 5: Generate enhanced response with personalization
+      // Step 5: Generate enhanced response with advanced memory and personalization
       let finalResponse: string;
       try {
         const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
         
+        // Apply advanced memory enhancement if available
+        let memoryEnhancedResponse = baseResponse;
+        if (this.advancedMemoryManager) {
+          try {
+            const memoryContext = {
+              userId: interaction.user.id,
+              channelId: interaction.channelId,
+              guildId: interaction.guildId,
+              conversationId: `conv-${interaction.channelId}-${Date.now()}`,
+              participants: [interaction.user.id, 'bot'],
+              content,
+              timestamp: new Date()
+            };
+
+            const enhancement = await this.advancedMemoryManager.enhanceResponse(
+              baseResponse,
+              memoryContext
+            );
+
+            memoryEnhancedResponse = enhancement.enhancedResponse;
+            
+            // Log memory enhancement details
+            if (enhancement.memoriesUsed.length > 0 || enhancement.socialAdaptations.length > 0) {
+              console.log('🧠 Response enhanced with advanced memory:', {
+                memoriesUsed: enhancement.memoriesUsed.length,
+                socialAdaptations: enhancement.socialAdaptations.length,
+                confidenceBoost: enhancement.confidenceBoost,
+                personalizations: enhancement.personalizations.length
+              });
+            }
+          } catch (memoryEnhancementError) {
+            console.warn('⚠️ Advanced memory enhancement failed, using base response:', memoryEnhancementError);
+          }
+        }
+        
         // Apply personalization if available
         finalResponse = await this.adaptPersonalizedResponse(
           interaction.user.id, 
-          baseResponse, 
+          memoryEnhancedResponse, 
           interaction.guildId || undefined
         );
       } catch (responseError) {
@@ -250,7 +299,29 @@ export class EnhancedInvisibleIntelligenceService {
       
       // Step 7: Store in memory and update analytics
       try {
+        // Store in traditional memory service
         await this.memoryService.storeConversationMemory(context, content, finalResponse);
+        
+        // Store in advanced memory system if available
+        if (this.advancedMemoryManager) {
+          try {
+            const memoryContext = {
+              userId: interaction.user.id,
+              channelId: interaction.channelId,
+              guildId: interaction.guildId,
+              conversationId: `conv-${interaction.channelId}-${Date.now()}`,
+              participants: [interaction.user.id, 'bot'],
+              content,
+              timestamp: new Date()
+            };
+
+            await this.advancedMemoryManager.storeConversationMemory(memoryContext);
+            console.log('🧠 Conversation stored in advanced memory system');
+          } catch (advancedMemoryError) {
+            console.warn('⚠️ Failed to store in advanced memory system:', advancedMemoryError);
+          }
+        }
+        
         await this.trackEnhancedAnalytics(context, startTime);
         
         // Personalization: Record interaction for adaptive learning
@@ -723,6 +794,22 @@ export class EnhancedInvisibleIntelligenceService {
 export function createEnhancedInvisibleIntelligenceService(
   mcpManager?: MCPManager
 ): EnhancedInvisibleIntelligenceService {
+  // Configure Advanced Memory System
+  const advancedMemoryConfig: AdvancedMemoryConfig = {
+    enableEpisodicMemory: process.env.ENABLE_EPISODIC_MEMORY !== 'false',
+    enableSocialIntelligence: process.env.ENABLE_SOCIAL_INTELLIGENCE !== 'false',
+    enableEmotionalIntelligence: process.env.ENABLE_EMOTIONAL_INTELLIGENCE !== 'false',
+    enableSemanticClustering: true,
+    enableMemoryConsolidation: true,
+    maxMemoriesPerUser: parseInt(process.env.MAX_MEMORIES_PER_USER || '500'),
+    memoryDecayRate: parseFloat(process.env.MEMORY_DECAY_RATE || '0.01'),
+    importanceThreshold: parseFloat(process.env.MEMORY_IMPORTANCE_THRESHOLD || '0.3'),
+    consolidationInterval: parseInt(process.env.MEMORY_CONSOLIDATION_INTERVAL || '3600000'), // 1 hour
+    socialAnalysisDepth: (process.env.SOCIAL_ANALYSIS_DEPTH as 'basic' | 'moderate' | 'comprehensive') || 'moderate',
+    emotionalSensitivity: parseFloat(process.env.EMOTIONAL_SENSITIVITY || '0.7'),
+    adaptationAggressiveness: parseFloat(process.env.ADAPTATION_AGGRESSIVENESS || '0.6')
+  };
+
   // Import the concrete implementations
   const dependencies: IEnhancedIntelligenceServiceDependencies = {
     mcpToolsService: new UnifiedMCPOrchestratorService(mcpManager),
@@ -731,6 +818,8 @@ export function createEnhancedInvisibleIntelligenceService(
     responseService: new EnhancedResponseService(),
     cacheService: new EnhancedCacheService(),
     userMemoryService: new UserMemoryService(),
+    // Advanced Memory & Social Intelligence System
+    advancedMemoryManager: new AdvancedMemoryManager(advancedMemoryConfig),
     // Optional personalization services
     behaviorAnalytics: new UserBehaviorAnalyticsService(),
     smartRecommendations: new SmartRecommendationService(),
