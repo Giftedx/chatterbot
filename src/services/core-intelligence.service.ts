@@ -48,6 +48,13 @@ import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as Enha
 import { modelRouterService } from './model-router.service.js';
 import { knowledgeBaseService } from './knowledge-base.service.js';
 
+// Advanced Capabilities
+import { 
+  AdvancedCapabilitiesManager, 
+  type AdvancedCapabilitiesConfig,
+  type EnhancedResponse 
+} from './advanced-capabilities/index.js';
+
 
 // Utilities and Others
 import { logger } from '../utils/logger.js';
@@ -76,6 +83,7 @@ export interface CoreIntelligenceConfig {
     enableEnhancedMemory: boolean;
     enableEnhancedUI: boolean;
     enableResponseCache: boolean;
+    enableAdvancedCapabilities?: boolean;
     mcpManager?: MCPManager;
     // Optional dependency injection for testing
     dependencies?: {
@@ -83,6 +91,7 @@ export interface CoreIntelligenceConfig {
         analyticsService?: UnifiedAnalyticsService;
         messageAnalysisService?: typeof unifiedMessageAnalysisService;
         geminiService?: GeminiService;
+        advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
     };
 }
 
@@ -114,6 +123,7 @@ export class CoreIntelligenceService {
     private personalizationEngine?: PersonalizationEngine;
     private behaviorAnalytics?: UserBehaviorAnalyticsService;
     private smartRecommendations?: SmartRecommendationService;
+    private advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
 
     constructor(config: CoreIntelligenceConfig) {
         this.config = config;
@@ -142,6 +152,27 @@ export class CoreIntelligenceService {
             this.personalizationEngine = new PersonalizationEngine(config.mcpManager);
             this.behaviorAnalytics = new UserBehaviorAnalyticsService();
             this.smartRecommendations = new SmartRecommendationService();
+        }
+
+        // Initialize Advanced Capabilities Manager
+        if (config.enableAdvancedCapabilities) {
+            const advancedConfig: AdvancedCapabilitiesConfig = {
+                enableImageGeneration: !!process.env.OPENAI_API_KEY || !!process.env.STABILITY_API_KEY,
+                enableGifGeneration: !!process.env.GIPHY_API_KEY || !!process.env.TENOR_API_KEY,
+                enableSpeechGeneration: !!process.env.ELEVENLABS_API_KEY || !!process.env.OPENAI_API_KEY || !!process.env.AZURE_SPEECH_KEY,
+                enableEnhancedReasoning: true, // Always available as it uses MCP + custom logic
+                enableWebSearch: !!config.mcpManager, // Available if MCP is enabled
+                enableMemoryEnhancement: true, // Always available
+                maxConcurrentCapabilities: 3,
+                responseTimeoutMs: 30000
+            };
+            
+            this.advancedCapabilitiesManager = config.dependencies?.advancedCapabilitiesManager ?? 
+                new AdvancedCapabilitiesManager(advancedConfig);
+                
+            logger.info('Advanced Capabilities Manager initialized', { 
+                capabilities: this.advancedCapabilitiesManager.getStatus().enabledCapabilities 
+            });
         }
 
         this.loadOptedInUsers().catch(err => logger.error('Failed to load opted-in users', err));
@@ -311,7 +342,9 @@ export class CoreIntelligenceService {
             await dm.send(messageOptions as any);
           } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
             const chan = await interaction.client.channels.fetch(targetChannelId);
-            if (chan && chan?.isTextBased()) await (chan as TextBasedChannel).send(messageOptions);
+            if (chan && chan?.isTextBased() && 'send' in chan) {
+              await chan.send(messageOptions);
+            }
           } else {
             await interaction.followUp(messageOptions);
           }
@@ -330,6 +363,26 @@ export class CoreIntelligenceService {
         if (now - last < ms) return true;
         this.lastReplyAt.set(userId, now);
         return false;
+    }
+
+    private async getUserPreferences(userId: string): Promise<Record<string, any>> {
+        try {
+            // Try to get preferences from the personalization engine if available
+            if (this.personalizationEngine) {
+                // For now, return basic preferences since getUserProfile may not exist
+                return {
+                    preferAudio: false,
+                    preferredVoice: 'default',
+                    imageStyle: 'realistic'
+                };
+            }
+            
+            // Fallback to basic preferences
+            return {};
+        } catch (error) {
+            logger.warn('Failed to retrieve user preferences', { userId, error: String(error) });
+            return {};
+        }
     }
 
     private async shouldRespond(message: Message): Promise<boolean> {
@@ -520,6 +573,45 @@ export class CoreIntelligenceService {
                 this.recordAnalyticsInteraction({ ...analyticsData, step: 'capabilities_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
             }
 
+            // Execute Advanced Capabilities if enabled
+            let advancedCapabilitiesResult: EnhancedResponse | null = null;
+            if (this.config.enableAdvancedCapabilities && this.advancedCapabilitiesManager) {
+                logger.debug(`[CoreIntelSvc] Stage 4.7: Advanced Capabilities Processing`, { userId: messageForPipeline.author.id });
+                try {
+                    const conversationHistory = (await getHistory(channelId)).map(msg => 
+                        msg.parts.map(part => typeof part === 'string' ? part : part.text || '').join(' ')
+                    );
+                    const userPreferences = await this.getUserPreferences(userId);
+                    
+                    advancedCapabilitiesResult = await this.advancedCapabilitiesManager.processMessage(
+                        promptText,
+                        Array.from(messageForPipeline.attachments.values()),
+                        userId,
+                        channelId,
+                        guildId || undefined,
+                        conversationHistory,
+                        userPreferences
+                    );
+                    
+                    this.recordAnalyticsInteraction({ 
+                        ...analyticsData, 
+                        step: 'advanced_capabilities_executed', 
+                        isSuccess: true, 
+                        capabilitiesUsed: advancedCapabilitiesResult.metadata.capabilitiesUsed,
+                        duration: Date.now() - analyticsData.startTime 
+                    });
+                    
+                    logger.info(`[CoreIntelSvc] Advanced capabilities executed: ${advancedCapabilitiesResult.metadata.capabilitiesUsed.join(', ')}`, { 
+                        userId,
+                        confidenceScore: advancedCapabilitiesResult.metadata.confidenceScore,
+                        attachmentsGenerated: advancedCapabilitiesResult.attachments.length
+                    });
+                } catch (error: any) {
+                    logger.warn(`[CoreIntelSvc] Advanced capabilities execution encountered an error: ${error.message}. Continuing with standard processing.`, { error, ...analyticsData });
+                    this.recordAnalyticsInteraction({ ...analyticsData, step: 'advanced_capabilities_error', isSuccess: false, error: error.message, duration: Date.now() - analyticsData.startTime });
+                }
+            }
+
             const history = await getHistory(channelId);
             const agenticContextData = await this._aggregateAgenticContext(messageForPipeline, unifiedAnalysis, capabilities, mcpOrchestrationResult, history, analyticsData);
 
@@ -528,6 +620,29 @@ export class CoreIntelligenceService {
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );
 
+            // Enhance response with advanced capabilities results if available
+            if (advancedCapabilitiesResult && advancedCapabilitiesResult.metadata.capabilitiesUsed.length > 0) {
+                // Use advanced capabilities text response if it's more comprehensive
+                if (advancedCapabilitiesResult.textResponse && 
+                    advancedCapabilitiesResult.textResponse.length > 10 && 
+                    advancedCapabilitiesResult.metadata.confidenceScore > 0.5) {
+                    fullResponseText = advancedCapabilitiesResult.textResponse;
+                }
+                
+                // Add reasoning if available
+                if (advancedCapabilitiesResult.reasoning) {
+                    fullResponseText += '\n\n' + advancedCapabilitiesResult.reasoning;
+                }
+                
+                // Add web search results if available
+                if (advancedCapabilitiesResult.webSearchResults && advancedCapabilitiesResult.webSearchResults.length > 0) {
+                    fullResponseText += '\n\n**Current Information:**\n';
+                    advancedCapabilitiesResult.webSearchResults.slice(0, 3).forEach((result: any, index: number) => {
+                        fullResponseText += `${index + 1}. ${result.title}: ${result.snippet}\n`;
+                    });
+                }
+            }
+
             fullResponseText = await this._applyPostResponsePersonalization(userId, guildId, fullResponseText, analyticsData);
 
             await this._updateStateAndAnalytics({
@@ -535,9 +650,45 @@ export class CoreIntelligenceService {
                 unifiedAnalysis, mcpOrchestrationResult, analyticsData, success: true
             });
 
+            // Prepare final response with advanced capabilities attachments
             const finalComponents = (this.config.enableEnhancedUI && this.enhancedUiService && !(uiContext instanceof ChatInputCommandInteraction && this.activeStreams.has(`${userId}-${channelId}`)))
                 ? [this.enhancedUiService.createResponseActionRow()] : [];
-            return { content: fullResponseText, components: finalComponents };
+            
+            const responseOptions: any = { content: fullResponseText, components: finalComponents };
+            
+            // Add generated files/attachments if available
+            if (advancedCapabilitiesResult && advancedCapabilitiesResult.attachments.length > 0) {
+                responseOptions.files = [];
+                
+                for (const attachment of advancedCapabilitiesResult.attachments) {
+                    if (attachment.buffer) {
+                        responseOptions.files.push({
+                            attachment: attachment.buffer,
+                            name: attachment.filename,
+                            description: attachment.description
+                        });
+                    } else if (attachment.url) {
+                        // For URLs, we could embed them or add them to the message
+                        if (attachment.type === 'image' || attachment.type === 'gif') {
+                            responseOptions.embeds = responseOptions.embeds || [];
+                            responseOptions.embeds.push({
+                                image: { url: attachment.url },
+                                description: attachment.description
+                            });
+                        }
+                    }
+                }
+                
+                // Log what we're sending
+                if (responseOptions.files?.length > 0) {
+                    logger.info(`[CoreIntelSvc] Sending response with ${responseOptions.files.length} generated files`, {
+                        userId,
+                        fileTypes: advancedCapabilitiesResult.attachments.map(a => a.type)
+                    });
+                }
+            }
+            
+            return responseOptions;
 
         } catch (error: any) {
             logger.error(`[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`, { error, stack: error.stack, ...analyticsData });
