@@ -106,7 +106,7 @@ export class HealthCheck {
       environment: process.env.NODE_ENV || 'development',
       version: process.env.npm_package_version || '0.1.0',
       features: {
-        discord: !!process.env.BOT_TOKEN,
+        discord: !!process.env.DISCORD_TOKEN,
         gemini: !!process.env.GEMINI_API_KEY,
         database: !!process.env.DATABASE_URL,
         moderation: true // Always enabled as it's built-in

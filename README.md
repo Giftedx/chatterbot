@@ -29,6 +29,10 @@ npx prisma migrate dev --name init
 
 # 4) Run in dev
 npm run dev
+
+# Optional: run health-only server (no Discord login required)
+npm run dev:health
+# Then visit http://localhost:3000/health or /metrics
 ```
 
 ---
@@ -123,6 +127,16 @@ src/
 
 ---
 
+### Development
+- Lint: `npm run lint`
+- Typecheck: `npm run typecheck`
+- Test: `npm test`
+- Docs: `npm run docs`
+- Combined CI check (typecheck + lint + tests): `npm run check:all`
+- Health-only server: `npm run dev:health` then visit `http://localhost:3000/health`
+
+---
+
 ### Docker
 ```bash
 # Build
@@ -135,14 +149,6 @@ docker run --rm -it \
   -e GEMINI_API_KEY=... \
   chatterbot
 ```
-
----
-
-### Development
-- Lint: `npm run lint`
-- Typecheck: `npm run typecheck`
-- Test: `npm test`
-- Docs: `npm run docs`
 
 ---
 

@@ -26,7 +26,7 @@ FROM node:18-alpine as production
 WORKDIR /app
 
 # Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+RUN apk add --no-cache dumb-init curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -44,12 +44,13 @@ RUN mkdir -p /app/data && chown botuser:nodejs /app/data
 # Switch to non-root user
 USER botuser
 
-# Expose analytics dashboard port (optional)
+# Expose analytics dashboard port (optional) and health port
 EXPOSE 3001
+EXPOSE 3000
 
-# Health check
+# Health check against the health endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "console.log('Health check passed')" || exit 1
+  CMD curl -sf http://localhost:3000/health > /dev/null || exit 1
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
