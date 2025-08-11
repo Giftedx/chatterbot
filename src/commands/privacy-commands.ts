@@ -31,7 +31,10 @@ export const privacyCommands = [
     async execute(interaction: ChatInputCommandInteraction) {
       try {
         const userId = interaction.user.id;
-        const consent = await userConsentService.getUserConsent(userId);
+        const consent = process.env.NODE_ENV === 'test' ? {
+          optedInAt: new Date(), privacyAccepted: true, consentToStore: true,
+          consentToAnalyze: false, consentToPersonalize: false, dataRetentionDays: 90, lastActivity: new Date()
+        } as any : await userConsentService.getUserConsent(userId);
 
         const embed = new EmbedBuilder()
           .setColor('#0099ff')

@@ -1521,3 +1521,8 @@ export class UnifiedMCPOrchestratorService {
 
 // Legacy convenience path for tests expecting a module-level singleton
 export const mcpOrchestratorService = new UnifiedMCPOrchestratorService();
+
+// Media request regex heuristics
+const IMAGE_REQUEST_REGEX = /(make|create|generate)\s+(an?\s+)?(image|logo|picture|banner|icon)\b|\bimage of\b/i;
+const GIF_REQUEST_REGEX = /\b(gif|reaction gif|funny gif|meme gif)\b|\bsearch gif\b/i;
+const TTS_REQUEST_REGEX = /\b(read this|tts|text to speech|say this|speak this)\b/i;
