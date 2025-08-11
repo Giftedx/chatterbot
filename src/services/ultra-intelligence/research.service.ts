@@ -496,24 +496,65 @@ export class UltraIntelligentResearchService {
      * Categorize source type
      */
     private categorizeSource(url: string): ResearchSource['type'] {
-        const domain = this.extractDomain(url);
+        let host = '';
+        try {
+            host = new URL(url).host;
+        } catch {
+            host = this.extractDomain(url); // fallback if URL parsing fails
+        }
         
-        if (domain.includes('reddit.com') || domain.includes('forum') || domain.includes('discussion')) {
+        // Define known hosts for each category
+        const forumHosts = [
+            'reddit.com',
+            'www.reddit.com',
+            'forums.something.com', // add more known forum hosts as needed
+        ];
+        const wikiHosts = [
+            'wikipedia.org',
+            'en.wikipedia.org',
+            'wiki.something.com', // add more known wiki hosts as needed
+        ];
+        const academicHosts = [
+            'arxiv.org',
+            'pubmed.ncbi.nlm.nih.gov',
+        ];
+        const newsHosts = [
+            'cnn.com',
+            'bbc.co.uk',
+            'nytimes.com',
+            'washingtonpost.com',
+        ];
+        const officialHosts = [
+            'usa.gov',
+            'gov.uk',
+        ];
+        const documentationHosts = [
+            'github.com',
+            'docs.github.com',
+        ];
+        
+        // Forum
+        if (forumHosts.includes(host) || host.endsWith('.reddit.com')) {
             return 'forum';
         }
-        if (domain.includes('wikipedia.org') || domain.includes('wiki')) {
+        // Wiki
+        if (wikiHosts.includes(host) || host.endsWith('.wikipedia.org') || host.includes('wiki')) {
             return 'wiki';
         }
-        if (domain.includes('.edu') || domain.includes('arxiv.org') || domain.includes('pubmed')) {
+        // Academic
+        if (academicHosts.includes(host) || host.endsWith('.edu')) {
             return 'academic';
         }
-        if (domain.includes('news') || domain.includes('times') || domain.includes('post') || domain.includes('cnn') || domain.includes('bbc')) {
+        // News
+        if (newsHosts.includes(host) || host.includes('news') || host.includes('times') || host.includes('post')) {
             return 'news';
         }
-        if (domain.includes('.gov') || domain.includes('official') || url.includes('docs')) {
+        // Official
+        if (officialHosts.includes(host) || host.endsWith('.gov') || host.includes('official') || url.includes('docs')) {
             return 'official';
         }
-        if (domain.includes('github.com') || domain.includes('docs.') || url.includes('documentation')) {
+        // Documentation
+        if (documentationHosts.includes(host) || host.startsWith('docs.') || url.includes('documentation')) {
             return 'documentation';
         }
         
