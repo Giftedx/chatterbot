@@ -6,7 +6,9 @@ import {
     ChatInputCommandInteraction,
     ButtonInteraction,
     Collection,
-    Attachment
+    Attachment,
+    TextBasedChannel,
+    ThreadManager
 } from 'discord.js';
 import { URL } from 'url';
 
@@ -264,13 +266,16 @@ export class CoreIntelligenceService {
             // Ensure a personal thread exists in this guild/channel
             if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
               const parent = interaction.channel;
-              const thread = await parent.threads.create({
-                name: `chat-${interaction.user.username}`.slice(0, 90),
-                autoArchiveDuration: 1440,
-                reason: 'Personal chat thread',
-              });
-              targetChannelId = thread.id;
-              await this.userConsentService.setLastThreadId(userId, thread.id);
+              // Check if the parent channel has threads capability
+              if ('threads' in parent && parent.threads) {
+                const thread = await parent.threads.create({
+                  name: `chat-${interaction.user.username}`.slice(0, 90),
+                  autoArchiveDuration: 1440,
+                  reason: 'Personal chat thread',
+                });
+                targetChannelId = thread.id;
+                await this.userConsentService.setLastThreadId(userId, thread.id);
+              }
             }
           }
         } catch (e) {
@@ -308,7 +313,9 @@ export class CoreIntelligenceService {
             await dm.send(messageOptions as any);
           } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
             const chan = await interaction.client.channels.fetch(targetChannelId);
-            if (chan && chan?.isTextBased()) await (chan as TextBasedChannel).send(messageOptions);
+            if (chan && chan?.isTextBased() && 'send' in chan) {
+              await chan.send(messageOptions);
+            }
           } else {
             await interaction.followUp(messageOptions);
           }
