@@ -375,7 +375,7 @@ export class CoreIntelligenceService {
     const guildId = (messageOrInteraction as any).guildId || null;
 
     const logIntent = async (type: string, pl?: any) => {
-      try { await prisma.intentLog.create({ data: { userId, type, payload: pl ?? undefined } }); } catch {}
+      try { await prisma.intentLog.create({ data: { userId, type, payload: pl ?? undefined } }); } catch (err) { console.error('Failed to log intent:', err); }
     };
 
     const dm = await targetUser.createDM();
