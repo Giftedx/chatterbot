@@ -695,7 +695,7 @@ export class CoreIntelligenceService {
                 const preamble = `You must ground answers in the retrieved context below. If insufficient, say you don't know.\nRetrieved Context:\n${ctx}\n---\n`;
                 ragPrefixedQuery = `${preamble}${agenticQuery.query}`;
               }
-            } catch (_) { /* ignore RAG failures */ }
+            } catch (error) { logger.warn('Failed to fetch RAG context, continuing without it.', { error }); }
 
             const fullResponseText: string = await modelRouterService.generate(
               ragPrefixedQuery,
