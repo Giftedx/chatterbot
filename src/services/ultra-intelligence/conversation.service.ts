@@ -377,7 +377,7 @@ export class HumanLikeConversationService {
         const relationshipStrength = userRelations?.get(context.serverId) || 0;
 
         // Clone base persona for adaptation
-        const adaptedPersona: ConversationPersona = JSON.parse(JSON.stringify(basePersona));
+        const adaptedPersona: ConversationPersona = structuredClone(basePersona);
 
         // Adjust personality based on relationship strength
         if (relationshipStrength > 0.8) {
