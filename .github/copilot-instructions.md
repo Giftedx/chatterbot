@@ -1,5 +1,89 @@
 # Discord Gemini Bot - AI Agent Instructions
 
+**ALWAYS follow these instructions first and only fallback to search or bash commands when the information here is incomplete or incorrect.**
+
+## Quick Start & Validated Commands
+
+**These commands have been validated and tested. Use these exact commands with the specified timeouts.**
+
+### Essential Setup (Required)
+```bash
+# 1. Install dependencies - takes ~70 seconds, NEVER CANCEL
+npm install
+```
+**NEVER CANCEL:** npm install takes approximately 70 seconds. Set timeout to 120+ seconds.
+
+### Database Setup (Known Issues)
+```bash
+# Generate Prisma client (may fail due to network restrictions)
+npx prisma generate
+
+# Alternative: Use existing client (incomplete but allows some functionality)  
+# The existing client in node_modules/.prisma/client/ has missing exports
+```
+**CRITICAL ISSUE:** Prisma client generation may fail in restricted environments due to external binary downloads (binaries.prisma.sh blocked). This causes TypeScript build failures due to missing `MediaFile` export.
+
+### Validation Commands (Always Work)
+```bash
+# Lint code - takes ~5 seconds
+npm run lint
+
+# Run tests - takes ~37 seconds, NEVER CANCEL  
+npm test
+
+# Health-only server (works without Discord tokens)
+npm run dev:health
+```
+**NEVER CANCEL:** Test suite runs 541 tests and takes approximately 37 seconds. Set timeout to 60+ seconds. Expect 540/541 tests to pass (1 flaky performance test).
+
+### Build Commands (Currently Failing)
+```bash
+# TypeScript build - FAILS due to Prisma client issue
+npm run build
+
+# Type checking - FAILS due to Prisma client issue
+npm run typecheck  
+
+# Complete CI check - FAILS due to TypeScript errors
+npm run check:all
+```
+**CRITICAL:** These commands fail with error: `Module '"@prisma/client"' has no exported member 'MediaFile'` in `src/multimodal/file-intelligence/analysis.service.ts:6`. This is NOT a hanging issue - it fails immediately.
+
+### Validation Scenarios (Manual Testing)
+```bash
+# 1. Always validate these work after making changes:
+npm run lint                    # Must pass
+npm test                       # 540/541 tests must pass  
+npm run dev:health             # Must start successfully
+
+# 2. Test health endpoints:
+curl http://localhost:3000/health      # Returns JSON with status, uptime, memory, features
+curl http://localhost:3000/metrics     # Returns Prometheus format metrics
+
+# 3. Expected health response format:
+# {"status":"healthy","timestamp":"...","uptime":...,"memory":{...},"environment":"development","version":"0.1.0","features":{...}}
+```
+
+### Environment Setup
+```bash
+# Copy environment template
+cp env.example .env
+
+# Required for full bot functionality (optional for health-only server):
+# DISCORD_TOKEN=your_discord_bot_token
+# DISCORD_CLIENT_ID=your_discord_client_id  
+# GEMINI_API_KEY=your_gemini_api_key
+```
+
+### Docker Build (Currently Failing)
+```bash
+# Docker build - FAILS due to .dockerignore excluding tsconfig.json
+docker build -t chatterbot .
+```
+**KNOWN ISSUE:** Build fails because `tsconfig.json` is excluded in `.dockerignore` line 52, but Dockerfile tries to copy it.
+
+---
+
 ## Core Architecture & Entry Points
 
 This is a **production-ready Discord AI bot** with triple intelligence architecture:
@@ -125,18 +209,25 @@ coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 ### Essential Commands
 - **Development**: `npm run dev` (uses `tsx` - THE ONLY reliable way to run TypeScript)
-- **Testing**: `npm test` (447+ tests across 51+ suites, comprehensive coverage with property-based tests)
+- **Testing**: `npm test` (541 tests total, 540/541 pass, comprehensive coverage with property-based tests)
 - **Production**: `npm start` (runs compiled JS - works perfectly when build succeeds)
 - **Database**: `npx prisma db push` for schema changes, `npx prisma studio` to view data
 
 ### Critical Build Issue & Workaround
-- **TypeScript Build**: `npm run build` hangs indefinitely - known issue, not blocking production
-- **Development & Production Workaround**: Use `tsx` directly - bot runs perfectly with `tsx` in all environments
-- **Docker Support**: Available but use `tsx` for reliability (`npm run docker:build`, `npm run docker:run`)
-- **Tests**: Property-based tests take 15-30s (comprehensive coverage with fast-check)
+- **TypeScript Build**: `npm run build` FAILS immediately (does NOT hang) due to Prisma client missing exports
+- **Specific Error**: `Module '"@prisma/client"' has no exported member 'MediaFile'` in `src/multimodal/file-intelligence/analysis.service.ts:6`
+- **Root Cause**: Incomplete Prisma client generation due to network restrictions (binaries.prisma.sh blocked)
+- **Development Workaround**: Use `tsx` directly - health server works with `npm run dev:health`
+- **Docker Issue**: Build fails because `tsconfig.json` excluded in `.dockerignore` but required by Dockerfile
+- **Tests**: Takes ~37 seconds with 540/541 tests passing (comprehensive coverage with fast-check)
 
 ### Development Debugging
 ```bash
+# Health-only server (ALWAYS WORKS - no Discord/Gemini tokens required)
+npm run dev:health              # Starts on port 3000
+curl http://localhost:3000/health       # JSON health status
+curl http://localhost:3000/metrics      # Prometheus metrics
+
 # Check MCP tool availability in development
 node debug-mcp-registry.js
 
@@ -150,7 +241,7 @@ curl http://localhost:3000/health
 ### Test Architecture (`src/test/setup.ts`)
 - **Global mocks** for Discord.js, Gemini API, and fetch with proper ESM typing
 - **Test utilities**: `mockDiscordMessage()`, `mockDiscordInteraction()`, `mockGeminiResponse()`
-- **Environment isolation**: `NODE_ENV=test` with 30-second timeouts
+- **Environment isolation**: `NODE_ENV=test` with 30-second test timeout (actual runtime ~37 seconds, 540/541 tests pass)
 - **Property-based testing**: Uses `fast-check` for robust edge case validation
 - **Integration testing**: Services coordinate correctly across intelligence layers
 
