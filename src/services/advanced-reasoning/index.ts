@@ -8,6 +8,7 @@
  * - Meta-cognitive reasoning and self-reflection
  * - Council of Critics for multi-perspective analysis
  * - Advanced Reasoning Orchestrator for coordination
+ * - Autonomous Reasoning Orchestrator for full autonomy
  */
 
 export * from './react-framework.service.js';
@@ -17,6 +18,9 @@ export * from './meta-cognitive.service.js';
 export * from './council-of-critics.service.js';
 export * from './advanced-reasoning-orchestrator.service.js';
 export * from './types.js';
+
+// Also export autonomous reasoning
+export { AutonomousReasoningOrchestrator } from '../autonomous-reasoning/autonomous-orchestrator.service.js';
 
 // Main orchestrator as default export
 export { AdvancedReasoningOrchestrator as default } from './advanced-reasoning-orchestrator.service.js';

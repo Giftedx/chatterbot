@@ -41,6 +41,10 @@ import type { MCPManager } from '../mcp-manager.service.js';
 import { AdvancedMemoryManager } from '../advanced-memory/advanced-memory-manager.service.js';
 import type { AdvancedMemoryConfig } from '../advanced-memory/types.js';
 
+// Import Ultra-Intelligence System
+import { UltraIntelligenceOrchestrator } from '../ultra-intelligence/index.js';
+import type { UltraIntelligenceConfig, UltraIntelligenceContext } from '../ultra-intelligence/orchestrator.service.js';
+
 // Import interfaces for dependency injection
 import type {
   IEnhancedIntelligenceServiceDependencies,
@@ -74,6 +78,9 @@ export class EnhancedInvisibleIntelligenceService {
   // TODO: Add crossSessionLearning when interface compatibility is resolved
   // private crossSessionLearning: CrossSessionLearningEngine;
 
+  // Ultra-Intelligence System
+  private ultraIntelligence?: UltraIntelligenceOrchestrator;
+
   constructor(dependencies: IEnhancedIntelligenceServiceDependencies) {
     this.mcpToolsService = dependencies.mcpToolsService;
     this.memoryService = dependencies.memoryService;
@@ -102,6 +109,36 @@ export class EnhancedInvisibleIntelligenceService {
       this.mcpToolsService.initialize().catch(error => {
         console.warn('⚠️ MCP Tools Service initialization failed:', error);
       });
+
+      // Initialize Ultra-Intelligence System if enabled
+      const enableUltraIntelligence = process.env.ENABLE_ULTRA_INTELLIGENCE === 'true';
+      if (enableUltraIntelligence) {
+        try {
+          const ultraConfig: UltraIntelligenceConfig = {
+            enableAdvancedMemory: process.env.ENABLE_EPISODIC_MEMORY === 'true',
+            enableAutonomousReasoning: process.env.ENABLE_AUTONOMOUS_REASONING === 'true',
+            enableUltraResearch: process.env.ENABLE_ULTRA_RESEARCH === 'true',
+            enableHumanConversation: process.env.ENABLE_HUMAN_CONVERSATION === 'true',
+            adaptationSpeed: 0.7,
+            creativityLevel: 0.8,
+            socialAwareness: 0.9,
+            expertiseConfidence: 0.8,
+            preferredPersonality: 'adaptive',
+            maxProcessingTime: 30000,
+            enableRealTimeLearning: true,
+            enableProactiveInsights: true,
+            enableMultiModalProcessing: true,
+            enableServerCultureAdaptation: true,
+            enableUserRelationshipMemory: true,
+            enableContinuousImprovement: true
+          };
+
+          this.ultraIntelligence = new UltraIntelligenceOrchestrator(ultraConfig);
+          console.log('🚀 Ultra-Intelligence System initialized successfully');
+        } catch (ultraError) {
+          console.warn('⚠️ Ultra-Intelligence initialization failed:', ultraError);
+        }
+      }
       
       console.log('🧠 Enhanced Intelligence Service initialized with advanced memory, personalization capabilities and MCP integration');
     } catch (personalizationError) {
@@ -228,10 +265,62 @@ export class EnhancedInvisibleIntelligenceService {
         context.errors.push('Processing timeout - using basic response');
       }
       
-      // Step 5: Generate enhanced response with advanced memory and personalization
+      // Step 5: Generate enhanced response with ultra-intelligence, advanced memory and personalization
       let finalResponse: string;
       try {
-        const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+        let baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+        
+        // Apply Ultra-Intelligence processing if available
+        if (this.ultraIntelligence) {
+          try {
+            const ultraContext: UltraIntelligenceContext = {
+              userId: interaction.user.id,
+              serverId: interaction.guildId || 'dm',
+              channelId: interaction.channelId,
+              messageContent: content,
+              attachments: attachments,
+              conversationHistory: [], // Would be populated from actual conversation history
+              serverContext: {
+                culture: this.inferServerCulture(interaction.guildId),
+                activityLevel: 'moderate',
+                memberCount: 100, // Would be actual member count
+                commonTopics: []
+              },
+              userContext: {
+                relationshipLevel: 0.5, // Would be calculated from history
+                preferredStyle: 'adaptive',
+                expertiseAreas: [],
+                currentMood: this.detectUserMood(content),
+                timeZone: 'UTC'
+              },
+              requestContext: {
+                complexity: this.assessComplexity(content, context.analysis),
+                urgency: this.assessUrgency(content),
+                domain: this.determineDomain(content, context.analysis),
+                requiresResearch: this.shouldResearch(content, context.analysis),
+                requiresMemory: true
+              }
+            };
+
+            const ultraResult = await this.ultraIntelligence.processWithUltraIntelligence(
+              content,
+              ultraContext
+            );
+
+            if (ultraResult.confidence > 0.7) {
+              baseResponse = ultraResult.response;
+              console.log('🚀 Ultra-Intelligence enhanced response:', {
+                confidence: ultraResult.confidence,
+                naturalness: ultraResult.naturalness,
+                capabilitiesUsed: ultraResult.capabilitiesUsed,
+                processingTime: ultraResult.processingTime
+              });
+            }
+
+          } catch (ultraError) {
+            console.warn('⚠️ Ultra-Intelligence processing failed, using base response:', ultraError);
+          }
+        }
         
         // Apply advanced memory enhancement if available
         let memoryEnhancedResponse = baseResponse;
@@ -784,6 +873,50 @@ export class EnhancedInvisibleIntelligenceService {
       console.warn('⚠️ Failed to adapt personalized response:', error);
       return originalResponse;
     }
+  }
+
+  /**
+   * Helper methods for Ultra-Intelligence integration
+   */
+  private inferServerCulture(guildId: string | null): 'gaming' | 'professional' | 'casual' | 'academic' | 'mixed' {
+    // Simple inference - in practice would analyze server content
+    if (!guildId) return 'casual';
+    return 'mixed'; // Default to mixed culture
+  }
+
+  private detectUserMood(content: string): string {
+    if (/!+/.test(content) || /awesome|great|excited/i.test(content)) return 'excited';
+    if (/\?{2,}|confused|help/i.test(content)) return 'curious';
+    if (/frustrated|annoyed/i.test(content)) return 'frustrated';
+    if (/thank|appreciate/i.test(content)) return 'happy';
+    return 'neutral';
+  }
+
+  private assessComplexity(content: string, analysis: MessageAnalysis): 'simple' | 'moderate' | 'complex' | 'expert' {
+    if (content.length > 300 || analysis.complexity === 'complex') return 'expert';
+    if (content.length > 150 || analysis.hasAttachments) return 'complex';
+    if (content.length > 50 || content.includes('?')) return 'moderate';
+    return 'simple';
+  }
+
+  private assessUrgency(content: string): 'low' | 'medium' | 'high' | 'critical' {
+    if (/urgent|asap|emergency|critical|immediately/i.test(content)) return 'critical';
+    if (/quickly|soon|fast|help/i.test(content)) return 'high';
+    if (/when|time|schedule/i.test(content)) return 'medium';
+    return 'low';
+  }
+
+  private determineDomain(content: string, analysis: MessageAnalysis): 'gaming' | 'technical' | 'general' | 'social' | 'creative' {
+    if (/game|play|esports|stream|twitch/i.test(content)) return 'gaming';
+    if (/code|program|technical|api|bug|error|debug/i.test(content)) return 'technical';
+    if (/create|design|art|music|write/i.test(content)) return 'creative';
+    if (/server|community|people|social/i.test(content)) return 'social';
+    return 'general';
+  }
+
+  private shouldResearch(content: string, analysis: MessageAnalysis): boolean {
+    return /what is|research|find|look up|current|latest|news|statistics/i.test(content) || 
+           analysis.complexity === 'complex';
   }
 }
 
