@@ -43,6 +43,15 @@ export interface MCPBrowserAutomationResult {
   data: { pageTitle: string; pageContent: string };
 }
 
+// Define local type for sequential thinking steps to ensure strong typing
+type SequentialThinkingStep = {
+  stepNumber: number;
+  thought: string;
+  analysis?: string;
+  reasoning?: string;
+  conclusion: string;
+};
+
 // ---------- Internal wrapper response types ----------
 interface MCPMemorySearchResponse {
   entities?: MCPMemorySearchResult['entities'];
@@ -285,7 +294,7 @@ export class MCPProductionIntegrationService {
         totalThoughts: 5
       });
       const stepsRaw = (result as SequentialThinkingResult).steps ?? [];
-const steps = stepsRaw.map((step: SequentialThinkingStep) => ({
+const steps = (stepsRaw as SequentialThinkingStep[]).map((step) => ({
   stepNumber: step.stepNumber,
   thought: step.thought,
   analysis: step.analysis ?? step.reasoning ?? '',
