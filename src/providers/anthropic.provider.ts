@@ -33,7 +33,7 @@ export class AnthropicProvider {
       messages: [
         ...messages.map(m => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
         { role: 'user', content: prompt }
-      ] as any
+      ] as MessageParam[]
     });
     const text = response.content?.[0] && 'text' in response.content[0] ? (response.content[0] as any).text : '';
     return text || '';
