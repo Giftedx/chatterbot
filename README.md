@@ -1,17 +1,18 @@
-# Chatterbot
+# Chatterbot — Discord AI with Single `/chat` UX
 
-> Advanced Discord AI bot powered by Google Gemini.
+> A production-ready Discord bot built with TypeScript and discord.js v14. End users see just one command: `/chat`. Everything else happens automatically behind the scenes.
 
-[Browse the API Docs »](./docs/api/index.html)
-
-A production-ready Discord bot built with TypeScript and Discord.js v14, featuring unified AI conversation via a single /chat command, optional agentic tools, and clean modular architecture. This repo is named Chatterbot and the published package is also named chatterbot.
+### What users experience
+- Type `/chat` once to opt in. You’ll get a short, friendly consent message.
+- The bot replies only in a personal thread (or DM if you choose “Move to DM?”). No channel clutter.
+- After that, just talk normally in your thread/DM and the bot replies when addressed.
+- Say things like “pause for 30 minutes”, “resume”, “delete my data”, “export my data”, or “what do you know about me?” at any time; the bot handles it quietly via DM.
 
 ### Highlights
-- Unified /chat command with multimodal Google Gemini integration
-- Opt-in conversational mode after first /chat
-- Optional agentic features: knowledge base, escalation, stats
-- Prisma (SQLite by default), structured logging, health endpoint
-- Minimal configuration; works without optional external APIs
+- Single visible command: `/chat` (prompt + optional attachment)
+- Automatic memory, summarization, and RAG over shared files/links
+- Strong moderation, graceful degradation, model fallback
+- Observability: health, metrics, analytics dashboard (optional)
 
 ---
 
@@ -22,30 +23,25 @@ npm install
 
 # 2) Configure environment
 cp env.example .env
-# Edit .env and set: DISCORD_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
+# Set: DISCORD_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
 
 # 3) Initialize database (SQLite by default)
-npx prisma migrate dev --name init
+npx prisma migrate dev --name init  # first time
+# If you’ve pulled recent changes with new models:
+npx prisma migrate dev --name single_chat_models
 
 # 4) Run in dev
 npm run dev
-
-# Optional: run health-only server (no Discord login required)
-npm run dev:health
-# Then visit http://localhost:3000/health or /metrics
 ```
 
 ---
 
-### Commands
-- /chat prompt [attachment]
-  - Primary command. After first use, the bot will respond to your normal messages (opt-in).
+### The only command
+- `/chat prompt [attachment]`
+  - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
+  - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
 
-- Agentic commands (enabled when ENABLE_AGENTIC_INTELLIGENCE=true):
-  - /learn question answer [tags]
-  - /knowledge query
-  - /escalate query [reason]
-  - /agentic-stats
+Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
 
 ---
 
@@ -60,7 +56,6 @@ GEMINI_API_KEY=your_google_gemini_key
 Optional
 ```env
 # Feature flags
-ENABLE_AGENTIC_INTELLIGENCE=true
 ENABLE_ENHANCED_INTELLIGENCE=false
 
 # Analytics dashboard
@@ -68,81 +63,55 @@ ENABLE_ANALYTICS_DASHBOARD=false
 ANALYTICS_DASHBOARD_PORT=3001
 
 # Logging
-LOG_LEVEL=info  # error|warn|info|debug
+LOG_LEVEL=info
 NODE_ENV=development
 ```
 
-Enhanced intelligence (optional MCP-backed features)
-```env
-ENABLE_ENHANCED_INTELLIGENCE=true
-
-# External API keys (optional; enable related tools if present)
-BRAVE_API_KEY=your_brave_api_key      # Web search
-FIRECRAWL_API_KEY=your_firecrawl_key  # Content extraction
-
-# MCP integration
-ENABLE_MCP_INTEGRATION=true
-```
-
 Notes
-- Using /chat once opts you in; subsequent non-command messages get intelligent replies.
-- The bot works without BRAVE_API_KEY/FIRECRAWL_API_KEY; those only enable advanced tools.
+- Default DB is SQLite. Set `DATABASE_URL` to switch (e.g., Postgres). If Postgres+pgvector is available, embeddings can be stored there; otherwise remain in SQLite bytes fields or external stores.
 
 ---
 
-### Project Structure (abridged)
-```
-src/
-├─ index.ts                     # Bot entry point
-├─ services/
-│  ├─ core-intelligence.service.ts   # /chat pipeline
-│  ├─ gemini.service.ts              # Google Gemini integration
-│  ├─ analytics-dashboard.ts         # Optional metrics API
-│  ├─ ...
-├─ commands/
-│  └─ agentic-commands.ts            # /learn, /knowledge, /escalate, /agentic-stats
-├─ prisma/
-│  └─ schema.prisma                  # SQLite by default
-```
+### Architecture (high level)
+- Gateway: discord.js v14 with Message Content intent
+- Orchestrator: gating → moderation → intent detect → retrieve (history + memories + KB) → plan/answer/critique → post-process → auto-learn → log
+- Memory engine: durable facts/preferences/projects/relationships/style; summaries per user; time-decayed recency
+- Guild Knowledge Base (RAG): auto-ingests shared files/links, chunks+embeds, ranks by recency and relevance
+- Moderation: pre/post filters, safe-complete
+- Observability: metrics, traces, transcripts (sampling), feature flags, A/B harness
+
+Key models (Prisma)
+- `User` with `dmPreferred`, `lastThreadId`, `pauseUntil`
+- `Memory`, `Summary`, `KBSource`, `KBChunk`, `MessageLog`, `IntentLog`, `StyleProfile`
+- Existing aggregates remain (`UserMemory`, etc.) for backward compatibility
 
 ---
 
-### Documentation
-- API docs: `docs/api/` (generated by TypeDoc)
-- All legacy and planning docs live under `archive/`. Anything under `docs/` applies to the current codebase.
+### Privacy (short, friendly)
+- The bot remembers helpful, long-lived details to personalize replies.
+- You can say “delete my data” or “export my data” any time; the bot will DM you and complete it quietly.
+
+For administrators: internals and guardrails live in code; end users only see `/chat` and natural language controls.
 
 ---
 
-### Database
-- If you build or run locally outside Docker, generate Prisma client once:
-  - `npx prisma generate`
-- Default DB is SQLite. Set `DATABASE_URL` to switch.
-
----
-
-### Observability
-- Health: GET `/health` on `HEALTH_CHECK_PORT` (default 3000)
-- Metrics: GET `/metrics` (Prometheus exposition format)
-- Analytics dashboard (optional): enable with `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001` (configurable via `ANALYTICS_DASHBOARD_PORT`). The old `ENABLE_ANALYTICS` flag in `env.example` is used only by security tests to validate env docs; the actual flag for the built-in dashboard is `ENABLE_ANALYTICS_DASHBOARD`.
+### Observability & Ops
+- Health: GET `/health`
+- Metrics: GET `/metrics`
+- Optional dashboard: set `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001`
 
 ---
 
 ### Development
+- Build: `npm run build`
 - Lint: `npm run lint`
 - Typecheck: `npm run typecheck`
 - Test: `npm test`
 - Docs: `npm run docs`
-- Combined CI check (typecheck + lint + tests): `npm run check:all`
-- Health-only server: `npm run dev:health` then visit `http://localhost:3000/health`
-
----
 
 ### Docker
 ```bash
-# Build
 docker build -t chatterbot .
-
-# Run (example)
 docker run --rm -it \
   -e DISCORD_TOKEN=... \
   -e DISCORD_CLIENT_ID=... \
@@ -150,7 +119,4 @@ docker run --rm -it \
   chatterbot
 ```
 
----
-
-### License
 MIT © 2025

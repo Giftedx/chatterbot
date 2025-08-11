@@ -18,3 +18,13 @@ Allowed patterns:
 
 Verification:
 - Security tests ensure that no runtime code references ENABLE_DOCUMENTATION_UPDATES and that suspicious file write patterns to documentation do not appear in application code paths.
+
+# Security & Privacy Guidelines
+
+- Only `/chat` is exposed by default. All other controls (pause/resume/delete/export/move DM/new topic) are handled via natural language and completed quietly via DM.
+- The bot avoids channel clutter by responding only in user-specific threads or DMs.
+- Moderation runs pre- and post-generation; unsafe content is blocked or safe-completed.
+- No chain-of-thought is logged or stored. Durable state consists of message logs, intent logs, memories, summaries, and optional embeddings.
+- Deletion requests wipe user memories, summaries, logs, and media for that user. Exports are DM’d as JSON.
+- Respect Discord rate limits. The orchestrator uses backoffs and short cooldowns per user.
+- Production note: Prefer Postgres with pgvector for embeddings; fall back to SQLite bytes or external stores if unavailable.
