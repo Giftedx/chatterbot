@@ -465,7 +465,7 @@ export class CoreIntelligenceService {
             const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
 
             // Log incoming
-            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: message.id, role: 'user', content: message.content } }); } catch {}
+            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: message.id, role: 'user', content: message.content } }); } catch (err) { logger.warn('[CoreIntelSvc] Failed to log user message', { messageId: message.id, error: err }); }
 
             const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
             await message.reply(responseOptions);
