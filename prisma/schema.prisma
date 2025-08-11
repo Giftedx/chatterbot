@@ -72,40 +72,44 @@ model UserMemory {
   lastUpdated DateTime @default(now()) @updatedAt
   memoryCount Int     @default(0) // Track number of stored memories
   tokenCount  Int     @default(0) // Approximate token count for size control
+  
+  // Memory decay and importance
+  lastAccessed DateTime @default(now()) // When memory was last used
+  accessCount  Int @default(0) // How often memory has been accessed
+  importance   Float @default(0.5) // 0-1 importance score
+  decayRate    Float @default(0.05) // How fast memory decays
+  
   createdAt   DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memoryEmbeddings MemoryEmbedding[]
 
   @@map("user_memories")
   @@unique([userId, guildId])
 }
 
-model ConversationThread {
-  id            Int      @id @default(autoincrement())
-  channelId     String
+model UserConversationThread {
+  id            String   @id @default(cuid())
   userId        String
   guildId       String?
-  threadTitle   String?  // Optional user-defined or AI-generated title
-  currentTopic  String?  // Current active topic
-  status        String   @default("active") // "active", "paused", "completed", "archived"
-  summary       String?  // AI-generated summary of the thread
-  importance    Float    @default(0.5) // 0-1 importance score for context retention
-  messageCount  Int      @default(0) // Number of messages in thread
-  tokenCount    Int      @default(0) // Approximate token count for the thread
-  createdAt     DateTime @default(now())
+  channelId     String
+  threadId      String   // Discord thread ID
+  threadTitle   String?  // Title of the thread
+  isActive      Boolean  @default(true)
+  messageCount  Int      @default(0)
   lastActivity  DateTime @default(now()) @updatedAt
   
-  // Relations
-  messages      ConversationMessage[]
-  topics        ConversationThreadTopic[]
-  multimodalConversations MultimodalConversation[]
-
-  @@map("conversation_threads")
-  @@index([channelId, userId])
-  @@index([status, lastActivity])
+  createdAt     DateTime @default(now())
+  
+  @@map("user_conversation_threads")
+  @@unique([userId, guildId, channelId])
+  @@index([threadId])
+  @@index([isActive, lastActivity])
 }
 
 model ConversationMessage {
   id               Int      @id @default(autoincrement())
-  threadId         Int?     // Optional: can be part of a thread
   channelId        String
   userId           String
   content          String
@@ -127,12 +131,10 @@ model ConversationMessage {
   createdAt        DateTime @default(now())
 
   // Relations
-  thread           ConversationThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
   mediaFiles       MediaFile[]
 
   @@map("conversation_messages")
   @@index([channelId, createdAt])
-  @@index([threadId, createdAt])
   @@index([importance, contextRelevant])
   @@index([hasImages, hasAudio, hasDocuments])
 }
@@ -148,30 +150,11 @@ model ConversationTopic {
   frequency       Int      @default(1) // How often this topic appears
   importance      Float    @default(0.5) // 0-1 importance score
 
-  // Relations
-  threadTopics    ConversationThreadTopic[]
-
   @@map("conversation_topics")
   @@index([category, importance])
   @@index([frequency, lastMentioned])
 }
 
-model ConversationThreadTopic {
-  id         Int      @id @default(autoincrement())
-  threadId   Int
-  topicId    Int
-  relevance  Float    @default(0.5) // 0-1 how relevant this topic is to the thread
-  firstSeen  DateTime @default(now())
-  lastSeen   DateTime @default(now()) @updatedAt
-
-  // Relations
-  thread     ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  topic      ConversationTopic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
-
-  @@map("conversation_thread_topics")
-  @@unique([threadId, topicId])
-  @@index([relevance, lastSeen])
-}
 
 // Media and File Processing Models for Multimodal AI Integration
 
@@ -251,7 +234,7 @@ model MediaInsight {
 
 model MultimodalConversation {
   id              Int       @id @default(autoincrement())
-  conversationThreadId Int
+  conversationId  String    // Reference to conversation session
   
   // Multimodal context
   mediaReferences String?   // JSON array of related media files
@@ -264,14 +247,11 @@ model MultimodalConversation {
   keyVisualElements String? // JSON array of important visual elements
   extractedEntities String? // JSON array of named entities from all content
   
-  // Relationships
-  conversationThread ConversationThread @relation(fields: [conversationThreadId], references: [id], onDelete: Cascade)
-  
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   
   @@map("multimodal_conversations")
-  @@index([conversationThreadId])
+  @@index([conversationId])
 }
 
 model ContentModerationResult {
@@ -308,28 +288,83 @@ model ContentModerationResult {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
+  id        String   @id // Discord user ID
+  username  String?  // Discord username for reference
+  optedInAt DateTime? // When user first opted in via /chat
+  optedOut  Boolean  @default(false) // If user has opted out
+  optedOutAt DateTime? // When user opted out
+  
+  // Privacy and data management
+  privacyAccepted Boolean @default(false) // Explicit privacy policy acceptance
+  privacyAcceptedAt DateTime? // When privacy was accepted
+  dataRetentionDays Int @default(90) // Custom retention period
+  
+  // Consent tracking
+  consentToStore Boolean @default(false) // Consent to store memories
+  consentToAnalyze Boolean @default(false) // Consent to analyze behavior
+  consentToPersonalize Boolean @default(false) // Consent to personalization
+  
+  // Data lifecycle
+  lastActivity DateTime @default(now()) @updatedAt
+  dataExportedAt DateTime? // Last data export timestamp
+  scheduledDeletion DateTime? // When data is scheduled for deletion
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Relations
+  memories UserMemory[]
+  
+  @@map("users")
 }
 
-model KnowledgeEntry {
-  id         String   @id @default(cuid())
-  content    String
-  source     String   // 'discord_message', 'faq', 'document', 'manual'
-  sourceId   String   // Discord message ID, FAQ ID, etc.
-  sourceUrl  String?  // Optional URL to source
-  channelId  String?  // Discord channel ID
-  authorId   String?  // Discord user ID
-  tags       String?  // JSON array of tags for categorization
-  confidence Float    @default(0.8) // 0-1 confidence score
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model MemoryEmbedding {
+  id          Int      @id @default(autoincrement())
+  memoryId    Int
+  content     String   // The text content that was embedded
+  embedding   Bytes    // Gemini embedding vector stored as bytes
+  kind        MemoryKind // Type of memory (FACT, PREF, NOTE)
+  weight      Float    @default(0.7) // Importance weight
+  lastSeenAt  DateTime @updatedAt
+  sourceMsgId String?  // Original message ID
+  
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  userMemory  UserMemory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  
+  @@map("memory_embeddings")
+  @@index([kind, weight])
+  @@index([lastSeenAt])
+}
 
+enum MemoryKind { 
+  FACT 
+  PREF 
+  NOTE 
+}
+
+model GuildKnowledgeBase {
+  id          String   @id @default(cuid())
+  guildId     String   
+  content     String   // Knowledge content
+  source      String   // 'manual', 'document', 'url', 'discord_message'
+  sourceId    String?  // Discord message ID, document ID, etc.
+  sourceUrl   String?  // Optional URL to source
+  tags        String?  // JSON array of tags for categorization
+  confidence  Float    @default(0.8) // 0-1 confidence score
+  embedding   Bytes?   // Gemini embedding for retrieval
+  
+  // Access control
+  addedBy     String   // User ID who added this
+  isPublic    Boolean  @default(true) // Whether all guild members can see
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("guild_knowledge_base")
+  @@index([guildId])
   @@index([source])
-  @@index([channelId])
   @@index([confidence])
   @@index([tags])
 }
