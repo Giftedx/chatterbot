@@ -159,7 +159,7 @@ export class KnowledgeBaseService {
         totalSearched: entries.length
       });
 
-      return relevantEntries as any;
+      return relevantEntries;
     } catch (error) {
       logger.error('Failed to search knowledge base', error);
       return [];
