@@ -29,6 +29,7 @@ const enablePersonalization = process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true
 const enableEnhancedMemory = process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true';
 const enableEnhancedUI = process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true';
 const enableResponseCache = process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true'; // Assuming enhanced includes cache
+const enableAdvancedCapabilities = process.env.ENABLE_ADVANCED_CAPABILITIES !== 'false'; // Default to true
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
@@ -41,6 +42,7 @@ const coreIntelConfig: CoreIntelligenceConfig = {
     enableEnhancedMemory,
     enableEnhancedUI,
     enableResponseCache,
+    enableAdvancedCapabilities,
     // MCP Manager will be passed after its initialization if needed
 };
 
