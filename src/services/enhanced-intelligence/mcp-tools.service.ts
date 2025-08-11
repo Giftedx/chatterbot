@@ -5,12 +5,29 @@
 
 import { MCPToolResult, ProcessingContext, AttachmentInfo } from './types.js';
 import { DirectMCPExecutor } from './direct-mcp-executor.service.js';
+import { AdvancedReasoningOrchestrator } from '../advanced-reasoning/index.js';
+import type { AdvancedReasoningConfig } from '../advanced-reasoning/types.js';
 
 export class EnhancedMCPToolsService {
   private mcpExecutor: DirectMCPExecutor;
+  private advancedOrchestrator: AdvancedReasoningOrchestrator;
 
   constructor() {
     this.mcpExecutor = new DirectMCPExecutor();
+    const defaultAdvancedConfig: AdvancedReasoningConfig = {
+      enableReAct: true,
+      enableChainOfDraft: true,
+      enableTreeOfThoughts: true,
+      enableCouncilOfCritics: true,
+      enableMetaCognitive: true,
+      maxProcessingTime: 8000,
+      maxReasoningSteps: 10,
+      confidenceThreshold: 0.6,
+      enableSelfReflection: true,
+      enableErrorRecovery: true,
+      adaptiveComplexity: true
+    };
+    this.advancedOrchestrator = new AdvancedReasoningOrchestrator(defaultAdvancedConfig);
   }
   
   /**
@@ -174,22 +191,46 @@ export class EnhancedMCPToolsService {
    */
   private async performComplexReasoning(content: string, context: ProcessingContext): Promise<void> {
     try {
-      // Use the direct executor to execute real sequential thinking
-      const result = await this.mcpExecutor.executeSequentialThinking(content);
-      
-      console.log(`🧠 Complex reasoning completed for: ${content.substring(0, 50)}...`);
-      
+      // Prefer advanced reasoning orchestrator
+      const advancedResponse = await this.advancedOrchestrator.processAdvancedReasoning(
+        content,
+        {
+          userId: context.userId,
+          channelId: context.channelId,
+          guildId: context.guildId,
+          requiredTools: context.analysis.requiredTools,
+          urls: context.analysis.urls
+        }
+      );
+
       context.results.set('complex-reasoning', {
-        success: result.success,
-        data: result.data,
-        toolUsed: 'sequential_thinking'
-      });
-    } catch (error) {
-      context.results.set('complex-reasoning', {
-        success: false,
-        error: `Complex reasoning failed: ${error}`,
-        toolUsed: 'sequential_thinking'
-      });
+        success: true,
+        data: {
+          type: advancedResponse.type,
+          response: advancedResponse.primaryResponse,
+          reasoningProcess: advancedResponse.reasoningProcess,
+          confidence: advancedResponse.confidence,
+          alternatives: advancedResponse.alternatives || [],
+          metadata: advancedResponse.metadata
+        },
+        toolUsed: 'advanced_reasoning'
+      } as MCPToolResult);
+    } catch (advancedError) {
+      // Fallback to sequential thinking via DirectMCPExecutor
+      try {
+        const result = await this.mcpExecutor.executeSequentialThinking(content);
+        context.results.set('complex-reasoning', {
+          success: result.success,
+          data: result.data,
+          toolUsed: 'sequential_thinking'
+        } as MCPToolResult);
+      } catch (fallbackError) {
+        context.results.set('complex-reasoning', {
+          success: false,
+          error: `Complex reasoning failed: ${advancedError}`,
+          toolUsed: 'advanced_reasoning'
+        } as MCPToolResult);
+      }
     }
   }
 
