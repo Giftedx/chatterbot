@@ -471,7 +471,7 @@ export class CoreIntelligenceService {
             await message.reply(responseOptions);
 
             // Log assistant reply
-            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch {}
+            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch (err) { logger.error('[CoreIntelSvc] Failed to log assistant reply:', { messageId: message.id, error: err }); }
         } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
             console.error('Failed to send reply', error);
