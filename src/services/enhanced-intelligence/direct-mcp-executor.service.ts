@@ -609,7 +609,7 @@ export class DirectMCPExecutor {
   async executeTextToSpeech(text: string, voiceId?: string): Promise<MCPToolResult> {
     try {
       console.log(`🗣️ TTS: ${text.substring(0, 80)}...`);
-      const vId = voiceId || this.elevenLabsVoiceId || '21m00Tcm4TlvDq8ikWAM';
+      const vId = voiceId || this.elevenLabsVoiceId;
       if (this.elevenLabsApiKey) {
         try {
           const resp = await axios.post(
