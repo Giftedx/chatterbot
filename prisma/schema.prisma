@@ -308,12 +308,19 @@ model User {
   lastActivity DateTime @default(now()) @updatedAt
   dataExportedAt DateTime? // Last data export timestamp
   scheduledDeletion DateTime? // When data is scheduled for deletion
+
+  // Conversation routing and controls
+  dmPreferred  Boolean  @default(false)
+  lastThreadId String?
+  pauseUntil   DateTime?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   memories UserMemory[]
+  style    StyleProfile?
+  summaries Summary[]
   
   @@map("users")
 }
@@ -342,6 +349,95 @@ enum MemoryKind {
   FACT 
   PREF 
   NOTE 
+  PROJECT
+  RELATIONSHIP
+  STYLE
+}
+
+/// New granular durable Memory store (in addition to existing UserMemory JSON aggregate)
+model Memory {
+  id           String   @id @default(cuid())
+  userId       String
+  kind         MemoryKind
+  content      String
+  importance   Float    @default(0.7) // [0..1]
+  recencyScore Float    @default(0)
+  sourceMsgId  String?
+  guildId      String?
+  embedding    Bytes?   // Optional embedding or external vector id bytes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Summary {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String   // compact profile summary
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model KBSource {
+  id        String   @id @default(cuid())
+  guildId   String
+  title     String
+  url       String?
+  fileId    String?
+  checksum  String   @unique
+  addedBy   String?
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model KBChunk {
+  id         String   @id @default(cuid())
+  sourceId   String
+  content    String
+  embedding  Bytes?
+  section    String?
+  createdAt  DateTime @default(now())
+
+  @@index([sourceId])
+}
+
+model MessageLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  guildId    String?
+  channelId  String?
+  threadId   String?
+  msgId      String
+  role       String   // user | assistant | system
+  content    String
+  tokens     Int      @default(0)
+  error      String?
+  createdAt  DateTime @default(now())
+}
+
+model IntentLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  type       String   // PAUSE | RESUME | DELETE | EXPORT | MOVE_DM | MOVE_THREAD | NEW_TOPIC
+  payload    Json?
+  createdAt  DateTime @default(now())
+}
+
+model StyleProfile {
+  userId      String   @id
+  tone        String?
+  formality   String?
+  emojis      Boolean? @default(true)
+  readingLvl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model GuildKnowledgeBase {

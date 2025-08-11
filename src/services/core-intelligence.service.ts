@@ -52,8 +52,9 @@ import { ChatMessage, getHistory, updateHistory, updateHistoryWithParts } from '
 import { createPrivacyConsentEmbed, createPrivacyConsentButtons } from '../ui/privacy-consent.js';
 import { UserConsentService } from '../services/user-consent.service.js';
 import { ModerationService } from '../moderation/moderation-service.js';
-import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID } from '../ui/components.js';
+import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID, MOVE_DM_BUTTON_ID, moveDmButtonRow } from '../ui/components.js';
 import { urlToGenerativePart } from '../utils/image-helper.js';
+import { prisma } from '../db/prisma.js';
 
 // import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
 
@@ -87,6 +88,8 @@ export class CoreIntelligenceService {
     private optedInUsers = new Set<string>();
     private activeStreams = new Map<string, { abortController: AbortController; isStreaming: boolean }>();
     private lastPromptCache = new Map<string, { prompt: string; attachments: CommonAttachment[]; channelId: string }>();
+    private lastReplyAt = new Map<string, number>();
+    private userThreadCache = new Map<string, string>();
 
     private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
     private readonly analyticsService: UnifiedAnalyticsService;
@@ -228,83 +231,251 @@ export class CoreIntelligenceService {
         const userId = interaction.user.id;
         const username = interaction.user.username;
 
-        // Check if user has given privacy consent
+        // Auto opt-in and consent: brief, friendly
         const userConsent = await this.userConsentService.getUserConsent(userId);
-        
         if (!userConsent || !userConsent.privacyAccepted || userConsent.optedOut) {
-            // Show privacy consent modal for first-time users
-            const embed = createPrivacyConsentEmbed();
-            const buttons = createPrivacyConsentButtons();
-            
-            await interaction.reply({
-                embeds: [embed],
-                components: [buttons],
-                ephemeral: true
-            });
-            return;
+          const embed = createPrivacyConsentEmbed();
+          const buttons = createPrivacyConsentButtons();
+          await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
+          return;
         }
 
-        // Check if user is paused
-        const isPaused = await this.userConsentService.isUserPaused(userId);
-        if (isPaused) {
-            await interaction.reply({
-                content: '⏸️ Your interactions are currently paused. Use `/resume` to resume or wait for the pause to expire.',
-                ephemeral: true
-            });
-            return;
+        // Respect pause
+        if (await this.userConsentService.isUserPaused(userId)) {
+          await interaction.reply({ content: '⏸️ You’re paused. Say “resume” or use /resume to continue.', ephemeral: true });
+          return;
         }
 
-        // Update user activity and ensure they're in our legacy opted-in set for compatibility
+        // Ensure presence and routing prefs
         await this.userConsentService.updateUserActivity(userId);
         this.optedInUsers.add(userId);
-        
-        await interaction.deferReply();
+
+        // Open DM or personal thread
+        const routing = await this.userConsentService.getRouting(userId);
+        let targetChannelId = routing.lastThreadId || interaction.channelId;
+        let movedToDm = false;
+
+        try {
+          if (routing.dmPreferred) {
+            const dm = await interaction.user.createDM();
+            targetChannelId = dm.id;
+            movedToDm = true;
+          } else {
+            // Ensure a personal thread exists in this guild/channel
+            if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
+              const parent: any = interaction.channel;
+              const thread = await parent.threads.create({
+                name: `chat-${interaction.user.username}`.slice(0, 90),
+                autoArchiveDuration: 1440,
+                reason: 'Personal chat thread',
+              });
+              targetChannelId = thread.id;
+              await this.userConsentService.setLastThreadId(userId, thread.id);
+            }
+          }
+        } catch (e) {
+          // Fallback to current channel if thread/DM failed
+          targetChannelId = interaction.channelId;
+        }
+
+        // Acknowledge ephemerally
+        const moveDmRow = routing.dmPreferred ? undefined : [moveDmButtonRow];
+        const ack = movedToDm
+          ? 'DM opened. Chat with me there anytime.'
+          : 'You’re all set. I’ll reply in your personal thread/DM.';
+        await interaction.reply({ content: ack, components: moveDmRow as any, ephemeral: true });
+
+        // If prompt provided, process and send to destination
         const commonAttachments: CommonAttachment[] = [];
         if (discordAttachment) {
-            commonAttachments.push({ name: discordAttachment.name, url: discordAttachment.url, contentType: discordAttachment.contentType });
+          commonAttachments.push({ name: discordAttachment.name, url: discordAttachment.url, contentType: discordAttachment.contentType });
         }
-        const messageOptions = await this._processPromptAndGenerateResponse(promptText, userId, interaction.channelId, interaction.guildId, commonAttachments, interaction);
-        await interaction.editReply(messageOptions);
+
+        // Create a mock message context targeting the destination channel
+        const messageOptions = await this._processPromptAndGenerateResponse(
+          promptText,
+          userId,
+          targetChannelId,
+          interaction.guildId,
+          commonAttachments,
+          interaction
+        );
+
+        try {
+          // Send message to the destination
+          if (routing.dmPreferred) {
+            const dm = await interaction.user.createDM();
+            await dm.send(messageOptions as any);
+          } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
+            const chan = await interaction.client.channels.fetch(targetChannelId);
+            if (chan && chan?.isTextBased()) await (chan as any).send(messageOptions);
+          } else {
+            await interaction.followUp(messageOptions);
+          }
+        } catch (_) {
+          // As last resort, send as follow-up in current context
+          await interaction.followUp(messageOptions);
+        }
+    }
+
+    private async loadOptedInUsers(): Promise<void> { logger.info('[CoreIntelSvc] Opted-in user loading (mocked - in-memory).'); }
+    private async saveOptedInUsers(): Promise<void> { logger.info('[CoreIntelSvc] Opted-in user saving (mocked - in-memory).'); }
+
+    private withinCooldown(userId: string, ms: number): boolean {
+        const now = Date.now();
+        const last = this.lastReplyAt.get(userId) || 0;
+        if (now - last < ms) return true;
+        this.lastReplyAt.set(userId, now);
+        return false;
+    }
+
+    private async shouldRespond(message: Message): Promise<boolean> {
+        const userId = message.author.id;
+        const consent = await this.userConsentService.getUserConsent(userId);
+        if (!consent || consent.optedOut) return false;
+        if (await this.userConsentService.isUserPaused(userId)) return false;
+
+        const inDM = !message.guildId;
+        if (inDM) return true;
+
+        const routing = await this.userConsentService.getRouting(userId);
+        const inPersonalThread = routing.lastThreadId && message.channelId === routing.lastThreadId;
+
+        const mentionedBot = !!message.mentions?.users?.has(message.client.user!.id);
+        const addressed = mentionedBot || /^(hey|hi|ok|bot|assistant)[\s,]+/i.test(message.content) || message.content.includes('?');
+
+        return Boolean(inPersonalThread || mentionedBot || addressed);
+    }
+
+    private classifyControlIntent(text: string): { intent: string; payload?: any } {
+        const t = text.toLowerCase();
+        // DELETE / EXPORT
+        if (/\b(delete|remove) my data\b|\bforget me\b/.test(t)) return { intent: 'DELETE' };
+        if (/\bexport my data\b|\bdata export\b|\bwhat do you know about me\b/.test(t)) return { intent: 'EXPORT' };
+        // PAUSE / RESUME
+        const pauseMatch = t.match(/\bpause(?: for)?\s+(\d+)\s*(minute|minutes|hour|hours)?/);
+        if (pauseMatch) {
+          const n = parseInt(pauseMatch[1], 10);
+          const unit = pauseMatch[2] || 'minutes';
+          const minutes = /hour/.test(unit) ? n * 60 : n;
+          return { intent: 'PAUSE', payload: { minutes } };
+        }
+        if (/\bpause\b|\bstop\b/.test(t)) return { intent: 'PAUSE', payload: { minutes: 60 } };
+        if (/\bresume\b|\bcontinue\b/.test(t)) return { intent: 'RESUME' };
+        // MOVE
+        if (/\bswitch to dm\b|\bdm(s)?\b|\btalk in dm\b/.test(t)) return { intent: 'MOVE_DM' };
+        if (/\btalk here\b|\bstay here\b/.test(t)) return { intent: 'MOVE_THREAD' };
+        if (/\bnew topic\b|\bstart over\b|\brestart\b/.test(t)) return { intent: 'NEW_TOPIC' };
+        return { intent: 'NONE' };
+    }
+
+      private async handleControlIntent(intent: string, payload: any, messageOrInteraction: Message | ChatInputCommandInteraction): Promise<boolean> {
+    const targetUser = 'user' in messageOrInteraction ? (messageOrInteraction as ChatInputCommandInteraction).user : (messageOrInteraction as Message).author;
+    const userId = targetUser.id;
+    const guildId = (messageOrInteraction as any).guildId || null;
+
+    const logIntent = async (type: string, pl?: any) => {
+      try { await prisma.intentLog.create({ data: { userId, type, payload: pl ?? undefined } }); } catch {}
+    };
+
+    const dm = await targetUser.createDM();
+
+        switch (intent) {
+          case 'PAUSE': {
+            const minutes = Math.max(1, Math.min(1440, payload?.minutes ?? 60));
+            const resumeAt = await this.userConsentService.pauseUser(userId, minutes);
+            await dm.send(`⏸️ Paused for ${minutes} minutes. I’ll be quiet until <t:${Math.floor((resumeAt?.getTime() || Date.now())/1000)}:t>.`);
+            await logIntent('PAUSE', { minutes });
+            return true;
+          }
+          case 'RESUME': {
+            await this.userConsentService.resumeUser(userId);
+            await dm.send('▶️ Resumed. I’m listening again.');
+            await logIntent('RESUME');
+            return true;
+          }
+          case 'DELETE': {
+            await dm.send('🔒 Got it. Deleting your data now…');
+            const ok = await this.userConsentService.forgetUser(userId);
+            await dm.send(ok ? '✅ Done. Your data has been deleted.' : '❌ I couldn’t delete your data. Please try again.');
+            await logIntent('DELETE');
+            return true;
+          }
+          case 'EXPORT': {
+            const data = await this.userConsentService.exportUserData(userId);
+            if (!data) { await dm.send('❌ I couldn’t export your data right now. Please try later.'); await logIntent('EXPORT', { ok: false }); return true; }
+            const json = JSON.stringify(data, null, 2);
+            await dm.send({ content: '📥 Your data export is ready.', files: [{ attachment: Buffer.from(json, 'utf-8'), name: 'export.json' }] });
+            await logIntent('EXPORT', { ok: true });
+            return true;
+          }
+          case 'MOVE_DM': {
+            await this.userConsentService.setDmPreference(userId, true);
+            await dm.send('📩 Okay! I’ll reply in DMs from now on.');
+            await logIntent('MOVE_DM');
+            return true;
+          }
+          case 'MOVE_THREAD': {
+            await this.userConsentService.setDmPreference(userId, false);
+            await dm.send('🧵 Got it. I’ll reply in your thread here.');
+            await logIntent('MOVE_THREAD');
+            return true;
+          }
+          case 'NEW_TOPIC': {
+            // Clear lastThreadId to force a fresh thread next time
+            await this.userConsentService.setLastThreadId(userId, null);
+            await dm.send('🆕 New topic set. I’ll start a fresh thread next time.');
+            await logIntent('NEW_TOPIC');
+            return true;
+          }
+          default:
+            return false;
+        }
     }
 
     public async handleMessage(message: Message): Promise<void> {
         try {
-            if (message.author.bot || message.content.startsWith('/') || (message.content.length < 3 && message.attachments.size === 0)) {
-                return;
-            }
+            if (message.author.bot || message.content.startsWith('/')) return;
 
             const userId = message.author.id;
-            
-            // Check if user has proper consent and is opted in
+
+            // Opt-in required
             const isOptedIn = await this.userConsentService.isUserOptedIn(userId);
-            if (!isOptedIn) {
-                return; // Silently ignore messages from non-opted-in users
+            if (!isOptedIn) return;
+
+            // Cooldown
+            if (this.withinCooldown(userId, 8000)) return;
+
+            // Gating: only respond when addressed, mentioned, or in personal thread/DM
+            const respond = await this.shouldRespond(message);
+            if (!respond) return;
+
+            // Intent detection (latent controls). If handled, stop.
+            const ctrl = this.classifyControlIntent(message.content);
+            if (ctrl.intent !== 'NONE') {
+                const handled = await this.handleControlIntent(ctrl.intent, ctrl.payload, message);
+                if (handled) return;
             }
 
-            // Check if user is paused
-            const isPaused = await this.userConsentService.isUserPaused(userId);
-            if (isPaused) {
-                return; // Silently ignore messages from paused users
-            }
-
-            // Update user activity and add to legacy opted-in set for compatibility
+            // Update activity
             await this.userConsentService.updateUserActivity(userId);
             this.optedInUsers.add(userId);
 
             if ('sendTyping' in message.channel) await message.channel.sendTyping();
             const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
+
+            // Log incoming
+            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: message.id, role: 'user', content: message.content } }); } catch {}
+
             const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
             await message.reply(responseOptions);
+
+            // Log assistant reply
+            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch {}
         } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
             console.error('Failed to send reply', error);
-            
-            // Try to send a fallback error message
-            try {
-                await message.reply({ content: '🤖 Sorry, I encountered an error while processing your message. Please try again later.' });
-            } catch (replyError) {
-                logger.error('[CoreIntelSvc] Failed to send error reply:', { messageId: message.id, error: replyError });
-            }
+            try { await message.reply({ content: '🤖 Sorry, I encountered an error while processing your message. Please try again later.' }); } catch {}
         }
     }
 
@@ -623,9 +794,9 @@ export class CoreIntelligenceService {
             if (interaction.channel && 'send' in interaction.channel) {
                 await interaction.channel.send(regeneratedResponseOptions);
             }
+        } else if (interaction.customId === MOVE_DM_BUTTON_ID) {
+            await this.userConsentService.setDmPreference(userId, true);
+            await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
         }
     }
-
-    private async loadOptedInUsers(): Promise<void> { logger.info('[CoreIntelSvc] Opted-in user loading (mocked - in-memory).'); }
-    private async saveOptedInUsers(): Promise<void> { logger.info('[CoreIntelSvc] Opted-in user saving (mocked - in-memory).'); }
 }

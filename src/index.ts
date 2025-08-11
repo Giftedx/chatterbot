@@ -59,13 +59,9 @@ const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list
 const coreCommands = coreIntelligenceService.buildCommands().map(cmd => cmd.toJSON());
-const privacyCommandsJson = privacyCommands.map(cmd => cmd.data.toJSON());
-const memoryCommandsJson = memoryCommands.map(cmd => cmd.data.toJSON());
+// Hide extra commands: do not register privacy/memory/agentic by default
 const allCommands = [
-  ...coreCommands,
-  ...privacyCommandsJson,
-  ...memoryCommandsJson,
-  ...(enableAgenticFeatures ? agenticCommands.map(cmd => cmd.data.toJSON()) : [])
+  ...coreCommands
 ];
 
 client.once('ready', async () => {
@@ -115,11 +111,6 @@ client.once('ready', async () => {
     await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), { body: allCommands });
     console.log(`✅ Registered ${allCommands.length} commands:`);
     coreCommands.forEach(cmd => console.log(`   - /${cmd.name} (Core Intelligence)`));
-    privacyCommandsJson.forEach(cmd => console.log(`   - /${cmd.name} (Privacy & Data Control)`));
-    memoryCommandsJson.forEach(cmd => console.log(`   - /${cmd.name} (Memory Management)`));
-    if (enableAgenticFeatures) {
-      agenticCommands.forEach(cmd => console.log(`   - /${cmd.data.name} (Agentic System)`));
-    }
   } catch (error) {
     console.error('❌ Error registering commands:', error);
   }
