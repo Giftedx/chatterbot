@@ -608,7 +608,16 @@ export class UltraIntelligentResearchService {
      */
     private extractKeyFindings(content: string, query: string, domain: ResearchQuery['domain']): string[] {
         const findings: string[] = [];
-        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+        // Limit content length to prevent performance issues
+        const MAX_CONTENT_LENGTH = 20000; // 20k chars
+        const MAX_SENTENCES = 500;
+        let safeContent = content;
+        if (content.length > MAX_CONTENT_LENGTH) {
+            safeContent = content.slice(0, MAX_CONTENT_LENGTH);
+        }
+        const findings: string[] = [];
+        // Split into sentences and limit the number processed
+        const sentences = safeContent.split(/[.!?]+/).filter(s => s.trim().length > 20).slice(0, MAX_SENTENCES);
         
         // Look for definitive statements
         const definitivePatterns = [
