@@ -26,7 +26,8 @@ jobs:
         run: npm ci
 
       - name: Verify environment (non-strict)
-        run: node scripts/verify-env.mjs || true
+        continue-on-error: true
+        run: node scripts/verify-env.mjs
 
       - name: Lint
         run: npm run lint --if-present
