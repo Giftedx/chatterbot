@@ -51,7 +51,7 @@ export class ModelRouterService {
     const provider = this.pickProvider(prompt, history);
 
     if (provider === 'openai' && this.openai) {
-      const mapped = history.map(m => ({ role: m.role as any, content: m.parts.map(p => p.text).join(' ') }));
+      const mapped = history.map(m => ({ role: m.role === 'model' ? 'assistant' : m.role, content: m.parts.map(p => p.text).join(' ') }));
       return this.openai.generate(prompt, mapped, systemPrompt);
     }
 
