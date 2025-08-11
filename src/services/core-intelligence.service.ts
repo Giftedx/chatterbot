@@ -310,8 +310,8 @@ export class CoreIntelligenceService {
             await dm.send(messageOptions as any);
           } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
             const chan = await interaction.client.channels.fetch(targetChannelId);
-            if (chan && 'isTextBased' in chan && typeof (chan as any).isTextBased === 'function' && (chan as any).isTextBased()) {
-              if ('send' in (chan as any)) await (chan as any).send(messageOptions);
+            if (chan?.isTextBased()) {
+              await chan.send(messageOptions);
             }
           } else {
             await interaction.followUp(messageOptions);
