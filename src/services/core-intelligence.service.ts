@@ -709,7 +709,7 @@ export class CoreIntelligenceService {
               citations: { citations: [], hasCitations: false, confidence: 0 },
               flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
               escalation: { shouldEscalate: false, priority: 'low', reason: '' },
-              knowledgeGrounded: false,
+              knowledgeGrounded: kbResults.length > 0,
               sourceSummary: '',
               metadata: { processingTime: 0, knowledgeEntriesFound: 0, responseQuality: 'high' }
             };
