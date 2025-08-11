@@ -360,8 +360,7 @@ export const agenticCommands = [
   {
     data: new SlashCommandBuilder()
       .setName('voice-leave')
-      .setDescription('Leave voice channel (preview)')
-    ,
+      .setDescription('Leave voice channel (preview)'),
     async execute(interaction: ChatInputCommandInteraction) {
       await interaction.reply({ content: '👋 Voice leave preview: feature coming soon.', ephemeral: true });
     }
