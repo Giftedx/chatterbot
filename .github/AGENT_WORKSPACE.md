@@ -85,7 +85,7 @@ npm run format
 ## AI Agent Integration
 
 ### Context Files Priority
-1. `.github/copilot-instructions.md` - **Primary context**
+1. `.github/COPILOT_INSTRUCTIONS.md` - **Primary context**
 2. `docs/ARCHITECTURE.md` - System overview  
 3. `docs/context/agent-brief.md` - Working agreements
 4. `package.json` - Dependencies and scripts
@@ -148,7 +148,7 @@ Some domains may be blocked in agent environments:
 - Use `npm run dev:health` for quick checks
 
 #### Context Management
-- Always read `.github/copilot-instructions.md` first
+- Always read `.github/COPILOT_INSTRUCTIONS.md` first
 - Generate snapshots before major changes
 - Update documentation when adding features
 - Maintain environment variable examples
@@ -187,7 +187,7 @@ Some domains may be blocked in agent environments:
 
 #### Documentation
 - `.github/COPILOT_AGENT_SETUP.md` - Complete setup guide
-- `.github/copilot-instructions.md` - Architecture guide
+- `.github/COPILOT_INSTRUCTIONS.md` - Architecture guide
 - `docs/ARCHITECTURE.md` - System overview
 - `docs/context/agent-brief.md` - Quick reference
 

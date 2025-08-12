@@ -71,7 +71,7 @@ class AgentEnvironmentValidator {
     const requiredFiles = [
       'package.json',
       'tsconfig.json',
-      '.github/copilot-instructions.md',
+      '.github/COPILOT_INSTRUCTIONS.md',
       'docs/ARCHITECTURE.md',
       'docs/context/agent-brief.md',
       'env.example',
@@ -347,7 +347,7 @@ class AgentEnvironmentValidator {
     
     console.log(`\n${colors.bold}For more information:${colors.reset}`);
     console.log('  • Read: .github/COPILOT_AGENT_SETUP.md');
-    console.log('  • Review: .github/copilot-instructions.md');
+    console.log('  • Review: .github/COPILOT_INSTRUCTIONS.md');
     console.log('  • Check: docs/context/agent-brief.md');
     
     // Exit with error code if critical issues found

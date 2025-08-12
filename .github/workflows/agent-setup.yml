@@ -172,5 +172,5 @@ jobs:
           echo ""
           echo "📖 Documentation:"
           echo "  • Setup guide: .github/COPILOT_AGENT_SETUP.md"
-          echo "  • Architecture: .github/copilot-instructions.md"
+          echo "  • Architecture: .github/COPILOT_INSTRUCTIONS.md"
           echo "  • Workspace: .github/AGENT_WORKSPACE.md"
