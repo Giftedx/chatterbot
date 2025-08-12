@@ -103,7 +103,10 @@ MIT © 2025
 
 - Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
 - Automatic routing selects the best model based on signals (coding, long context, safety, latency). Users do not choose providers; the AI selects automatically per message.
-- Cross-model answer verification and self-critique can be enabled to improve factuality and reasoning.
+- Optional internal enhancements (flag-controlled):
+  - LangGraph-driven intent conditioning (`FEATURE_LANGGRAPH=true`) to improve tone/precision.
+  - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations and future tool/JSON workflows.
+  - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
 
 Environment flags (see `env.example`):
 

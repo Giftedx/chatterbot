@@ -33,6 +33,23 @@ function reRankEntries(entries: Array<{ content: string } & Record<string, any>>
   return selected;
 }
 
+async function cohereRerank(query: string, entries: Array<{ content: string } & Record<string, any>>, limit: number): Promise<any[]> {
+  try {
+    if (!process.env.COHERE_API_KEY || process.env.FEATURE_RERANK !== 'true') return entries.slice(0, limit);
+    const { CohereClient } = await import('cohere-ai');
+    const cohere = new CohereClient({ token: process.env.COHERE_API_KEY! });
+    const documents = entries.map((e, idx) => ({ id: String(idx), text: e.content }));
+    const result = await cohere.rerank({ model: 'rerank-english-v3.0', query, documents });
+    const ranked = result.results
+      .sort((a: any, b: any) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
+      .slice(0, limit)
+      .map((r: any) => entries[Number(r.document?.id ?? r.index)]);
+    return ranked.length ? ranked : entries.slice(0, limit);
+  } catch {
+    return entries.slice(0, limit);
+  }
+}
+
 export interface KnowledgeEntry {
   id: string;
   content: string;
@@ -172,8 +189,9 @@ export class KnowledgeBaseService {
                 createdAt: new Date(),
                 updatedAt: new Date()
               } as any));
-              const reranked = reRankEntries(mapped, limit) as KnowledgeEntry[];
-              return reranked;
+              const heuristic = reRankEntries(mapped, limit) as KnowledgeEntry[];
+              const reranked = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              return reranked && reranked.length ? reranked : heuristic;
             }
           }
         } catch (e) {
@@ -209,8 +227,9 @@ export class KnowledgeBaseService {
               createdAt: s.chunk.createdAt,
               updatedAt: s.chunk.createdAt
             } as any));
-            const reranked = reRankEntries(mapped, limit) as KnowledgeEntry[];
-            return reranked;
+            const heuristic = reRankEntries(mapped, limit) as KnowledgeEntry[];
+            const reranked = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+            return reranked && reranked.length ? reranked : heuristic;
           }
         }
       } catch {}

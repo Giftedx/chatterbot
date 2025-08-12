@@ -10,6 +10,7 @@ import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
 import { modelTelemetryStore } from './advanced-capabilities/index.js';
 import { getEnvAsBoolean } from '../utils/env.js';
+import { OpenAIResponsesProvider } from '../providers/openai-responses.provider.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -28,6 +29,7 @@ interface RouterPreferences {
 export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
+  private openaiResponses?: OpenAIResponsesProvider;
   private anthropic?: AnthropicProvider;
   private groq?: GroqProvider;
   private mistral?: MistralProvider;
@@ -38,7 +40,12 @@ export class ModelRouterService {
     this.gemini = new GeminiService();
     this.defaultProvider = (options.defaultProvider || (process.env.DEFAULT_PROVIDER as ProviderName)) || 'gemini';
 
-    if (process.env.OPENAI_API_KEY) this.openai = new OpenAIProvider();
+    if (process.env.OPENAI_API_KEY) {
+      this.openai = new OpenAIProvider();
+      if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+        this.openaiResponses = new OpenAIResponsesProvider();
+      }
+    }
     if (process.env.ANTHROPIC_API_KEY) this.anthropic = new AnthropicProvider();
     if (process.env.GROQ_API_KEY) this.groq = new GroqProvider();
     if (process.env.MISTRAL_API_KEY) this.mistral = new MistralProvider();
@@ -67,7 +74,11 @@ export class ModelRouterService {
       switch (card.provider) {
         case 'openai':
           if (!this.openai) throw new Error('OpenAI provider not available');
-          out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          if (this.openaiResponses && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+            out = await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+          } else {
+            out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          }
           break;
         case 'anthropic':
           if (!this.anthropic) throw new Error('Anthropic provider not available');
