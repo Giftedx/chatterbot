@@ -1,0 +1,15 @@
+id: 20-langgraph-agent-workflows
+title: "Add LangGraph agentic state machines"
+problem_statement: |
+  Introduce LangGraph-based workflows to model reasoning steps, tool routing, and recovery paths.
+scope:
+  add:
+    - "src/agents/langgraph/graph.ts"
+  modify:
+    - "package.json" # add langchain/langgraph deps
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Graph compiles; basic unit tests validate transitions and tool selection."

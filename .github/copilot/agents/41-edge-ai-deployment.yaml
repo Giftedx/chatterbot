@@ -1,0 +1,13 @@
+id: 41-edge-ai-deployment
+title: "Edge inference for low-latency tasks"
+problem_statement: |
+  Introduce optional on-device lightweight inference for intent classification; gate by privacy/perf.
+scope:
+  add:
+    - "src/edge/*"
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Edge module compiles; unit tests validate classification path and gating."

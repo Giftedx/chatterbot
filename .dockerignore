@@ -49,7 +49,7 @@ archive/
 # Configuration that shouldn't be in container
 jest.config.js
 .eslintrc.*
-tsconfig.json
+# tsconfig.json is intentionally NOT ignored to allow Docker COPY
 
 # Keep only necessary files:
 # package.json, package-lock.json - for dependencies

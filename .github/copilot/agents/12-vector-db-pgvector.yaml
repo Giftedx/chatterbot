@@ -1,0 +1,18 @@
+id: 12-vector-db-pgvector
+title: "Migrate embeddings storage to pgvector"
+problem_statement: |
+  Move from basic embeddings storage to pgvector for production-scale similarity search. Provide adapter and migrations.
+scope:
+  add:
+    - "src/rag/vector/pgvector.adapter.ts"
+    - "prisma/migrations/pgvector/*"
+  modify:
+    - "package.json" # add pg deps
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+risks:
+  - "DB migration risk; ship disabled without DATABASE_URL and PGVECTOR enabled."
+acceptance_criteria:
+  - "Vector upsert/search unit tests pass; fallback to keyword when vectors missing."

@@ -1,0 +1,13 @@
+id: 40-mlops-pipeline
+title: "Add MLOps lifecycle (registry, deploy, monitor)"
+problem_statement: |
+  Establish a minimal MLOps loop with model registry references and blue/green routing; collect basic metrics.
+scope:
+  add:
+    - "src/mlops/*"
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "CI validates code; unit tests cover routing and metric thresholds."
