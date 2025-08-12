@@ -252,7 +252,11 @@ export class KnowledgeBaseService {
         .sort((a, b) => b.score - a.score)
         .map((e) => e.entry);
 
-      const reranked = reRankEntries(relevantEntries, limit) as KnowledgeEntry[];
+      let reranked = reRankEntries(relevantEntries, limit) as KnowledgeEntry[];
+      try {
+        const re = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+        if (re && re.length) reranked = re as KnowledgeEntry[];
+      } catch {}
 
       logger.info('Knowledge base search completed', {
         query: searchQuery,

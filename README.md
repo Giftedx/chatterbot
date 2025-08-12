@@ -128,4 +128,7 @@ MAX_RERUNS=1
 # Optional advanced SDK integrations
 FEATURE_VERCEL_AI=false
 FEATURE_LANGGRAPH=false
+FEATURE_OPENAI_RESPONSES=false
+FEATURE_RERANK=false
+COHERE_API_KEY=...
 ```
