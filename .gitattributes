@@ -1,0 +1,13 @@
+# Normalize text files to LF in repo; respect .editorconfig in editors
+* text=auto eol=lf
+
+# Treat these as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+# Keep lockfiles consistent
+package-lock.json text eol=lf

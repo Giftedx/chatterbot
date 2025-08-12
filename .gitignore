@@ -35,3 +35,14 @@ yarn-cache/
 
 # Prisma artifacts
 prisma/dev.db
+
+# Agent-specific directories and files
+.agent-metrics/
+agent-environment-summary.md
+copilot-*.log
+.copilot-cache/
+
+# Temporary agent files
+temp-agent-*
+.agent-temp/
+agent-debug-*

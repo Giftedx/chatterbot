@@ -1,0 +1,105 @@
+# GitHub Copilot Extensions Configuration
+# Configures Copilot for optimal AI agent collaboration
+
+# Environment Setup for Copilot Agents
+environment:
+  preinstall:
+    # Pre-install dependencies that are commonly needed
+    - name: Install global tools
+      run: |
+        npm install -g typescript tsx
+        npm install -g @types/node
+    
+    # Setup environment for better debugging
+    - name: Setup debugging environment
+      run: |
+        echo "NODE_ENV=development" >> $GITHUB_ENV
+        echo "DEBUG=*" >> $GITHUB_ENV
+        echo "COPILOT_AGENT=true" >> $GITHUB_ENV
+
+# Agent-specific configuration
+agent_config:
+  # Enable enhanced debugging for agent sessions
+  debug_mode: true
+  
+  # Provide context files that should always be available
+  context_files:
+    - ".github/copilot-instructions.md"
+    - "docs/ARCHITECTURE.md"
+    - "docs/context/agent-brief.md"
+    - "package.json"
+    - "tsconfig.json"
+    - "env.example"
+    - "README.md"
+  
+  # Commands that agents should have access to
+  available_commands:
+    - "npm run lint"
+    - "npm test"
+    - "npm run dev:health"
+    - "node scripts/verify-env.mjs"
+    - "node scripts/context-snapshot.mjs"
+    - "npx prisma generate"
+    - "npx prisma studio"
+    
+  # Working directory preferences
+  workspace:
+    default_directory: "/home/runner/work/chatterbot/chatterbot"
+    preserve_state: true
+    
+# Allowlist for external resources
+allowlist:
+  # Prisma and database related
+  - "binaries.prisma.sh"
+  - "prisma.io"
+  - "*.prisma.io"
+  
+  # Discord API
+  - "discord.com"
+  - "*.discord.com"
+  - "discordapp.com"
+  - "*.discordapp.com"
+  
+  # Google/Gemini AI
+  - "googleapis.com"
+  - "*.googleapis.com"
+  - "google.com"
+  - "*.google.com"
+  
+  # NPM and Node.js ecosystem
+  - "npmjs.org"
+  - "*.npmjs.org"
+  - "npmjs.com"
+  - "*.npmjs.com"
+  - "nodejs.org"
+  - "*.nodejs.org"
+  
+  # GitHub and Git
+  - "github.com"
+  - "*.github.com"
+  - "raw.githubusercontent.com"
+  
+  # Common testing and development domains
+  - "api.github.com"
+  - "httpbin.org"
+  - "jsonplaceholder.typicode.com"
+  
+  # Documentation and reference
+  - "developer.mozilla.org"
+  - "stackoverflow.com"
+  - "docs.microsoft.com"
+
+# Performance optimizations
+performance:
+  # Cache commonly used dependencies
+  cache_dependencies: true
+  
+  # Parallel execution where possible
+  parallel_execution: true
+  
+  # Timeout settings
+  timeouts:
+    npm_install: 300  # 5 minutes for npm install
+    tests: 120        # 2 minutes for test suite
+    build: 180        # 3 minutes for build
+    general: 60       # 1 minute for general commands
