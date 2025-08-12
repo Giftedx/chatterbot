@@ -10,6 +10,7 @@ import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
 import { modelTelemetryStore } from './advanced-capabilities/index.js';
 import { getEnvAsBoolean } from '../utils/env.js';
+import { OpenAIResponsesProvider } from '../providers/openai-responses.provider.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -21,9 +22,15 @@ export interface GenerationMeta {
   model: string;
 }
 
+interface RouterPreferences {
+  latencyPreference?: RoutingSignal['latencyPreference'];
+}
+
 export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
+  private openaiResponses?: OpenAIResponsesProvider;
+  private openaiResponsesTools?: (await import('../providers/openai-responses-tools.provider.js')).OpenAIResponsesToolsProvider | undefined;
   private anthropic?: AnthropicProvider;
   private groq?: GroqProvider;
   private mistral?: MistralProvider;
@@ -34,14 +41,23 @@ export class ModelRouterService {
     this.gemini = new GeminiService();
     this.defaultProvider = (options.defaultProvider || (process.env.DEFAULT_PROVIDER as ProviderName)) || 'gemini';
 
-    if (process.env.OPENAI_API_KEY) this.openai = new OpenAIProvider();
+    if (process.env.OPENAI_API_KEY) {
+      this.openai = new OpenAIProvider();
+      if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+        this.openaiResponses = new OpenAIResponsesProvider();
+        try {
+          const { OpenAIResponsesToolsProvider } = await import('../providers/openai-responses-tools.provider.js');
+          this.openaiResponsesTools = new OpenAIResponsesToolsProvider();
+        } catch {}
+      }
+    }
     if (process.env.ANTHROPIC_API_KEY) this.anthropic = new AnthropicProvider();
     if (process.env.GROQ_API_KEY) this.groq = new GroqProvider();
     if (process.env.MISTRAL_API_KEY) this.mistral = new MistralProvider();
     if (process.env.OPENAI_COMPAT_API_KEY && process.env.OPENAI_COMPAT_BASE_URL) this.openaiCompat = new OpenAICompatProvider();
   }
 
-  private buildRoutingSignal(prompt: string, history: ChatMessage[]): RoutingSignal {
+  private buildRoutingSignal(prompt: string, history: ChatMessage[], overrideLatency?: RoutingSignal['latencyPreference']): RoutingSignal {
     const text = [
       ...history.map(h => h.parts.map(p => (p as any).text || '').join(' ')),
       prompt
@@ -51,7 +67,7 @@ export class ModelRouterService {
     const needsMultimodal = /http(s)?:\/\/.+\.(png|jpg|jpeg|gif)/.test(text);
     const needsHighSafety = /suicide|self-harm|hate|nsfw|explicit|medical|legal/.test(text);
     const domain: RoutingSignal['domain'] = /leetcode|stack overflow|docker|k8s|node|python|typescript|react|error|exception/.test(text) ? 'technical' : 'general';
-    const latencyPreference: RoutingSignal['latencyPreference'] = /urgent|quick|fast|now/.test(text) ? 'low' : 'normal';
+    const latencyPreference: RoutingSignal['latencyPreference'] = overrideLatency || (/urgent|quick|fast|now/.test(text) ? 'low' : 'normal');
     return { mentionsCode, requiresLongContext, needsMultimodal, needsHighSafety, domain, latencyPreference };
   }
 
@@ -63,7 +79,17 @@ export class ModelRouterService {
       switch (card.provider) {
         case 'openai':
           if (!this.openai) throw new Error('OpenAI provider not available');
-          out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+            if (this.openaiResponsesTools && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES_TOOLS', false)) {
+              out = await this.openaiResponsesTools.generate(prompt, mapped, systemPrompt, card.model);
+            } else if (this.openaiResponses) {
+              out = await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+            } else {
+              out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+            }
+          } else {
+            out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          }
           break;
         case 'anthropic':
           if (!this.anthropic) throw new Error('Anthropic provider not available');
@@ -94,10 +120,24 @@ export class ModelRouterService {
           out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
         }
       }
-      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: true });
+      const latencyMs = Date.now() - start;
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: true });
+      try {
+        const { prisma } = await import('../db/prisma.js');
+        if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: true } });
+        }
+      } catch {}
       return out;
     } catch (e) {
-      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: false });
+      const latencyMs = Date.now() - start;
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: false });
+      try {
+        const { prisma } = await import('../db/prisma.js');
+        if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: false } });
+        }
+      } catch {}
       throw e;
     }
   }
@@ -106,10 +146,35 @@ export class ModelRouterService {
     prompt: string,
     history: ChatMessage[],
     systemPrompt?: string,
-    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {}
+    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {},
+    preferences: RouterPreferences = {}
   ): Promise<GenerationMeta> {
-    const signal = this.buildRoutingSignal(prompt, history);
-    const selected = modelRegistry.selectBestModel(signal, constraints) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
+    const signal = this.buildRoutingSignal(prompt, history, preferences.latencyPreference);
+    // Optional constraints for budgets/timeouts
+    const costTierMax = process.env.COST_TIER_MAX as 'low' | 'medium' | 'high' | undefined;
+    const speedMin = process.env.SPEED_TIER_MIN as 'fast' | 'medium' | 'slow' | undefined;
+    let candidates = modelRegistry.listAvailableModels();
+    if (costTierMax) {
+      const tierRank = { low: 0, medium: 1, high: 2 } as const;
+      const maxRank = tierRank[costTierMax];
+      candidates = candidates.filter(c => tierRank[c.costTier] <= maxRank);
+    }
+    if (speedMin) {
+      const speedRank = { slow: 0, medium: 1, fast: 2 } as const;
+      const minRank = speedRank[speedMin];
+      candidates = candidates.filter(c => speedRank[c.speedTier] >= minRank);
+    }
+    if (constraints.disallowProviders?.length) {
+      candidates = candidates.filter(c => !constraints.disallowProviders!.includes(c.provider));
+    }
+    if (constraints.preferProvider) {
+      candidates = candidates.map(c => ({ card: c, boost: c.provider === constraints.preferProvider ? 1 : 0 } as const))
+        .sort((a, b) => b.boost - a.boost)
+        .map(x => x.card);
+    }
+    const ranked = (await import('./model-registry.service.js')).then(m => m.modelRegistry.selectBestModel(signal, constraints))
+      .catch(() => null);
+    const selected = (await ranked) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
     const text = await this.callProvider(selected as ModelCard, prompt, history, systemPrompt);
     return { text, provider: selected.provider as ProviderName, model: selected.model };
   }
@@ -119,9 +184,11 @@ export class ModelRouterService {
     history: ChatMessage[],
     userId: string,
     guildId: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {},
+    preferences: RouterPreferences = {}
   ): Promise<string> {
-    const meta = await this.generateWithMeta(prompt, history, systemPrompt);
+    const meta = await this.generateWithMeta(prompt, history, systemPrompt, constraints, preferences);
     return meta.text;
   }
 

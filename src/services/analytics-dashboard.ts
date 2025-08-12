@@ -149,6 +149,23 @@ export class AnalyticsDashboard {
         break;
       }
 
+      case '/api/telemetry/db': {
+        try {
+          const { prisma } = await import('../db/prisma.js');
+          const limit = Math.max(1, Math.min(200, parseInt(params.get('limit') || '50', 10)));
+          const offset = Math.max(0, parseInt(params.get('offset') || '0', 10));
+          const items = await prisma.modelSelection.findMany({
+            orderBy: { timestamp: 'desc' },
+            take: limit,
+            skip: offset
+          });
+          this.sendJson(res, { items, limit, offset });
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load DB telemetry');
+        }
+        break;
+      }
+
       case '/api/kb-stats': {
         try {
           const { knowledgeBaseService } = await import('./knowledge-base.service.js');

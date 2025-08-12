@@ -47,6 +47,9 @@ import { UserMemoryService } from '../memory/user-memory.service.js';
 import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types.js';
 import { modelRouterService } from './model-router.service.js';
 import { knowledgeBaseService } from './knowledge-base.service.js';
+import type { ProviderName } from '../config/models.js';
+import { getEnvAsBoolean } from '../utils/env.js';
+import { langGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 // Advanced Capabilities
 import { 
@@ -983,12 +986,56 @@ export class CoreIntelligenceService {
               }
             } catch (error) { logger.warn('Failed to fetch RAG context, continuing without it.', { error }); }
 
-            const fullResponseText: string = await modelRouterService.generate(
-              typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery,
-              history,
-              userId,
-              guildId || 'default'
-            );
+            // Optional: derive intent with LangGraph to condition a concise, precise system prompt
+            let systemPrompt: string | undefined;
+            if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
+              try {
+                const state = await langGraphWorkflow.run({ query: ragPrefixedQuery });
+                if (state && (state as any).intent) {
+                  systemPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+                }
+              } catch {}
+            }
+
+            const groundedQuery = typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery;
+
+            let fullResponseText: string;
+            let selectedProvider: string | undefined;
+            let selectedModel: string | undefined;
+
+            // Optional streaming for slash interactions only
+            const isSlashInteraction = (uiContext as any)?.isChatInputCommand?.() === true;
+            if (getEnvAsBoolean('FEATURE_VERCEL_AI', false) && isSlashInteraction) {
+              try {
+                const stream = await modelRouterService.stream(groundedQuery, history, systemPrompt);
+                // Stream to the user's ephemeral reply (controls disabled to keep it light)
+                fullResponseText = await sendStream(uiContext as any, stream, { throttleMs: 1000, withControls: false });
+              } catch {
+                // Fallback to non-streaming
+                const meta = await modelRouterService.generateWithMeta(
+                  groundedQuery,
+                  history,
+                  systemPrompt
+                );
+                fullResponseText = meta.text;
+                selectedProvider = meta.provider;
+                selectedModel = meta.model;
+              }
+            } else {
+              const meta = await modelRouterService.generateWithMeta(
+                groundedQuery,
+                history,
+                systemPrompt
+              );
+              fullResponseText = meta.text;
+              selectedProvider = meta.provider;
+              selectedModel = meta.model;
+            }
+
+            if (selectedProvider || selectedModel) {
+              logger.info('[CoreIntelSvc] Model selection', { provider: selectedProvider, model: selectedModel });
+            }
+
             const agenticResponse: AgenticResponse = {
               response: fullResponseText,
               confidence: 0.8,

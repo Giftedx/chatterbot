@@ -41,7 +41,7 @@ npm run dev
 - `/chat prompt [attachment]`
   - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
   - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
-
+  
 Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
 
 ---
@@ -102,8 +102,12 @@ MIT © 2025
 ## Multi-Provider Model Routing and Verification
 
 - Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
-- Automatic routing selects the best model based on signals (coding, long context, safety, latency).
-- Cross-model answer verification and self-critique can be enabled to improve factuality and reasoning.
+- Automatic routing selects the best model based on signals (coding, long context, safety, latency). Users do not choose providers; the AI selects automatically per message.
+- Optional internal enhancements (flag-controlled):
+  - LangGraph-driven intent conditioning (`FEATURE_LANGGRAPH=true`) to improve tone/precision.
+  - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations.
+  - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop. Optionally append tool summaries in the final answer with `FEATURE_TOOL_SUMMARY=true`.
+  - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
 
 Environment flags (see `env.example`):
 
@@ -121,4 +125,27 @@ OPENAI_COMPAT_BASE_URL=...
 ENABLE_ANSWER_VERIFICATION=true
 CROSS_MODEL_VERIFICATION=true
 MAX_RERUNS=1
+
+# Optional advanced SDK integrations
+FEATURE_VERCEL_AI=false
+FEATURE_LANGGRAPH=false
+FEATURE_OPENAI_RESPONSES=false
+FEATURE_OPENAI_RESPONSES_TOOLS=false
+FEATURE_TOOL_SUMMARY=false
+FEATURE_RERANK=false
+FEATURE_PERSIST_TELEMETRY=false
+COST_TIER_MAX=medium   # one of: low|medium|high (max spend)
+SPEED_TIER_MIN=medium  # one of: slow|medium|fast (min speed)
+COHERE_API_KEY=...
+
+### Metrics and telemetry
+- Telemetry snapshot: GET `/api/telemetry` (last N provider/model selections with latency)
+- Telemetry (DB): GET `/api/telemetry/db?limit=50&offset=0`
+- Verification metrics: GET `/api/verification-metrics`
+- KB stats: GET `/api/kb-stats`
+- Enable dashboard: `ENABLE_ANALYTICS_DASHBOARD=true` (lightweight endpoints)
 ```
+
+### Optional streaming (internal)
+- When `FEATURE_VERCEL_AI=true`, slash interactions may stream responses using the internal streaming path for supported providers.
+- This is automatic and does not expose new user options.

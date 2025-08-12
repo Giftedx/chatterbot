@@ -406,6 +406,21 @@ model KBChunk {
   @@index([sourceId])
 }
 
+model ModelSelection {
+  id         Int      @id @default(autoincrement())
+  timestamp  DateTime @default(now())
+  provider   String
+  model      String
+  latencyMs  Int
+  success    Boolean
+  // Optional context
+  userId     String?
+  guildId    String?
+
+  @@map("model_selections")
+  @@index([timestamp])
+}
+
 model MessageLog {
   id         String   @id @default(cuid())
   userId     String?
