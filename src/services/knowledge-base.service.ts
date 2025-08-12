@@ -5,6 +5,8 @@
 
 import { prisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
+import { features } from '../config/feature-flags.js';
+import { pgvectorRepository } from '../vector/pgvector.repository.js';
 
 function cosineSim(a: Float32Array, b: Float32Array): number {
   let dot = 0, na = 0, nb = 0;
@@ -125,6 +127,36 @@ export class KnowledgeBaseService {
     try {
       const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
 
+      // Vector-first search using pgvector if enabled
+      if (features.pgvector && process.env.OPENAI_API_KEY) {
+        try {
+          const OpenAI = (await import('openai')).default;
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: searchQuery });
+          const qvec = emb.data?.[0]?.embedding;
+          if (qvec && (await pgvectorRepository.init())) {
+            const results = await pgvectorRepository.search({ vector: qvec, topK: limit, filter: {} });
+            if (results.length > 0) {
+              return results.map(r => ({
+                id: r.id,
+                content: r.content,
+                source: 'kb_vector',
+                sourceId: r.id,
+                sourceUrl: null,
+                channelId: null,
+                authorId: null,
+                tags: null,
+                confidence: Math.max(minConfidence, Math.min(0.99, r.score)),
+                createdAt: new Date(),
+                updatedAt: new Date()
+              } as any));
+            }
+          }
+        } catch (e) {
+          logger.debug('pgvector search failed, falling back', { error: String(e) });
+        }
+      }
+
       // Attempt vector retrieval via KBChunk if embeddings exist
       try {
         const chunks = await prisma.kBChunk.findMany({ take: 200 });
@@ -135,10 +167,11 @@ export class KnowledgeBaseService {
           const qvec = emb.data?.[0]?.embedding;
           if (qvec) {
             const q = new Float32Array(qvec);
-            const scored = (chunks as Array<{ id: string; content: string; embedding: Buffer | null; sourceId: string; createdAt: Date }>).map((c) => {
-              const vec = c.embedding ? new Float32Array(Buffer.from(c.embedding).buffer) : new Float32Array();
-              return { chunk: c, score: vec.length ? cosineSim(q, vec) : 0 };
-            }).sort((a: { score: number }, b: { score: number }) => b.score - a.score).slice(0, limit);
+            const scored = (chunks as Array<{ id: string; content: string; embedding: Buffer | null; sourceId: string; createdAt: Date }>).
+              map((c) => {
+                const vec = c.embedding ? new Float32Array(Buffer.from(c.embedding).buffer) : new Float32Array();
+                return { chunk: c, score: vec.length ? cosineSim(q, vec) : 0 };
+              }).sort((a: { score: number }, b: { score: number }) => b.score - a.score).slice(0, limit);
             // Map back to KnowledgeEntry-like objects as a fallback
             return scored.map((s: { chunk: any; score: number }) => ({
               id: s.chunk.id,
