@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 import { GeminiService } from './gemini.service.js';
 import { ChatMessage } from './context-manager.js';
 import { modelRouterService } from './model-router.service.js';
+import { langGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 export interface AgenticResponse {
   response: string;
@@ -192,6 +193,14 @@ I am operating at peak performance.
         includeCitations,
         enableEscalation
       });
+
+      // Optional: pre-analyze with LangGraph if enabled
+      try {
+        const lg = await langGraphWorkflow.run({ query });
+        if (lg?.intent) {
+          logger.debug('LangGraph intent detected', { intent: lg.intent });
+        }
+      } catch {}
 
       // Step 0: Check for help query
       if (this.isHelpQuery(query)) {
