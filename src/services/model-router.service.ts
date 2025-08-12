@@ -7,6 +7,7 @@ import { MistralProvider } from '../providers/mistral.provider.js';
 import { OpenAICompatProvider } from '../providers/openai-compatible.provider.js';
 import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
+import { modelTelemetryStore } from './advanced-capabilities/index.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -54,25 +55,39 @@ export class ModelRouterService {
 
   private async callProvider(card: ModelCard, prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<string> {
     const mapped = history.map(m => ({ role: (m.role === 'model' ? 'assistant' : (m.role as 'user' | 'assistant' | 'system')), content: m.parts.map(p => (p as any).text || '').join(' ') }));
-    switch (card.provider) {
-      case 'openai':
-        if (!this.openai) throw new Error('OpenAI provider not available');
-        return this.openai.generate(prompt, mapped, systemPrompt, card.model);
-      case 'anthropic':
-        if (!this.anthropic) throw new Error('Anthropic provider not available');
-        return this.anthropic.generate(prompt, mapped as any, systemPrompt, card.model);
-      case 'groq':
-        if (!this.groq) throw new Error('Groq provider not available');
-        return this.groq.generate(prompt, mapped, systemPrompt, card.model);
-      case 'mistral':
-        if (!this.mistral) throw new Error('Mistral provider not available');
-        return this.mistral.generate(prompt, mapped, systemPrompt, card.model);
-      case 'openai_compat':
-        if (!this.openaiCompat) throw new Error('OpenAI-compatible provider not available');
-        return this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
-      case 'gemini':
-      default:
-        return this.gemini.generateResponse(prompt, history, 'user', 'global');
+    const start = Date.now();
+    try {
+      let out = '';
+      switch (card.provider) {
+        case 'openai':
+          if (!this.openai) throw new Error('OpenAI provider not available');
+          out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          break;
+        case 'anthropic':
+          if (!this.anthropic) throw new Error('Anthropic provider not available');
+          out = await this.anthropic.generate(prompt, mapped as any, systemPrompt, card.model);
+          break;
+        case 'groq':
+          if (!this.groq) throw new Error('Groq provider not available');
+          out = await this.groq.generate(prompt, mapped, systemPrompt, card.model);
+          break;
+        case 'mistral':
+          if (!this.mistral) throw new Error('Mistral provider not available');
+          out = await this.mistral.generate(prompt, mapped, systemPrompt, card.model);
+          break;
+        case 'openai_compat':
+          if (!this.openaiCompat) throw new Error('OpenAI-compatible provider not available');
+          out = await this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
+          break;
+        case 'gemini':
+        default:
+          out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
+      }
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: true });
+      return out;
+    } catch (e) {
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: false });
+      throw e;
     }
   }
 

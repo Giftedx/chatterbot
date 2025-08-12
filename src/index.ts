@@ -61,9 +61,12 @@ const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list
 const coreCommands = coreIntelligenceService.buildCommands().map(cmd => cmd.toJSON());
+const { diagnosticsCommands } = await import('./commands/diagnostics-commands.js');
+
 // Hide extra commands: do not register privacy/memory/agentic by default
 const allCommands = [
-  ...coreCommands
+  ...coreCommands,
+  ...diagnosticsCommands.map(cmd => cmd.data.toJSON())
 ];
 
 client.once('ready', async () => {
@@ -188,6 +191,14 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   // Agentic commands can be handled separately if they are not integrated into CoreIntelligenceService's command map.
   // For full consolidation, CoreIntelligenceService's handleInteraction would internally route agentic commands too.
   // This example keeps agentic command handling separate for now if they have distinct logic not fitting CoreIntelligenceService.
+  if (interaction.isChatInputCommand()) {
+    const diag = diagnosticsCommands.find(cmd => cmd.data.name === interaction.commandName);
+    if (diag) {
+      try { await diag.execute(interaction as any); } catch (e) { console.error(e); }
+      return;
+    }
+  }
+
   if (enableAgenticFeatures && interaction.isChatInputCommand()) {
     const agenticCommand = agenticCommands.find(cmd => cmd.data.name === interaction.commandName);
     if (agenticCommand) {
