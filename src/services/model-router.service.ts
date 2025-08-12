@@ -120,10 +120,24 @@ export class ModelRouterService {
           out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
         }
       }
-      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: true });
+      const latencyMs = Date.now() - start;
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: true });
+      try {
+        const { prisma } = await import('../db/prisma.js');
+        if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: true } });
+        }
+      } catch {}
       return out;
     } catch (e) {
-      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: false });
+      const latencyMs = Date.now() - start;
+      modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: false });
+      try {
+        const { prisma } = await import('../db/prisma.js');
+        if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: false } });
+        }
+      } catch {}
       throw e;
     }
   }
@@ -136,7 +150,31 @@ export class ModelRouterService {
     preferences: RouterPreferences = {}
   ): Promise<GenerationMeta> {
     const signal = this.buildRoutingSignal(prompt, history, preferences.latencyPreference);
-    const selected = modelRegistry.selectBestModel(signal, constraints) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
+    // Optional constraints for budgets/timeouts
+    const costTierMax = process.env.COST_TIER_MAX as 'low' | 'medium' | 'high' | undefined;
+    const speedMin = process.env.SPEED_TIER_MIN as 'fast' | 'medium' | 'slow' | undefined;
+    let candidates = modelRegistry.listAvailableModels();
+    if (costTierMax) {
+      const tierRank = { low: 0, medium: 1, high: 2 } as const;
+      const maxRank = tierRank[costTierMax];
+      candidates = candidates.filter(c => tierRank[c.costTier] <= maxRank);
+    }
+    if (speedMin) {
+      const speedRank = { slow: 0, medium: 1, fast: 2 } as const;
+      const minRank = speedRank[speedMin];
+      candidates = candidates.filter(c => speedRank[c.speedTier] >= minRank);
+    }
+    if (constraints.disallowProviders?.length) {
+      candidates = candidates.filter(c => !constraints.disallowProviders!.includes(c.provider));
+    }
+    if (constraints.preferProvider) {
+      candidates = candidates.map(c => ({ card: c, boost: c.provider === constraints.preferProvider ? 1 : 0 } as const))
+        .sort((a, b) => b.boost - a.boost)
+        .map(x => x.card);
+    }
+    const ranked = (await import('./model-registry.service.js')).then(m => m.modelRegistry.selectBestModel(signal, constraints))
+      .catch(() => null);
+    const selected = (await ranked) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
     const text = await this.callProvider(selected as ModelCard, prompt, history, systemPrompt);
     return { text, provider: selected.provider as ProviderName, model: selected.model };
   }

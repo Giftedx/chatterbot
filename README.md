@@ -133,10 +133,14 @@ FEATURE_OPENAI_RESPONSES=false
 FEATURE_OPENAI_RESPONSES_TOOLS=false
 FEATURE_TOOL_SUMMARY=false
 FEATURE_RERANK=false
+FEATURE_PERSIST_TELEMETRY=false
+COST_TIER_MAX=medium   # one of: low|medium|high (max spend)
+SPEED_TIER_MIN=medium  # one of: slow|medium|fast (min speed)
 COHERE_API_KEY=...
 
 ### Metrics and telemetry
 - Telemetry snapshot: GET `/api/telemetry` (last N provider/model selections with latency)
+- Telemetry (DB): GET `/api/telemetry/db?limit=50&offset=0`
 - Verification metrics: GET `/api/verification-metrics`
 - KB stats: GET `/api/kb-stats`
 - Enable dashboard: `ENABLE_ANALYTICS_DASHBOARD=true` (lightweight endpoints)
