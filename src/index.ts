@@ -7,6 +7,7 @@ import { healthCheck } from './health.js';
 import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './ui/privacy-consent.handlers.js';
 import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
+import { startTemporalOrchestrationIfEnabled } from './orchestration/temporal/loader.js';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -68,6 +69,14 @@ client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
   console.log(`🤖 Core Intelligence Discord Bot v3.0 ready!`);
   console.log(`Features: Agentic(${enableAgenticFeatures}), Personalization(${enablePersonalization}), EnhancedMemory(${enableEnhancedMemory}), EnhancedUI(${enableEnhancedUI}), ResponseCache(${enableResponseCache})`);
+
+  // Start orchestration worker if enabled
+  try {
+    const orchestration = await startTemporalOrchestrationIfEnabled();
+    if (orchestration.started) {
+      console.log('🧩 Orchestration worker started.');
+    }
+  } catch {}
 
   // Initialize Enhanced Intelligence if enabled
   if (process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true') {

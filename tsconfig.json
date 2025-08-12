@@ -17,8 +17,10 @@
     "types": ["node", "jest"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/**/*", "tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/**/*.test.ts",
+    "src/**/__tests__/**"
   ]
 }
