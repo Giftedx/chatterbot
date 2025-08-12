@@ -682,19 +682,21 @@ export class CoreIntelligenceService {
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );
 
-            // Optional self-critique and refinement
+            // Answer verification and refinement (self-critique + cross-model with auto-rerun)
             try {
-                if (process.env.ENABLE_SELF_CRITIQUE === 'true' && uiContext && 'id' in uiContext) {
-                    const { SelfCritiqueService } = await import('./self-critique.service.js');
-                    const critiqueSvc = new SelfCritiqueService();
-                    const refined = await critiqueSvc.critiqueAndRefine(
-                        promptText,
-                        fullResponseText,
-                        history
-                    );
-                    if (refined && refined !== fullResponseText) {
-                        fullResponseText = refined;
-                    }
+                const { AnswerVerificationService } = await import('./verification/answer-verification.service.js');
+                const verifier = new AnswerVerificationService({
+                  enabled: process.env.ENABLE_ANSWER_VERIFICATION === 'true' || process.env.ENABLE_SELF_CRITIQUE === 'true',
+                  crossModel: process.env.CROSS_MODEL_VERIFICATION === 'true',
+                  maxReruns: Number(process.env.MAX_RERUNS || 1)
+                });
+                const refined = await verifier.verifyAndImprove(
+                  promptText,
+                  fullResponseText,
+                  history
+                );
+                if (refined && refined !== fullResponseText) {
+                  fullResponseText = refined;
                 }
             } catch (e) {
                 logger.debug('[CoreIntelSvc] Self-critique skipped', { error: String(e) });

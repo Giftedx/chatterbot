@@ -21,7 +21,8 @@ export class OpenAIProvider {
   public async generate(
     prompt: string,
     history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [],
-    systemPrompt?: string
+    systemPrompt?: string,
+    overrideModel?: string
   ): Promise<string> {
     const messages = [] as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
@@ -29,7 +30,7 @@ export class OpenAIProvider {
     messages.push({ role: 'user', content: prompt });
 
     const completion = await this.client.chat.completions.create({
-      model: this.model,
+             model: overrideModel || this.model,
       messages,
       temperature: 0.7
     });

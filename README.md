@@ -130,3 +130,27 @@ docker run --rm -it \
 ```
 
 MIT © 2025
+
+## Multi-Provider Model Routing and Verification
+
+- Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
+- Automatic routing selects the best model based on signals (coding, long context, safety, latency).
+- Cross-model answer verification and self-critique can be enabled to improve factuality and reasoning.
+
+Environment flags (see `env.example`):
+
+```
+DEFAULT_PROVIDER=gemini
+# Providers
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GROQ_API_KEY=...
+MISTRAL_API_KEY=...
+OPENAI_COMPAT_API_KEY=...
+OPENAI_COMPAT_BASE_URL=...
+
+# Verification
+ENABLE_ANSWER_VERIFICATION=true
+CROSS_MODEL_VERIFICATION=true
+MAX_RERUNS=1
+```

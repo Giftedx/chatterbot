@@ -2,43 +2,90 @@ import { ChatMessage } from './context-manager.js';
 import { GeminiService } from './gemini.service.js';
 import { OpenAIProvider } from '../providers/openai.provider.js';
 import { AnthropicProvider } from '../providers/anthropic.provider.js';
-
-export type ProviderName = 'gemini' | 'openai' | 'anthropic';
+import { GroqProvider } from '../providers/groq.provider.js';
+import { MistralProvider } from '../providers/mistral.provider.js';
+import { OpenAICompatProvider } from '../providers/openai-compatible.provider.js';
+import { modelRegistry } from './model-registry.service.js';
+import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
+}
+
+export interface GenerationMeta {
+  text: string;
+  provider: ProviderName;
+  model: string;
 }
 
 export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
   private anthropic?: AnthropicProvider;
+  private groq?: GroqProvider;
+  private mistral?: MistralProvider;
+  private openaiCompat?: OpenAICompatProvider;
   private defaultProvider: ProviderName;
 
   constructor(options: RouterOptions = {}) {
     this.gemini = new GeminiService();
     this.defaultProvider = (options.defaultProvider || (process.env.DEFAULT_PROVIDER as ProviderName)) || 'gemini';
 
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAIProvider();
-    }
-    if (process.env.ANTHROPIC_API_KEY) {
-      this.anthropic = new AnthropicProvider();
+    if (process.env.OPENAI_API_KEY) this.openai = new OpenAIProvider();
+    if (process.env.ANTHROPIC_API_KEY) this.anthropic = new AnthropicProvider();
+    if (process.env.GROQ_API_KEY) this.groq = new GroqProvider();
+    if (process.env.MISTRAL_API_KEY) this.mistral = new MistralProvider();
+    if (process.env.OPENAI_COMPAT_API_KEY && process.env.OPENAI_COMPAT_BASE_URL) this.openaiCompat = new OpenAICompatProvider();
+  }
+
+  private buildRoutingSignal(prompt: string, history: ChatMessage[]): RoutingSignal {
+    const text = [
+      ...history.map(h => h.parts.map(p => (p as any).text || '').join(' ')),
+      prompt
+    ].join(' ').toLowerCase();
+    const mentionsCode = /```|\basync\b|\bclass\b|\bfunction\b|\berror\b|\btraceback\b|\bts\b|\bjs\b/.test(text);
+    const requiresLongContext = history.length > 12 || text.length > 4000;
+    const needsMultimodal = /http(s)?:\/\/.+\.(png|jpg|jpeg|gif)/.test(text);
+    const needsHighSafety = /suicide|self-harm|hate|nsfw|explicit|medical|legal/.test(text);
+    const domain: RoutingSignal['domain'] = /leetcode|stack overflow|docker|k8s|node|python|typescript|react|error|exception/.test(text) ? 'technical' : 'general';
+    const latencyPreference: RoutingSignal['latencyPreference'] = /urgent|quick|fast|now/.test(text) ? 'low' : 'normal';
+    return { mentionsCode, requiresLongContext, needsMultimodal, needsHighSafety, domain, latencyPreference };
+  }
+
+  private async callProvider(card: ModelCard, prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<string> {
+    const mapped = history.map(m => ({ role: (m.role === 'model' ? 'assistant' : (m.role as 'user' | 'assistant' | 'system')), content: m.parts.map(p => (p as any).text || '').join(' ') }));
+    switch (card.provider) {
+      case 'openai':
+        if (!this.openai) throw new Error('OpenAI provider not available');
+        return this.openai.generate(prompt, mapped, systemPrompt, card.model);
+      case 'anthropic':
+        if (!this.anthropic) throw new Error('Anthropic provider not available');
+        return this.anthropic.generate(prompt, mapped as any, systemPrompt, card.model);
+      case 'groq':
+        if (!this.groq) throw new Error('Groq provider not available');
+        return this.groq.generate(prompt, mapped, systemPrompt, card.model);
+      case 'mistral':
+        if (!this.mistral) throw new Error('Mistral provider not available');
+        return this.mistral.generate(prompt, mapped, systemPrompt, card.model);
+      case 'openai_compat':
+        if (!this.openaiCompat) throw new Error('OpenAI-compatible provider not available');
+        return this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
+      case 'gemini':
+      default:
+        return this.gemini.generateResponse(prompt, history, 'user', 'global');
     }
   }
 
-  private pickProvider(prompt: string, history: ChatMessage[]): ProviderName {
-    // Simple heuristic: code/structured tasks -> OpenAI, safety-sensitive / long context -> Anthropic, otherwise Gemini
-    const text = [
-      ...history.map(h => h.parts.map(p => p.text).join(' ')),
-      prompt
-    ].join(' ').toLowerCase();
-
-    const mentionsCode = /```|\basync\b|\bclass\b|\bfunction\b|\berror\b|\btraceback\b/.test(text);
-    const longContext = history.length > 12;
-    if (mentionsCode && this.openai) return 'openai';
-    if (longContext && this.anthropic) return 'anthropic';
-    return this.defaultProvider;
+  public async generateWithMeta(
+    prompt: string,
+    history: ChatMessage[],
+    systemPrompt?: string,
+    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {}
+  ): Promise<GenerationMeta> {
+    const signal = this.buildRoutingSignal(prompt, history);
+    const selected = modelRegistry.selectBestModel(signal, constraints) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
+    const text = await this.callProvider(selected as ModelCard, prompt, history, systemPrompt);
+    return { text, provider: selected.provider as ProviderName, model: selected.model };
   }
 
   public async generate(
@@ -48,20 +95,8 @@ export class ModelRouterService {
     guildId: string,
     systemPrompt?: string
   ): Promise<string> {
-    const provider = this.pickProvider(prompt, history);
-
-    if (provider === 'openai' && this.openai) {
-      const mapped = history.map(m => ({ role: (m.role === 'model' ? 'assistant' : (m.role as 'user' | 'assistant' | 'system')), content: m.parts.map(p => (p as any).text || '').join(' ') }));
-      return this.openai.generate(prompt, mapped, systemPrompt);
-    }
-
-    if (provider === 'anthropic' && this.anthropic) {
-      const mapped = history.map(m => ({ role: m.role as any, content: m.parts.map(p => p.text).join(' ') }));
-      return this.anthropic.generate(prompt, mapped, systemPrompt);
-    }
-
-    // Fallback to Gemini
-    return this.gemini.generateResponse(prompt, history, userId, guildId);
+    const meta = await this.generateWithMeta(prompt, history, systemPrompt);
+    return meta.text;
   }
 }
 

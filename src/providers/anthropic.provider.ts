@@ -21,13 +21,14 @@ export class AnthropicProvider {
   public async generate(
     prompt: string,
     history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [],
-    systemPrompt?: string
+    systemPrompt?: string,
+    overrideModel?: string
   ): Promise<string> {
     const messages = [] as Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
     for (const m of history) messages.push(m);
 
     const response = await this.client.messages.create({
-      model: this.model,
+      model: overrideModel || this.model,
       max_tokens: 1024,
       system: systemPrompt,
       messages: [

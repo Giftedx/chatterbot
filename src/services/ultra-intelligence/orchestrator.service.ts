@@ -12,7 +12,7 @@
  */
 
 import { logger } from '../../utils/logger.js';
-import { AutonomousReasoningOrchestrator } from '../autonomous-reasoning/autonomous-orchestrator.service.js';
+// import { AutonomousReasoningOrchestrator } from '../autonomous-reasoning/autonomous-orchestrator.service.js';
 import { UltraIntelligentResearchService } from './research.service.js';
 import { HumanLikeConversationService } from './conversation.service.js';
 import { AdvancedMemoryManager } from '../advanced-memory/advanced-memory-manager.service.js';
@@ -94,7 +94,7 @@ export interface UltraIntelligenceResult {
 }
 
 export class UltraIntelligenceOrchestrator {
-    private autonomousReasoning: AutonomousReasoningOrchestrator;
+    private autonomousReasoning: any; // Placeholder for now, as AutonomousReasoningOrchestrator is commented out
     private researchService: UltraIntelligentResearchService;
     private conversationService: HumanLikeConversationService;
     private advancedMemory: AdvancedMemoryManager | null = null;
@@ -137,24 +137,25 @@ export class UltraIntelligenceOrchestrator {
 
         // Initialize Autonomous Reasoning
         if (this.config.enableAutonomousReasoning) {
-            const reasoningConfig: AutonomousReasoningConfig = {
-                enableSelfReflection: true,
-                enableGoalSetting: true,
-                enablePersonaAdaptation: true,
-                enableCouncilOfCritics: true,
-                reflectionFrequency: 30, // minutes
-                goalEvaluationInterval: 60, // minutes
-                personaAdaptationThreshold: 0.7,
-                maxActiveGoals: 5,
-                maxReflectionHistory: 50,
-                criticCount: 3,
-                criticExpertise: ['logic', 'empathy', 'practicality'],
-                consensusThreshold: 0.6,
-                adaptationSensitivity: this.config.adaptationSpeed,
-                conservatismBias: 1 - this.config.creativityLevel
-            };
+            // const reasoningConfig: AutonomousReasoningConfig = {
+            //     enableSelfReflection: true,
+            //     enableGoalSetting: true,
+            //     enablePersonaAdaptation: true,
+            //     enableCouncilOfCritics: true,
+            //     reflectionFrequency: 30, // minutes
+            //     goalEvaluationInterval: 60, // minutes
+            //     personaAdaptationThreshold: 0.7,
+            //     maxActiveGoals: 5,
+            //     maxReflectionHistory: 50,
+            //     criticCount: 3,
+            //     criticExpertise: ['logic', 'empathy', 'practicality'],
+            //     consensusThreshold: 0.6,
+            //     adaptationSensitivity: this.config.adaptationSpeed,
+            //     conservatismBias: 1 - this.config.creativityLevel
+            // };
             
-            this.autonomousReasoning = new AutonomousReasoningOrchestrator(reasoningConfig);
+            // this.autonomousReasoning = new AutonomousReasoningOrchestrator(reasoningConfig);
+            logger.warn('Autonomous Reasoning is disabled in config, skipping initialization.');
         }
 
         // Initialize Ultra Research
@@ -560,9 +561,7 @@ export class UltraIntelligenceOrchestrator {
         context: any,
         reasoningResult: any
     ): Promise<string[]> {
-        if (!this.config.enableRealTimeLearn
-
-) {
+        if (!this.config.enableRealTimeLearning) {
             return [];
         }
 
