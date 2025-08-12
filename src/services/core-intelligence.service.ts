@@ -574,7 +574,7 @@ export class CoreIntelligenceService {
         // DM-only admin diagnose trigger
         try {
             const isDM = !guildId;
-            const isAdmin = await this.permissionService.isAdmin(userId, { guildId: guildId || undefined, channelId, userId });
+            const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'stats', { guildId: guildId || undefined, channelId, userId });
             if (isDM && isAdmin && /\b(diagnose|status|health|providers|telemetry|kb)\b/i.test(promptText)) {
                 const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
                 const providers = getProviderStatuses();
