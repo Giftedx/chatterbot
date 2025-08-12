@@ -1,0 +1,17 @@
+id: 01-docker-build-fix
+title: "Fix Docker build by including tsconfig.json"
+problem_statement: |
+  Docker build fails because tsconfig.json is excluded by .dockerignore, but the Dockerfile copies it.
+  Remove tsconfig.json from .dockerignore to allow successful COPY and TypeScript build in the builder stage.
+scope:
+  modify:
+    - ".dockerignore"
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+    - "npm run dev:health"
+risks:
+  - "No functional risk; no production behavior change."
+acceptance_criteria:
+  - "docker build completes past COPY tsconfig.json and runs npm run build in builder stage"

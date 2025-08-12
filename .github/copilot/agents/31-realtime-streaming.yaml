@@ -1,0 +1,15 @@
+id: 31-realtime-streaming
+title: "Introduce streaming backbone for live interactions"
+problem_statement: |
+  Add streaming primitives (WebSocket/Kafka) for real-time data flows with backpressure handling and reconnection.
+scope:
+  add:
+    - "src/streaming/*"
+  modify:
+    - "package.json" # add ws/kafkajs deps
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Streaming utilities compile; unit tests for backpressure and reconnection pass."

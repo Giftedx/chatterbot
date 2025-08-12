@@ -1,0 +1,13 @@
+id: 22-multimodal-gpt4o-integration
+title: "Enhance multimodal processing with GPT-4o"
+problem_statement: |
+  Extend multimodal pipeline to leverage GPT-4o via the adopted AI SDK for vision/audio understanding under safe defaults.
+scope:
+  modify:
+    - "src/multimodal/*"
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Feature-flagged multimodal enhancements compile; tests validate basic flows."

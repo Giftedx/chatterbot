@@ -3,9 +3,7 @@
  * Core file analysis coordination and processing
  */
 
-// import { MediaFile } from '@prisma/client';
-// TODO: Re-enable after Prisma client generation
-type MediaFile = any;
+import type { MediaFile } from '@prisma/client';
 import {
   FileProcessingOptions,
   MultimodalAnalysisResult,
