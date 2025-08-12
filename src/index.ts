@@ -9,6 +9,7 @@ import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
 import { startTemporalOrchestrationIfEnabled } from './orchestration/temporal/loader.js';
 import { memoryConsolidationScheduler } from './services/schedulers/memory-consolidation.scheduler.js';
+import { vectorMaintenanceScheduler } from './services/schedulers/vector-maintenance.scheduler.js';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -83,6 +84,12 @@ client.once('ready', async () => {
   try {
     memoryConsolidationScheduler.start();
     console.log('🧠 Memory consolidation scheduler started.');
+  } catch {}
+
+  // Start vector maintenance scheduler
+  try {
+    vectorMaintenanceScheduler.start();
+    console.log('🧹 Vector maintenance scheduler started.');
   } catch {}
 
   // Initialize Enhanced Intelligence if enabled
