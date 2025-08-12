@@ -115,6 +115,9 @@ client.once('ready', async () => {
   }
 
   startAnalyticsDashboardIfEnabled();
+  // Start background KB ingest if configured
+  const { BackgroundIngestJob } = await import('./services/ingest/background-ingest.job.js');
+  new BackgroundIngestJob(client).start();
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {

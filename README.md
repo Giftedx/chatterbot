@@ -67,6 +67,7 @@ The bot runs a single, well-defined pipeline for every message:
 - DM-only admin diagnose (no commands):
   - DM the bot with phrases like “diagnose”, “status”, “health”, “providers”, “telemetry”, or “kb”.
   - Only users recognized as admins (via RBAC) will receive a DM summary of provider availability, recent model usage, and knowledge base stats.
+  - Configure keywords via `DIAGNOSE_KEYWORDS` env (comma-separated).
 - Verification metrics (for tuning): exported via code (`getVerificationMetrics`) and can be logged periodically to observe low-agreement rates and reruns.
 
 ---
@@ -75,6 +76,7 @@ The bot runs a single, well-defined pipeline for every message:
 - Lightweight embeddings path using OpenAI `text-embedding-3-small` stored in `KBChunk.embedding` (bytes).
 - Search prefers vector similarity if chunks exist; else keyword relevance.
 - Ingestion helper: `KnowledgeBaseIngestService.addSource(guildId, title, content, url?)` to add and embed new content.
+- Background ingestion (optional): set `KB_INGEST_CHANNEL_ID` to automatically ingest URLs posted in that channel.
 
 ---
 

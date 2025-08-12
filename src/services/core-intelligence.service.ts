@@ -572,22 +572,27 @@ export class CoreIntelligenceService {
         try {
             const isDM = !guildId;
             const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'stats', { guildId: guildId || undefined, channelId, userId });
-            if (isDM && isAdmin && /\b(diagnose|status|health|providers|telemetry|kb)\b/i.test(promptText)) {
-                const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
-                const providers = getProviderStatuses();
-                const telemetry = modelTelemetryStore.snapshot(10);
-                const { knowledgeBaseService } = await import('./knowledge-base.service.js');
-                const kb = await knowledgeBaseService.getStats();
-                const lines: string[] = [];
-                lines.push('Providers:');
-                for (const p of providers) lines.push(`- ${p.name}: ${p.available ? 'available' : 'not set'}`);
-                lines.push('\nRecent model usage:');
-                for (const t of telemetry) lines.push(`- ${t.provider}/${t.model} in ${Math.round(t.latencyMs)}ms ${t.success ? '✅' : '❌'}`);
-                lines.push('\nKnowledge Base:');
-                lines.push(`- Total entries: ${kb.totalEntries}`);
-                lines.push(`- Avg confidence: ${kb.averageConfidence.toFixed(2)}`);
-                lines.push(`- Recent additions (7d): ${kb.recentAdditions}`);
-                return { content: lines.join('\n') };
+            if (isDM && isAdmin) {
+                const { getDiagnoseKeywords } = await import('../config/admin-config.js');
+                const kws = getDiagnoseKeywords();
+                const re = new RegExp(`\\b(${kws.join('|')})\\b`, 'i');
+                if (re.test(promptText)) {
+                    const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
+                    const providers = getProviderStatuses();
+                    const telemetry = modelTelemetryStore.snapshot(10);
+                    const { knowledgeBaseService } = await import('./knowledge-base.service.js');
+                    const kb = await knowledgeBaseService.getStats();
+                    const lines: string[] = [];
+                    lines.push('Providers:');
+                    for (const p of providers) lines.push(`- ${p.name}: ${p.available ? 'available' : 'not set'}`);
+                    lines.push('\nRecent model usage:');
+                    for (const t of telemetry) lines.push(`- ${t.provider}/${t.model} in ${Math.round(t.latencyMs)}ms ${t.success ? '✅' : '❌'}`);
+                    lines.push('\nKnowledge Base:');
+                    lines.push(`- Total entries: ${kb.totalEntries}`);
+                    lines.push(`- Avg confidence: ${kb.averageConfidence.toFixed(2)}`);
+                    lines.push(`- Recent additions (7d): ${kb.recentAdditions}`);
+                    return { content: lines.join('\n') };
+                }
             }
         } catch (diagErr) {
             // Non-fatal
