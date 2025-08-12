@@ -1,0 +1,20 @@
+id: 02-prisma-type-shim
+title: "Provide Prisma MediaFile type shim for restricted environments"
+problem_statement: |
+  In restricted environments, Prisma client generation may fail, causing TypeScript errors:
+    Module '@prisma/client' has no exported member 'MediaFile'
+  The codebase references a 'MediaFile' type. Provide a compile-time shim without altering runtime.
+scope:
+  add:
+    - "src/types/prisma-model-shim.d.ts"
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+    - "npm run dev:health"
+constraints:
+  - "Types only; no runtime exports or client construction."
+  - "Keep shape aligned with prisma/schema.prisma MediaFile model."
+acceptance_criteria:
+  - "Type references compile when Prisma client is unavailable."
+  - "No conflicts when real Prisma types exist."

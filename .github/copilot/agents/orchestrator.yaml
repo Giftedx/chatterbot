@@ -1,0 +1,129 @@
+version: 1
+owner: Giftedx
+repo: Giftedx/chatterbot
+
+conventions:
+  esm_imports: "Always use .js extensions for local imports in TypeScript."
+  validations:
+    - cmd: "npm install"
+      timeout_seconds: 150
+      notes: "Installation can take ~70s."
+    - cmd: "npm run lint"
+      timeout_seconds: 30
+    - cmd: "npm test"
+      timeout_seconds: 120
+      notes: "All tests should pass."
+    - cmd: "npm run dev:health"
+      timeout_seconds: 30
+      notes: "Health server must boot without tokens."
+
+acceptance_criteria:
+  - "No regressions in lint/test/health."
+  - "ESM import rules preserved; no bare '.ts' imports."
+  - "Each agent PR contains problem statement, scope, risks, and validation notes."
+
+phases:
+  - name: "A: Unblockers"
+    agents: [01-docker-build-fix, 02-prisma-type-shim]
+  - name: "B: Foundation"
+    agents: [10-temporal-orchestration, 11-vercel-ai-sdk, 12-vector-db-pgvector]
+  - name: "C: Intelligence"
+    agents: [20-langgraph-agent-workflows, 21-long-term-memory, 22-multimodal-gpt4o-integration]
+  - name: "D: Advanced"
+    agents: [30-crewai-multi-agent, 31-realtime-streaming, 32-speech-audio-stack]
+  - name: "E: Production"
+    agents: [40-mlops-pipeline, 41-edge-ai-deployment]
+
+agents:
+  - id: 01-docker-build-fix
+    title: "Fix Docker build by including tsconfig.json"
+    depends_on: []
+    paths:
+      modify:
+        - ".dockerignore"
+    validations:
+      run: ["npm run lint", "npm test", "npm run dev:health"]
+    success:
+      - "docker build proceeds past COPY tsconfig.json and builds successfully"
+
+  - id: 02-prisma-type-shim
+    title: "Provide Prisma MediaFile type shim for restricted environments"
+    depends_on: []
+    paths:
+      add:
+        - "src/types/prisma-model-shim.d.ts"
+    validations:
+      run: ["npm run lint", "npm test", "npm run dev:health"]
+    constraints:
+      - "No runtime exports; types only"
+    success:
+      - "Type references compile when Prisma client is unavailable"
+      - "No conflicts when real Prisma types exist"
+
+  - id: 10-temporal-orchestration
+    title: "Integrate Temporal for durable workflows"
+    depends_on: [01-docker-build-fix, 02-prisma-type-shim]
+    validations:
+      run: ["npm run lint", "npm test", "npm run dev:health"]
+    success:
+      - "Durable execution for multi-step interactions; human-in-loop signals supported"
+
+  - id: 11-vercel-ai-sdk
+    title: "Adopt Vercel AI SDK for TS-first AI flows"
+    depends_on: [10-temporal-orchestration]
+    success:
+      - "Streaming and tool invocation abstractions standardized"
+
+  - id: 12-vector-db-pgvector
+    title: "Migrate embeddings storage to pgvector"
+    depends_on: [02-prisma-type-shim]
+    success:
+      - "RAG queries via vector similarity; fallback to keyword search"
+
+  - id: 20-langgraph-agent-workflows
+    title: "Add LangGraph agentic state machines"
+    depends_on: [11-vercel-ai-sdk]
+    success:
+      - "Graph-based intent analysis/tool routing; feature-flagged"
+
+  - id: 21-long-term-memory
+    title: "Introduce durable, privacy-aware long-term memory"
+    depends_on: [12-vector-db-pgvector]
+    success:
+      - "User facts/preferences/summaries persisted with opt-in and deletion controls"
+
+  - id: 22-multimodal-gpt4o-integration
+    title: "Enhance multimodal processing with GPT-4o"
+    depends_on: [11-vercel-ai-sdk]
+    success:
+      - "Image/audio attachments analyzed where allowed; safe defaults"
+
+  - id: 30-crewai-multi-agent
+    title: "Add CrewAI-based specialists for research/writing"
+    depends_on: [20-langgraph-agent-workflows]
+    success:
+      - "Opt-in multi-agent runs; deterministic handoffs"
+
+  - id: 31-realtime-streaming
+    title: "Introduce streaming backbone for live interactions"
+    depends_on: [11-vercel-ai-sdk]
+    success:
+      - "WebSocket/Kafka streaming abstractions; toggled via env"
+
+  - id: 32-speech-audio-stack
+    title: "Harden TTS/STT with multi-provider fallback"
+    depends_on: []
+    success:
+      - "Natural voice responses with fallback providers"
+
+  - id: 40-mlops-pipeline
+    title: "Add MLOps lifecycle (registry, deploy, monitor)"
+    depends_on: []
+    success:
+      - "Model promotion with blue/green; basic drift metrics"
+
+  - id: 41-edge-ai-deployment
+    title: "Edge inference for low-latency tasks"
+    depends_on: []
+    success:
+      - "On-device classifiers gated by privacy and performance"

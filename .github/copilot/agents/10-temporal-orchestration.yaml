@@ -1,0 +1,22 @@
+id: 10-temporal-orchestration
+title: "Integrate Temporal for durable workflows"
+problem_statement: |
+  Add Temporal to orchestrate multi-step LLM interactions with durability, retries, and human-in-the-loop signals.
+  Implement a minimal feature-flagged worker and one durable workflow skeleton; do not enable by default.
+scope:
+  add:
+    - "src/orchestration/temporal/README.md"
+    - "src/orchestration/temporal/worker.ts"
+    - "src/orchestration/temporal/workflows/aiAgent.workflow.ts"
+    - "src/orchestration/temporal/activities/index.ts"
+  modify:
+    - "package.json" # add temporal deps & scripts (guarded)
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+    - "npm run dev:health"
+risks:
+  - "Temporal server dependency; gated behind env feature flag."
+acceptance_criteria:
+  - "Workflow builds and unit tests pass; worker is off unless FEATURE_TEMPORAL=true."
