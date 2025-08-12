@@ -14,7 +14,6 @@
     "downlevelIteration": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
-    "baseUrl": ".",
     "types": ["node", "jest"],
     "lib": ["ES2022", "DOM"]
   },

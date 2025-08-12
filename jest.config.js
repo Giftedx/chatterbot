@@ -23,7 +23,7 @@ export default {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
     }],
-    '^.+\\.jsx?$': ['ts-jest', {
+    '^.+\\.(js|jsx)$': ['ts-jest', {
       useESM: true,
     }],
   },
