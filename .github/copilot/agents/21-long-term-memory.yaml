@@ -1,0 +1,17 @@
+id: 21-long-term-memory
+title: "Introduce durable, privacy-aware long-term memory"
+problem_statement: |
+  Implement memory schemas (facts, preferences, summaries) with consent, export, and deletion APIs. Integrate with RAG.
+scope:
+  add:
+    - "src/memory/service.ts"
+    - "src/memory/types.ts"
+    - "src/api/memory.routes.ts"
+  modify:
+    - "prisma/schema.prisma" # add memory tables
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Memory APIs unit-tested; opt-in only; deletion/export supported."

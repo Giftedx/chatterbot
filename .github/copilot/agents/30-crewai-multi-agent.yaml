@@ -1,0 +1,15 @@
+id: 30-crewai-multi-agent
+title: "Add CrewAI-based specialists for research/writing"
+problem_statement: |
+  Provide optional CrewAI integration to run specialized agents for research and content creation with deterministic hand-offs.
+scope:
+  add:
+    - "src/agents/crewai/*"
+  modify:
+    - "package.json" # add crewai deps
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Feature compiles behind FEATURE_CREWAI; unit tests for agent coordination pass."

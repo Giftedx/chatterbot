@@ -1,0 +1,15 @@
+id: 32-speech-audio-stack
+title: "Harden TTS/STT with multi-provider fallback"
+problem_statement: |
+  Implement speech synthesis and transcription providers with fallback ordering and rate-limiting.
+scope:
+  add:
+    - "src/speech/*"
+  modify:
+    - "package.json" # add providers deps
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+acceptance_criteria:
+  - "Speech utilities compile; unit tests for provider fallback pass."

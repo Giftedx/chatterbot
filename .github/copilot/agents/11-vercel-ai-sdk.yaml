@@ -1,0 +1,18 @@
+id: 11-vercel-ai-sdk
+title: "Adopt Vercel AI SDK for TS-first AI flows"
+problem_statement: |
+  Introduce Vercel AI SDK to standardize model calls and tool invocation with streaming support in TypeScript.
+scope:
+  add:
+    - "src/ai/providers/vercel/README.md"
+    - "src/ai/providers/vercel/client.ts"
+  modify:
+    - "package.json" # add ai-sdk deps & scripts
+validation:
+  commands:
+    - "npm run lint"
+    - "npm test"
+risks:
+  - "Incremental adoption; guard with FEATURE_VERCEL_AI."
+acceptance_criteria:
+  - "New provider compiles and is feature-flagged; no regressions in existing flows."
