@@ -68,10 +68,8 @@ import { ModerationService } from '../moderation/moderation-service.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID, MOVE_DM_BUTTON_ID, moveDmButtonRow } from '../ui/components.js';
 import { urlToGenerativePart } from '../utils/image-helper.js';
 import { prisma } from '../db/prisma.js';
-
-// import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
-
-
+import { sendStream } from '../ui/stream-utils.js';
+import { intelligenceAnalysisService } from './intelligence/analysis.service.js';
 
 
 interface CommonAttachment {
