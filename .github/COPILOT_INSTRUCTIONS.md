@@ -2,7 +2,22 @@
 
 **ALWAYS follow these instructions first and only fallback to search or bash commands when the information here is incomplete or incorrect.**
 
-## Quick Start & Validated Commands
+## 🎯 Core Mission & Context
+
+You are working on **Chatterbot**, a production-ready Discord AI bot with sophisticated architecture. This is a TypeScript/Node.js project using ESM modules, Discord.js v14, Google Gemini AI, and comprehensive testing infrastructure.
+
+### User Experience
+- **Single command interface**: `/chat <prompt> [attachment]` - users only see this one command
+- **Automatic opt-in**: First-time users are automatically enrolled with friendly consent
+- **Personal threads/DMs**: Responses appear in private threads or DMs to avoid channel clutter
+- **Natural conversation**: After opt-in, users can chat normally without commands
+
+### Architecture Levels
+1. **Core Intelligence**: Base conversation with modular services in `src/services/intelligence/`
+2. **Enhanced Intelligence**: Advanced MCP tools via `ENABLE_ENHANCED_INTELLIGENCE=true`
+3. **Agentic Intelligence**: Knowledge base + auto-escalation via `ENABLE_AGENTIC_INTELLIGENCE=true`
+
+## 🚀 Quick Start & Validated Commands
 
 **These commands have been validated and tested. Use these exact commands with the specified timeouts.**
 
@@ -98,6 +113,31 @@ This is a **production-ready Discord AI bot** with triple intelligence architect
 1. **Core**: `CoreIntelligenceService` - base conversation with modular `src/services/intelligence/`
 2. **Enhanced**: Advanced MCP tools (web search, content extraction) via `ENABLE_ENHANCED_INTELLIGENCE=true`
 3. **Agentic**: Knowledge base + auto-escalation via `ENABLE_AGENTIC_INTELLIGENCE=true`
+
+---
+
+## 💡 AI Agent Best Practices & Code Quality
+
+### Quality Code Requirements
+- **Read Documentation First**: Always review existing documentation, README.md, and architecture files before making changes
+- **Understand Context**: Study the codebase architecture, patterns, and existing implementations before proposing solutions
+- **Minimal Changes**: Make the smallest possible changes to achieve the goal - prefer surgical modifications over broad refactoring
+- **Test-Driven**: Run existing tests before and after changes to ensure no regressions
+- **Type Safety**: Maintain strict TypeScript typing - avoid `any` types when possible
+- **ESM Modules**: Always use `.js` extensions in imports for ESM compatibility
+
+### Reasoning Requirements
+- **Explain Your Approach**: Clearly articulate why you're choosing a specific solution
+- **Consider Alternatives**: Mention alternative approaches and why you selected your chosen method
+- **Document Assumptions**: State any assumptions about requirements or system behavior
+- **Error Handling**: Consider edge cases and error scenarios in your implementations
+- **Performance Impact**: Be mindful of performance implications of your changes
+
+### Collaboration Guidelines
+- **Preserve Existing Architecture**: Work within the established patterns and service structure
+- **Follow Naming Conventions**: Use existing naming patterns for consistency
+- **Maintain Documentation**: Update relevant documentation when making architectural changes
+- **Consider Future Maintainers**: Write clear, self-documenting code with appropriate comments
 
 ## 2. Critical Development Patterns
 
@@ -711,7 +751,7 @@ The repository includes comprehensive CI pipelines that handle agent-specific re
 - **Performance Metrics**: Integrated performance monitoring
 
 ### Documentation Hierarchy for Agents
-1. **Primary Context**: `.github/copilot-instructions.md` (this file) - Complete architecture overview
+1. **Primary Context**: `.github/COPILOT_INSTRUCTIONS.md` (this file) - Complete architecture overview
 2. **Setup Guide**: `.github/COPILOT_AGENT_SETUP.md` - Comprehensive setup instructions
 3. **Quick Reference**: `docs/context/agent-brief.md` - Working agreements and commands
 4. **Architecture**: `docs/ARCHITECTURE.md` - High-level system design
@@ -743,3 +783,18 @@ npm run lint                         # Code quality (always works)
 REMEMBER: After every memory reset, I begin completely fresh. The Memory Bank is my only link to previous work. It must be maintained with precision and clarity, as my effectiveness depends entirely on its accuracy.
 
 **For GitHub Copilot Agents**: Always start by reading this file completely, then run `node scripts/agent-env-validator.mjs` to validate your environment setup before beginning any work.
+
+---
+
+## 🎯 Summary for AI Agents
+
+This repository follows GitHub Copilot best practices for coding agents:
+
+1. **Context-First Approach**: Always read documentation before making changes
+2. **Quality Over Speed**: Prioritize correct, maintainable solutions over quick fixes
+3. **Architectural Awareness**: Understand the modular intelligence system and service patterns
+4. **Test-Driven Development**: Validate changes with the comprehensive test suite
+5. **Type Safety**: Maintain strict TypeScript standards and ESM module compatibility
+6. **Graceful Degradation**: Ensure features work even when external services are unavailable
+
+**Remember**: This is a production system serving real users. Every change should enhance reliability, maintainability, and user experience while preserving the existing architecture's strengths.

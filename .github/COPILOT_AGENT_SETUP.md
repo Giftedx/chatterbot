@@ -15,7 +15,7 @@ This document provides comprehensive setup and configuration for optimal GitHub 
 The following files provide essential context for AI agents:
 
 ### Primary Context
-- `.github/copilot-instructions.md` - Complete bot architecture and patterns
+- `.github/COPILOT_INSTRUCTIONS.md` - Complete bot architecture and patterns
 - `docs/ARCHITECTURE.md` - High-level system overview
 - `docs/context/agent-brief.md` - Working agreements and commands
 - `package.json` - Dependencies and available scripts
@@ -134,7 +134,7 @@ src/
 ## Agent Workflow
 
 ### Initial Setup
-1. Read `.github/copilot-instructions.md` for complete context
+1. Read `.github/COPILOT_INSTRUCTIONS.md` for complete context
 2. Run `node scripts/verify-env.mjs` to check environment
 3. Execute `npm install` (allow 120+ seconds)
 4. Validate with `npm run lint` and `npm test`

@@ -24,7 +24,7 @@ agent_config:
   
   # Provide context files that should always be available
   context_files:
-    - ".github/copilot-instructions.md"
+    - ".github/COPILOT_INSTRUCTIONS.md"
     - "docs/ARCHITECTURE.md"
     - "docs/context/agent-brief.md"
     - "package.json"

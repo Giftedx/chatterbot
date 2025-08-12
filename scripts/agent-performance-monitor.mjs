@@ -180,7 +180,7 @@ class AgentPerformanceMonitor {
     });
     
     await this.measureOperation('file_read_instructions', async () => {
-      return readFileSync(join(projectRoot, '.github/copilot-instructions.md'), 'utf8');
+      return readFileSync(join(projectRoot, '.github/COPILOT_INSTRUCTIONS.md'), 'utf8');
     });
   }
 
