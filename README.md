@@ -134,3 +134,7 @@ FEATURE_OPENAI_RESPONSES_TOOLS=false
 FEATURE_RERANK=false
 COHERE_API_KEY=...
 ```
+
+### Optional streaming (internal)
+- When `FEATURE_VERCEL_AI=true`, slash interactions may stream responses using the internal streaming path for supported providers.
+- This is automatic and does not expose new user options.

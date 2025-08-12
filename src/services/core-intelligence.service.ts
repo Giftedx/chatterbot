@@ -999,12 +999,43 @@ export class CoreIntelligenceService {
 
             const groundedQuery = typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery;
 
-            const meta = await modelRouterService.generateWithMeta(
-              groundedQuery,
-              history,
-              systemPrompt
-            );
-            const fullResponseText: string = meta.text;
+            let fullResponseText: string;
+            let selectedProvider: string | undefined;
+            let selectedModel: string | undefined;
+
+            // Optional streaming for slash interactions only
+            const isSlashInteraction = (uiContext as any)?.isChatInputCommand?.() === true;
+            if (getEnvAsBoolean('FEATURE_VERCEL_AI', false) && isSlashInteraction) {
+              try {
+                const stream = await modelRouterService.stream(groundedQuery, history, systemPrompt);
+                // Stream to the user's ephemeral reply (controls disabled to keep it light)
+                fullResponseText = await sendStream(uiContext as any, stream, { throttleMs: 1000, withControls: false });
+              } catch {
+                // Fallback to non-streaming
+                const meta = await modelRouterService.generateWithMeta(
+                  groundedQuery,
+                  history,
+                  systemPrompt
+                );
+                fullResponseText = meta.text;
+                selectedProvider = meta.provider;
+                selectedModel = meta.model;
+              }
+            } else {
+              const meta = await modelRouterService.generateWithMeta(
+                groundedQuery,
+                history,
+                systemPrompt
+              );
+              fullResponseText = meta.text;
+              selectedProvider = meta.provider;
+              selectedModel = meta.model;
+            }
+
+            if (selectedProvider || selectedModel) {
+              logger.info('[CoreIntelSvc] Model selection', { provider: selectedProvider, model: selectedModel });
+            }
+
             const agenticResponse: AgenticResponse = {
               response: fullResponseText,
               confidence: 0.8,
