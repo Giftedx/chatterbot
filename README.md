@@ -105,7 +105,8 @@ MIT © 2025
 - Automatic routing selects the best model based on signals (coding, long context, safety, latency). Users do not choose providers; the AI selects automatically per message.
 - Optional internal enhancements (flag-controlled):
   - LangGraph-driven intent conditioning (`FEATURE_LANGGRAPH=true`) to improve tone/precision.
-  - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations and future tool/JSON workflows.
+  - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations.
+  - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop.
   - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
 
 Environment flags (see `env.example`):
@@ -129,6 +130,7 @@ MAX_RERUNS=1
 FEATURE_VERCEL_AI=false
 FEATURE_LANGGRAPH=false
 FEATURE_OPENAI_RESPONSES=false
+FEATURE_OPENAI_RESPONSES_TOOLS=false
 FEATURE_RERANK=false
 COHERE_API_KEY=...
 ```

@@ -30,6 +30,7 @@ export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
   private openaiResponses?: OpenAIResponsesProvider;
+  private openaiResponsesTools?: (await import('../providers/openai-responses-tools.provider.js')).OpenAIResponsesToolsProvider | undefined;
   private anthropic?: AnthropicProvider;
   private groq?: GroqProvider;
   private mistral?: MistralProvider;
@@ -44,6 +45,10 @@ export class ModelRouterService {
       this.openai = new OpenAIProvider();
       if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
         this.openaiResponses = new OpenAIResponsesProvider();
+        try {
+          const { OpenAIResponsesToolsProvider } = await import('../providers/openai-responses-tools.provider.js');
+          this.openaiResponsesTools = new OpenAIResponsesToolsProvider();
+        } catch {}
       }
     }
     if (process.env.ANTHROPIC_API_KEY) this.anthropic = new AnthropicProvider();
@@ -74,8 +79,14 @@ export class ModelRouterService {
       switch (card.provider) {
         case 'openai':
           if (!this.openai) throw new Error('OpenAI provider not available');
-          if (this.openaiResponses && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
-            out = await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+          if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+            if (this.openaiResponsesTools && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES_TOOLS', false)) {
+              out = await this.openaiResponsesTools.generate(prompt, mapped, systemPrompt, card.model);
+            } else if (this.openaiResponses) {
+              out = await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+            } else {
+              out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+            }
           } else {
             out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
           }
