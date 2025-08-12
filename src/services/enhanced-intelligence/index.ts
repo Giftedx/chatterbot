@@ -329,7 +329,7 @@ export class EnhancedInvisibleIntelligenceService {
             const memoryContext = {
               userId: interaction.user.id,
               channelId: interaction.channelId,
-              guildId: interaction.guildId,
+              guildId: interaction.guildId || undefined,
               conversationId: `conv-${interaction.channelId}-${Date.now()}`,
               participants: [interaction.user.id, 'bot'],
               content,
@@ -397,7 +397,7 @@ export class EnhancedInvisibleIntelligenceService {
             const memoryContext = {
               userId: interaction.user.id,
               channelId: interaction.channelId,
-              guildId: interaction.guildId,
+              guildId: interaction.guildId || undefined,
               conversationId: `conv-${interaction.channelId}-${Date.now()}`,
               participants: [interaction.user.id, 'bot'],
               content,

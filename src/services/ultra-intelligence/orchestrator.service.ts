@@ -95,8 +95,8 @@ export interface UltraIntelligenceResult {
 
 export class UltraIntelligenceOrchestrator {
     private autonomousReasoning: any; // Placeholder for now, as AutonomousReasoningOrchestrator is commented out
-    private researchService: UltraIntelligentResearchService;
-    private conversationService: HumanLikeConversationService;
+    private researchService!: UltraIntelligentResearchService;
+    private conversationService!: HumanLikeConversationService;
     private advancedMemory: AdvancedMemoryManager | null = null;
     
     // Performance tracking
@@ -173,14 +173,16 @@ export class UltraIntelligenceOrchestrator {
             const memoryConfig: AdvancedMemoryConfig = {
                 enableEpisodicMemory: true,
                 enableSocialIntelligence: true,
+                enableEmotionalIntelligence: true,
+                enableSemanticClustering: true,
+                enableMemoryConsolidation: true,
                 memoryDecayRate: 0.1,
-                emotionalWeighting: 0.8,
-                socialAdaptationThreshold: 0.7,
                 maxMemoriesPerUser: 1000,
-                memoryConsolidationInterval: 60,
-                semanticClusteringThreshold: 0.6,
-                personalityLearningRate: this.config.adaptationSpeed,
-                crossUserLearning: true
+                importanceThreshold: 0.3,
+                consolidationInterval: 60 * 60 * 1000,
+                socialAnalysisDepth: 'moderate',
+                emotionalSensitivity: 0.7,
+                adaptationAggressiveness: 0.6
             };
             
             this.advancedMemory = new AdvancedMemoryManager(memoryConfig);
@@ -304,18 +306,18 @@ export class UltraIntelligenceOrchestrator {
         content: string,
         context: UltraIntelligenceContext
     ): Promise<any> {
-        const enhanced = { ...context };
+        const enhanced: any = { ...context };
 
         // Add user profile information
         const userProfile = this.userProfiles.get(context.userId) || this.createDefaultUserProfile(context.userId);
-        enhanced.userProfile = userProfile;
+        (enhanced as any).userProfile = userProfile;
 
         // Add server intelligence
         const serverProfile = this.serverProfiles.get(context.serverId) || this.createDefaultServerProfile(context.serverId);
-        enhanced.serverProfile = serverProfile;
+        (enhanced as any).serverProfile = serverProfile;
 
         // Add temporal context
-        enhanced.temporalContext = {
+        (enhanced as any).temporalContext = {
             timestamp: new Date(),
             timeOfDay: this.getTimeOfDay(),
             dayOfWeek: this.getDayOfWeek(),
@@ -323,7 +325,7 @@ export class UltraIntelligenceOrchestrator {
         };
 
         // Add conversation flow analysis
-        enhanced.conversationFlow = this.analyzeConversationFlow(content, context);
+        (enhanced as any).conversationFlow = this.analyzeConversationFlow(content, context);
 
         return enhanced;
     }
@@ -384,16 +386,18 @@ export class UltraIntelligenceOrchestrator {
         try {
             // Determine research depth based on complexity and reasoning
             let depth: 'basic' | 'comprehensive' | 'expert' = 'comprehensive';
-            
-            if (context.requestContext.complexity === 'expert' || reasoningResult?.complexityLevel > 0.8) {
+            if (context.requestContext.complexity === 'expert' || (reasoningResult?.complexityLevel ?? 0) > 0.8) {
                 depth = 'expert';
             } else if (context.requestContext.complexity === 'simple') {
                 depth = 'basic';
             }
 
+            const safeDomain = (['technical','general','server','gaming','realworld'] as const).includes(context.requestContext.domain as any)
+              ? (context.requestContext.domain as any)
+              : 'general';
             return await this.researchService.conductUltraIntelligentResearch(
                 content,
-                context.requestContext.domain,
+                safeDomain,
                 depth
             );
 
@@ -520,7 +524,7 @@ export class UltraIntelligenceOrchestrator {
                 channelId: context.channelId,
                 messageHistory: context.conversationHistory || [],
                 currentTopic: this.extractMainTopic(content),
-                userMood: this.detectUserMood(content),
+                userMood: (['neutral','excited','happy','frustrated','serious','curious'] as const).includes(this.detectUserMood(content) as any) ? (this.detectUserMood(content) as any) : 'neutral',
                 conversationFlow: context.conversationFlow || 'continuing',
                 timeContext: this.getTimeContext(),
                 serverActivity: context.serverContext?.activityLevel || 'moderate'
@@ -1078,7 +1082,7 @@ export class UltraIntelligenceOrchestrator {
      */
     getUltraIntelligenceStatus(): {
         config: UltraIntelligenceConfig;
-        metrics: typeof this.globalMetrics;
+        metrics: { totalInteractions: number; averageConfidence: number; averageNaturalness: number; averageExpertise: number; successfulAdaptations: number; learningMilestones: number };
         activeUsers: number;
         activeServers: number;
         capabilityStatus: {
