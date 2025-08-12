@@ -8,6 +8,7 @@ import { OpenAICompatProvider } from '../providers/openai-compatible.provider.js
 import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
 import { modelTelemetryStore } from './advanced-capabilities/index.js';
+import { getEnvAsBoolean } from '../utils/env.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -80,8 +81,17 @@ export class ModelRouterService {
           out = await this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
           break;
         case 'gemini':
-        default:
           out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
+          break;
+        default: {
+          // Optional Vercel AI provider path if enabled
+          if (getEnvAsBoolean('FEATURE_VERCEL_AI', false)) {
+            const { vercelAIProvider } = await import('../providers/vercel-ai.provider.js');
+            out = await vercelAIProvider.generate(prompt, mapped, systemPrompt, card.model);
+            break;
+          }
+          out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
+        }
       }
       modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs: Date.now() - start, success: true });
       return out;
