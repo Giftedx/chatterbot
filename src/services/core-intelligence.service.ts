@@ -1144,4 +1144,8 @@ export class CoreIntelligenceService {
             await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
         }
     }
+
+    public getMemoryManager(): AdvancedMemoryManager | undefined {
+        return this.memoryManager;
+    }
 }
