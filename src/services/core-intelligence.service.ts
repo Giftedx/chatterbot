@@ -249,33 +249,7 @@ export class CoreIntelligenceService {
             .setName('chat')
             .setDescription('Engage with intelligent conversation features.')
             .addStringOption(option => option.setName('prompt').setDescription('Your message, question, or request.').setRequired(true))
-            .addAttachmentOption(option => option.setName('attachment').setDescription('Optional file attachment.').setRequired(false))
-            .addStringOption(option =>
-                option
-                  .setName('provider')
-                  .setDescription('Preferred model/provider (optional)')
-                  .setRequired(false)
-                  .addChoices(
-                    { name: 'Auto', value: 'auto' },
-                    { name: 'OpenAI', value: 'openai' },
-                    { name: 'Anthropic', value: 'anthropic' },
-                    { name: 'Gemini', value: 'gemini' },
-                    { name: 'Groq', value: 'groq' },
-                    { name: 'Mistral', value: 'mistral' },
-                    { name: 'OpenAI Compatible', value: 'openai_compat' }
-                  )
-              )
-            .addStringOption(option =>
-                option
-                  .setName('mode')
-                  .setDescription('Speed/quality preference (optional)')
-                  .setRequired(false)
-                  .addChoices(
-                    { name: 'Auto', value: 'auto' },
-                    { name: 'Speed', value: 'speed' },
-                    { name: 'Quality', value: 'quality' }
-                  )
-              );
+            .addAttachmentOption(option => option.setName('attachment').setDescription('Optional file attachment.').setRequired(false));
         commands.push(chatCommand as SlashCommandBuilder);
         return commands;
     }
@@ -1023,27 +997,12 @@ export class CoreIntelligenceService {
               } catch {}
             }
 
-            // Optional: respect user preferred provider from slash option
-            let constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {};
-            let preferences: { latencyPreference?: 'low' | 'normal' } = {};
-            try {
-              const maybeProvider = (uiContext as any)?.options?.getString?.('provider');
-              if (maybeProvider && maybeProvider !== 'auto') {
-                constraints = { preferProvider: maybeProvider as ProviderName };
-              }
-              const maybeMode = (uiContext as any)?.options?.getString?.('mode');
-              if (maybeMode === 'speed') preferences.latencyPreference = 'low';
-              if (maybeMode === 'quality') preferences.latencyPreference = 'normal';
-            } catch {}
-
             const groundedQuery = typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery;
 
             const meta = await modelRouterService.generateWithMeta(
               groundedQuery,
               history,
-              systemPrompt,
-              constraints,
-              preferences
+              systemPrompt
             );
             const fullResponseText: string = meta.text;
             const agenticResponse: AgenticResponse = {

@@ -41,9 +41,7 @@ npm run dev
 - `/chat prompt [attachment]`
   - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
   - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
-  - Optional: choose provider with `/chat ... provider: [Auto|OpenAI|Anthropic|Gemini|Groq|Mistral|OpenAI Compatible]`. If omitted, the router auto-selects based on context and latency.
-  - Optional: choose mode with `/chat ... mode: [Auto|Speed|Quality]`. “Speed” biases for low-latency models; “Quality” allows higher-latency picks.
-
+  
 Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
 
 ---
@@ -104,7 +102,7 @@ MIT © 2025
 ## Multi-Provider Model Routing and Verification
 
 - Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
-- Automatic routing selects the best model based on signals (coding, long context, safety, latency).
+- Automatic routing selects the best model based on signals (coding, long context, safety, latency). Users do not choose providers; the AI selects automatically per message.
 - Cross-model answer verification and self-critique can be enabled to improve factuality and reasoning.
 
 Environment flags (see `env.example`):
