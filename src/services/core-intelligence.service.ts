@@ -571,6 +571,31 @@ export class CoreIntelligenceService {
         const startTime = Date.now();
         const analyticsData = { guildId: guildId || undefined, userId, commandOrEvent: uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate', promptLength: promptText.length, attachmentCount: commonAttachments.length, startTime };
 
+        // DM-only admin diagnose trigger
+        try {
+            const isDM = !guildId;
+            const isAdmin = await this.permissionService.isAdmin(userId, { guildId: guildId || undefined, channelId, userId });
+            if (isDM && isAdmin && /\b(diagnose|status|health|providers|telemetry|kb)\b/i.test(promptText)) {
+                const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
+                const providers = getProviderStatuses();
+                const telemetry = modelTelemetryStore.snapshot(10);
+                const { knowledgeBaseService } = await import('./knowledge-base.service.js');
+                const kb = await knowledgeBaseService.getStats();
+                const lines: string[] = [];
+                lines.push('Providers:');
+                for (const p of providers) lines.push(`- ${p.name}: ${p.available ? 'available' : 'not set'}`);
+                lines.push('\nRecent model usage:');
+                for (const t of telemetry) lines.push(`- ${t.provider}/${t.model} in ${Math.round(t.latencyMs)}ms ${t.success ? '✅' : '❌'}`);
+                lines.push('\nKnowledge Base:');
+                lines.push(`- Total entries: ${kb.totalEntries}`);
+                lines.push(`- Avg confidence: ${kb.averageConfidence.toFixed(2)}`);
+                lines.push(`- Recent additions (7d): ${kb.recentAdditions}`);
+                return { content: lines.join('\n') };
+            }
+        } catch (diagErr) {
+            // Non-fatal
+        }
+
         try {
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'start_processing', isSuccess: true, duration: 0 });
 

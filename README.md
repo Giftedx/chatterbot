@@ -14,6 +14,7 @@
 - Strong moderation, graceful degradation, model fallback
 - Observability: health, metrics, analytics dashboard (optional)
 - New: Smart media generation (images, GIFs) and speech replies (TTS)
+- New: DM-only admin diagnose support (see Observability & Ops)
 
 ---
 
@@ -44,6 +45,20 @@ npm run dev
   - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
 
 Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
+
+---
+
+### Processing pipeline (robust, autonomous)
+The bot runs a single, well-defined pipeline for every message:
+1. Privacy and consent checks (opt-in with `/chat` once)
+2. Moderation (text + attachments)
+3. Unified message analysis (intents, domains, complexity, attachments)
+4. Retrieval (conversation history, memories, knowledge base RAG)
+5. Tool/MCP orchestration as needed (web search, scraping, browser, etc.)
+6. Model routing across providers (OpenAI/Anthropic/Gemini/Groq/Mistral/compatible)
+7. Answer verification (self-critique, cross-model comparison, optional auto-rerun)
+8. Personalization and memory update (durable memory and summaries)
+9. Response delivery with enhanced UI (threads/DMs, attachments)
 
 ---
 
@@ -109,6 +124,9 @@ For administrators: internals and guardrails live in code; end users only see `/
 - Health: GET `/health`
 - Metrics: GET `/metrics`
 - Optional dashboard: set `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001`
+- DM-only admin diagnose (no commands):
+  - DM the bot with phrases like “diagnose”, “status”, “health”, “providers”, “telemetry”, or “kb”.
+  - Only users recognized as admins (via RBAC) will receive a DM summary of provider availability, recent model usage, and knowledge base stats.
 
 ---
 
