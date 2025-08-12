@@ -11,6 +11,7 @@ import { logger } from '../utils/logger.js';
 import { GeminiService } from './gemini.service.js';
 import { ChatMessage } from './context-manager.js';
 import { modelRouterService } from './model-router.service.js';
+import { langGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 export interface AgenticResponse {
   response: string;
@@ -193,6 +194,14 @@ I am operating at peak performance.
         enableEscalation
       });
 
+      // Optional: pre-analyze with LangGraph if enabled
+      try {
+        const lg = await langGraphWorkflow.run({ query });
+        if (lg?.intent) {
+          logger.debug('LangGraph intent detected', { intent: lg.intent });
+        }
+      } catch {}
+
       // Step 0: Check for help query
       if (this.isHelpQuery(query)) {
         return this.getHelpMessage();
@@ -208,6 +217,15 @@ I am operating at peak performance.
         query,
         minConfidence
       );
+
+      // Attempt retrieval context regardless; used to enrich if not grounded
+      const retrieval = await (async () => {
+        try {
+          const { HybridRetrievalService } = await import('./hybrid-retrieval.service.js');
+          const hrs = new HybridRetrievalService({ enableWeb: true, maxLocalDocs: 3 });
+          return await hrs.retrieve(query, channelId);
+        } catch { return { groundedSnippets: [], citations: [], usedWeb: false }; }
+      })();
 
       // Step 2: Generate initial response (this would come from your existing AI service)
       const initialResponse = await this.generateInitialResponse(
@@ -266,6 +284,13 @@ I am operating at peak performance.
           )
         : { response: initialResponse, citations: citations.citations, confidence: 0, sourceSummary: '' };
 
+      // Enrich with grounded snippets if not grounded and we have retrieval
+      let enrichedResponse = formattedResponse.response;
+      if (!knowledgeGrounded && retrieval.groundedSnippets.length > 0) {
+        const snippet = retrieval.groundedSnippets.slice(0, 2).join('\n- ');
+        enrichedResponse = `${formattedResponse.response}\n\nRelevant info:\n- ${snippet}`;
+      }
+
       // Step 7: Handle escalation if needed
       if (escalation.shouldEscalate) {
         await this.handleEscalation(query, userId, channelId, escalation, flaggingResult, context);
@@ -274,7 +299,7 @@ I am operating at peak performance.
       const processingTime = Date.now() - startTime;
 
       const response: AgenticResponse = {
-        response: formattedResponse.response,
+        response: enrichedResponse,
         confidence: Math.min(1, (formattedResponse.confidence + citations.confidence) / 2),
         citations,
         flagging: {
@@ -293,7 +318,7 @@ I am operating at peak performance.
         metadata: {
           processingTime,
           knowledgeEntriesFound: citations.citations.length,
-          responseQuality: this.assessResponseQuality(formattedResponse.response, citations.hasCitations)
+          responseQuality: this.assessResponseQuality(enrichedResponse, citations.hasCitations)
         }
       };
 

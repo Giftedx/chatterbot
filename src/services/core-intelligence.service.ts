@@ -55,6 +55,10 @@ import {
   type EnhancedResponse 
 } from './advanced-capabilities/index.js';
 
+import { UltraIntelligenceOrchestrator } from './ultra-intelligence/orchestrator.service.js';
+import { AdvancedMemoryManager } from './advanced-memory/advanced-memory-manager.service.js';
+import { registerMemoryManager } from './memory-registry.js';
+
 
 // Utilities and Others
 import { logger } from '../utils/logger.js';
@@ -65,10 +69,8 @@ import { ModerationService } from '../moderation/moderation-service.js';
 import { REGENERATE_BUTTON_ID, STOP_BUTTON_ID, MOVE_DM_BUTTON_ID, moveDmButtonRow } from '../ui/components.js';
 import { urlToGenerativePart } from '../utils/image-helper.js';
 import { prisma } from '../db/prisma.js';
-
-// import { sendStream } from '../ui/stream-utils'; // sendStream is used by EnhancedUIService
-
-
+import { sendStream } from '../ui/stream-utils.js';
+import { intelligenceAnalysisService } from './intelligence/analysis.service.js';
 
 
 interface CommonAttachment {
@@ -124,6 +126,8 @@ export class CoreIntelligenceService {
     private behaviorAnalytics?: UserBehaviorAnalyticsService;
     private smartRecommendations?: SmartRecommendationService;
     private advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
+    private memoryManager?: AdvancedMemoryManager;
+    private ultra?: UltraIntelligenceOrchestrator;
 
     constructor(config: CoreIntelligenceConfig) {
         this.config = config;
@@ -142,6 +146,24 @@ export class CoreIntelligenceService {
         this.capabilityService = intelligenceCapabilityService;
         this.userMemoryService = new UserMemoryService();
         this.userConsentService = UserConsentService.getInstance();
+
+        if (config.enableEnhancedMemory) {
+            this.memoryManager = new AdvancedMemoryManager({
+                enableEpisodicMemory: true,
+                enableSocialIntelligence: true,
+                enableEmotionalIntelligence: true,
+                enableSemanticClustering: true,
+                enableMemoryConsolidation: true,
+                memoryDecayRate: 0.05,
+                maxMemoriesPerUser: 1000,
+                importanceThreshold: 0.3,
+                consolidationInterval: 60 * 60 * 1000,
+                socialAnalysisDepth: 'moderate',
+                emotionalSensitivity: 0.7,
+                adaptationAggressiveness: 0.6
+            });
+            this.memoryManager.initialize().then(() => registerMemoryManager(this.memoryManager!)).catch(() => {});
+        }
 
         if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
         if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
@@ -1076,6 +1098,22 @@ export class CoreIntelligenceService {
         }
     }
 
+    private async enhanceAndPersistMemory(userId: string, channelId: string, guildId: string | undefined, content: string, response: string) {
+        if (!this.memoryManager) return response;
+        const context = {
+            userId,
+            channelId,
+            guildId,
+            conversationId: `${channelId}:${userId}`,
+            participants: [userId],
+            content,
+            timestamp: new Date()
+        };
+        await this.memoryManager.storeConversationMemory(context);
+        const enhanced = await this.memoryManager.enhanceResponse(response, context);
+        return enhanced.enhancedResponse;
+    }
+
     private async handleButtonPress(interaction: ButtonInteraction): Promise<void> {
         const userId = interaction.user.id;
         const streamKey = `${userId}-${interaction.channelId}`;
@@ -1106,5 +1144,9 @@ export class CoreIntelligenceService {
             await this.userConsentService.setDmPreference(userId, true);
             await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
         }
+    }
+
+    public getMemoryManager(): AdvancedMemoryManager | undefined {
+        return this.memoryManager;
     }
 }

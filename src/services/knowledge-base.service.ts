@@ -5,11 +5,32 @@
 
 import { prisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
+import { features } from '../config/feature-flags.js';
+import { pgvectorRepository } from '../vector/pgvector.repository.js';
 
 function cosineSim(a: Float32Array, b: Float32Array): number {
   let dot = 0, na = 0, nb = 0;
   for (let i = 0; i < a.length && i < b.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
   return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
+}
+
+function jaccardSimilarity(a: string, b: string): number {
+  const sa = new Set(a.toLowerCase().split(/\W+/).filter(Boolean));
+  const sb = new Set(b.toLowerCase().split(/\W+/).filter(Boolean));
+  const intersection = new Set([...sa].filter(x => sb.has(x))).size;
+  const union = new Set([...sa, ...sb]).size || 1;
+  return intersection / union;
+}
+
+function reRankEntries(entries: Array<{ content: string } & Record<string, any>>, limit: number): any[] {
+  const selected: any[] = [];
+  const threshold = 0.7; // consider near-duplicates above this similarity
+  for (const e of entries) {
+    const isDuplicate = selected.some(s => jaccardSimilarity(s.content, e.content) >= threshold);
+    if (!isDuplicate) selected.push(e);
+    if (selected.length >= limit) break;
+  }
+  return selected;
 }
 
 export interface KnowledgeEntry {
@@ -29,6 +50,7 @@ export interface KnowledgeEntry {
 export interface KnowledgeQuery {
   query: string;
   channelId?: string;
+  guildId?: string;
   tags?: string[];
   minConfidence?: number;
   limit?: number;
@@ -123,7 +145,41 @@ export class KnowledgeBaseService {
    */
   async search(query: KnowledgeQuery): Promise<KnowledgeEntry[]> {
     try {
-      const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
+      const { query: searchQuery, channelId, guildId, tags, minConfidence = 0.5, limit = 5 } = query;
+
+      // Vector-first search using pgvector if enabled
+      if (features.pgvector && process.env.OPENAI_API_KEY) {
+        try {
+          const OpenAI = (await import('openai')).default;
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: searchQuery });
+          const qvec = emb.data?.[0]?.embedding;
+          if (qvec && (await pgvectorRepository.init())) {
+            const filter: any = {};
+            if (guildId) filter.guildId = guildId;
+            const results = await pgvectorRepository.search({ vector: qvec, topK: limit * 3, filter });
+            if (results.length > 0) {
+              const mapped = results.map(r => ({
+                id: r.id,
+                content: r.content,
+                source: 'kb_vector',
+                sourceId: r.id,
+                sourceUrl: null,
+                channelId: null,
+                authorId: null,
+                tags: null,
+                confidence: Math.max(minConfidence, Math.min(0.99, r.score)),
+                createdAt: new Date(),
+                updatedAt: new Date()
+              } as any));
+              const reranked = reRankEntries(mapped, limit) as KnowledgeEntry[];
+              return reranked;
+            }
+          }
+        } catch (e) {
+          logger.debug('pgvector search failed, falling back', { error: String(e) });
+        }
+      }
 
       // Attempt vector retrieval via KBChunk if embeddings exist
       try {
@@ -135,12 +191,12 @@ export class KnowledgeBaseService {
           const qvec = emb.data?.[0]?.embedding;
           if (qvec) {
             const q = new Float32Array(qvec);
-            const scored = (chunks as Array<{ id: string; content: string; embedding: Buffer | null; sourceId: string; createdAt: Date }>).map((c) => {
-              const vec = c.embedding ? new Float32Array(Buffer.from(c.embedding).buffer) : new Float32Array();
-              return { chunk: c, score: vec.length ? cosineSim(q, vec) : 0 };
-            }).sort((a: { score: number }, b: { score: number }) => b.score - a.score).slice(0, limit);
-            // Map back to KnowledgeEntry-like objects as a fallback
-            return scored.map((s: { chunk: any; score: number }) => ({
+            const scored = (chunks as Array<{ id: string; content: string; embedding: Buffer | null; sourceId: string; createdAt: Date }>).
+              map((c) => {
+                const vec = c.embedding ? new Float32Array(Buffer.from(c.embedding).buffer) : new Float32Array();
+                return { chunk: c, score: vec.length ? cosineSim(q, vec) : 0 };
+              }).sort((a: { score: number }, b: { score: number }) => b.score - a.score).slice(0, limit * 3);
+            const mapped = scored.map((s: { chunk: any; score: number }) => ({
               id: s.chunk.id,
               content: s.chunk.content,
               source: 'kb_chunk',
@@ -153,6 +209,8 @@ export class KnowledgeBaseService {
               createdAt: s.chunk.createdAt,
               updatedAt: s.chunk.createdAt
             } as any));
+            const reranked = reRankEntries(mapped, limit) as KnowledgeEntry[];
+            return reranked;
           }
         }
       } catch {}
@@ -166,23 +224,24 @@ export class KnowledgeBaseService {
       const entries = await prisma.knowledgeEntry.findMany({
         where: whereClause,
         orderBy: [ { confidence: 'desc' }, { updatedAt: 'desc' } ],
-        take: limit * 3
+        take: limit * 5
       });
 
       const relevantEntries = (entries as KnowledgeEntry[])
         .map((entry) => ({ entry, score: this.calculateRelevance(searchQuery, entry.content) }))
         .filter((e) => e.score > 0.2)
         .sort((a, b) => b.score - a.score)
-        .slice(0, limit)
         .map((e) => e.entry);
+
+      const reranked = reRankEntries(relevantEntries, limit) as KnowledgeEntry[];
 
       logger.info('Knowledge base search completed', {
         query: searchQuery,
-        results: relevantEntries.length,
+        results: reranked.length,
         totalSearched: entries.length
       });
 
-      return relevantEntries;
+      return reranked;
     } catch (error) {
       logger.error('Failed to search knowledge base', error);
       return [];

@@ -6,30 +6,12 @@ export interface OrchestrationResult {
   started: boolean;
 }
 
-export function startTemporalOrchestrationIfEnabled(): OrchestrationResult {
-  if (!features.temporal) {
-    logger.debug('Temporal orchestration is disabled by feature flag.');
-    return { started: false };
-  }
-
-  // Deferred import so runtime does not require Temporal unless enabled.
-  (async () => {
-    try {
-      const mod = await import('./runtime.js');
-      await mod.startWorker();
-      logger.info('Temporal orchestration started.');
-    } catch (err) {
-      logger.error('Failed to start Temporal orchestration:', err);
-    }
-  })();
-
 export async function startTemporalOrchestrationIfEnabled(): Promise<OrchestrationResult> {
   if (!features.temporal) {
     logger.debug('Temporal orchestration is disabled by feature flag.');
     return { started: false };
   }
 
-  // Deferred import so runtime does not require Temporal unless enabled.
   try {
     const mod = await import('./runtime.js');
     await mod.startWorker();

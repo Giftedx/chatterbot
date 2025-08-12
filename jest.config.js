@@ -1,5 +1,4 @@
 export default {
-  preset: 'ts-jest/presets/default-esm',
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(.*)\\.js$': '$1',

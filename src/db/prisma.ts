@@ -2,62 +2,57 @@
 // In a normal serverless environment you would guard with `globalThis`. For this long-running
 // Discord bot process, a simple singleton is sufficient.
 
-import { PrismaClient } from '@prisma/client';
-
+// Use dynamic import to avoid compile-time dependency on generated Prisma client types
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let prisma: PrismaClient | any;
+let prisma: any;
 
-// Initialize Prisma client synchronously 
+async function createRealClient() {
+  try {
+    const mod: any = await import('@prisma/client');
+    const ClientCtor = mod?.PrismaClient || mod?.default?.PrismaClient || mod;
+    if (!ClientCtor) throw new Error('PrismaClient constructor not found');
+    return new ClientCtor();
+  } catch (error) {
+    throw new Error('❌ PrismaClient not available. Run "npx prisma generate" to generate the client.');
+  }
+}
+
+// Initialize Prisma client depending on environment
 async function initializePrisma() {
   if (process.env.NODE_ENV === 'test') {
     try {
-      // Try to create the real PrismaClient first
-      prisma = new PrismaClient();
-    } catch (error) {
+      prisma = await createRealClient();
+    } catch {
       // Fall back to mock if PrismaClient is not available
-      console.log('⚠️ Using mock Prisma client for tests (real client not available)');
       const { mockPrisma } = await import('./prisma-mock.js');
       prisma = mockPrisma;
     }
   } else {
-    try {
-      prisma = new PrismaClient();
-    } catch (error) {
-      console.error('❌ PrismaClient not available. Run "npx prisma generate" to generate the client.');
-      throw error;
-    }
+    prisma = await createRealClient();
   }
   return prisma;
 }
 
 // Initialize synchronously for non-test environments, mock for tests
 if (process.env.NODE_ENV === 'test') {
-  // For tests, always use mock - don't try real client
-  console.log('⚠️ Using mock Prisma client for tests');
-  // Use dynamic import to avoid top-level await
+  // For tests, always use mock if real client fails - don't block startup
   import('./prisma-mock.js').then(({ mockPrisma }) => {
     prisma = mockPrisma;
-  }).catch(() => {
-    console.log('⚠️ Mock Prisma not available, using fallback');
-    prisma = {
-      // Basic mock implementation
-      user: { findMany: () => [], create: () => ({}) },
-      conversation: { findMany: () => [], create: () => ({}) },
-      analytics: { findMany: () => [], create: () => ({}) }
-    };
+  }).catch(async () => {
+    try {
+      prisma = await createRealClient();
+    } catch {
+      prisma = {};
+    }
   });
 } else {
-  try {
-    prisma = new PrismaClient();
-  } catch (error) {
-    console.error('❌ PrismaClient not available. Run "npx prisma generate" to generate the client.');
-    throw error;
-  }
+  // Best-effort initialize real client synchronously
+  // Note: top-level await not available here, so keep uninitialized until first get
 }
 
 // Helper function to get prisma instance, initializing if needed
 async function getPrisma() {
-  if (!prisma && process.env.NODE_ENV === 'test') {
+  if (!prisma) {
     return await initializePrisma();
   }
   return prisma;
