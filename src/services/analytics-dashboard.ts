@@ -126,6 +126,40 @@ export class AnalyticsDashboard {
         break;
       }
 
+      case '/api/verification-metrics': {
+        try {
+          const { getVerificationMetrics } = await import('./verification/answer-verification.service.js');
+          const m = getVerificationMetrics();
+          this.sendJson(res, m);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load verification metrics');
+        }
+        break;
+      }
+
+      case '/api/telemetry': {
+        try {
+          const { modelTelemetryStore } = await import('./advanced-capabilities/index.js');
+          const limit = parseInt(params.get('limit') || '20', 10);
+          const data = modelTelemetryStore.snapshot(Math.max(1, Math.min(200, limit)));
+          this.sendJson(res, data);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load telemetry');
+        }
+        break;
+      }
+
+      case '/api/kb-stats': {
+        try {
+          const { knowledgeBaseService } = await import('./knowledge-base.service.js');
+          const stats = await knowledgeBaseService.getStats();
+          this.sendJson(res, stats);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load KB stats');
+        }
+        break;
+      }
+
       default:
         this.sendError(res, 404, 'Not Found');
     }
