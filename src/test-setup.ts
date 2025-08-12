@@ -25,17 +25,27 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
   };
   
   // Ensure Prisma connections are closed after all tests to avoid open handles
-  import('./db/prisma.js')
-    .then(({ prisma }) => {
-      afterAll(async () => {
-        try {
-          await prisma.$disconnect();
-        } catch (_) {
-          // ignore
-        }
-      });
-    })
-    .catch(() => {/* prisma not available */});
+  // Setup teardown synchronously to avoid Jest hook timing issues
+  let prismaInstance: any;
+  
+  beforeAll(async () => {
+    try {
+      const { prisma } = await import('./db/prisma.js');
+      prismaInstance = prisma;
+    } catch (_) {
+      // prisma not available in this environment
+    }
+  });
+  
+  afterAll(async () => {
+    if (prismaInstance) {
+      try {
+        await prismaInstance.$disconnect();
+      } catch (_) {
+        // ignore disconnect errors
+      }
+    }
+  });
 
   // --- Global timer tracking to clean up handles that keep Node alive ---
   type TimerHandle = NodeJS.Timeout;

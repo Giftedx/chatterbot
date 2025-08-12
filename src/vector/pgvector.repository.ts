@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { features } from '../config/feature-flags.js';
 
 export interface VectorRecord {
@@ -16,9 +15,14 @@ export interface VectorSearchParams {
   filter?: { userId?: string; guildId?: string };
 }
 
+interface PgClient {
+  query(text: string, params?: unknown[]): Promise<{ rows: unknown[] }>;
+  end(): Promise<void>;
+}
+
 export class PgvectorRepository {
   private initialized = false;
-  private client: any;
+  private client: PgClient | null = null;
 
   async init(): Promise<boolean> {
     if (this.initialized) return true;

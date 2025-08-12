@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { getEnvAsBoolean } from '../../utils/env.js';
 
 export interface AgentState {

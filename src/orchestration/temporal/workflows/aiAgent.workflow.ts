@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { defineSignal, setHandler } from '@temporalio/workflow';
 
 export const humanApproval = defineSignal('humanApproval');

@@ -1,4 +1,3 @@
-// @ts-nocheck
 export async function llmDraft(input: { prompt: string }): Promise<string> {
   const p = input?.prompt || '';
   let hash = 0;

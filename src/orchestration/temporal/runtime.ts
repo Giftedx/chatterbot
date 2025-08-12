@@ -1,12 +1,23 @@
-// @ts-nocheck
 // Runtime module only loaded when FEATURE_TEMPORAL=true.
 // Keep this dependency-light; load Temporal SDK dynamically.
 import { logger } from '../../utils/logger.js';
 
+interface TemporalWorkerSDK {
+  Worker: {
+    create(options: {
+      workflowsPath: string;
+      activities: Record<string, unknown>;
+      taskQueue: string;
+    }): Promise<{
+      run(): Promise<void>;
+    }>;
+  };
+}
+
 export async function startWorker(): Promise<void> {
   try {
-    const sdk = await import('@temporalio/worker');
-    const { Worker } = sdk as any;
+    const sdk = await import('@temporalio/worker') as TemporalWorkerSDK;
+    const { Worker } = sdk;
     const taskQueue = process.env.TEMPORAL_TASK_QUEUE || 'discord-ai-bot';
 
     const worker = await Worker.create({
