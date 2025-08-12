@@ -3,7 +3,7 @@ import { Client, GatewayIntentBits, REST, Routes, Interaction, Message } from 'd
 import { CoreIntelligenceService, CoreIntelligenceConfig } from './services/core-intelligence.service.js';
 import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard.js';
 import { healthCheck } from './health.js';
-import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './commands/privacy-commands.js';
+import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './ui/privacy-consent.handlers.js';
 import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
 

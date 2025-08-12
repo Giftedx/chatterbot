@@ -2,6 +2,12 @@ import { modelRouterService } from '../model-router.service.js';
 import type { ChatMessage } from '../context-manager.js';
 import { logger } from '../../utils/logger.js';
 
+const verifyMetrics = {
+  comparisons: 0,
+  lowAgreements: 0,
+  reruns: 0
+};
+
 export interface AnswerVerificationOptions {
   enabled?: boolean;
   crossModel?: boolean;
@@ -38,55 +44,30 @@ export class AnswerVerificationService {
       // 2) Cross-model verification (optional)
       if (this.options.crossModel) {
         try {
-          // Generate comparison answer from a different provider
-          const alt = await modelRouterService.generateWithMeta(
-            userPrompt,
-            history,
-            undefined,
-            { disallowProviders: [], /* prefer different provider than initial is handled below */ }
-          );
+          const alt = await modelRouterService.generateWithMeta(userPrompt, history);
+          const alt2 = await modelRouterService.generateWithMeta(userPrompt, history, undefined, { disallowProviders: [alt.provider] });
 
-          // If provider appears same as previous inference path, request different one
-          const alt2 = await modelRouterService.generateWithMeta(
-            userPrompt,
-            history,
-            undefined,
-            { disallowProviders: [alt.provider] }
-          );
-
-          const comparisonPrompt = `You are a verifier. Compare Answer A and Answer B to the same user question. Identify disagreements and rate overall agreement 0-1.
-Return JSON with { agreement: number, critical_differences: string[], better_answer: 'A'|'B'|'tie' }.
-
-User Question:\n${userPrompt}
-
-Answer A:\n${current}
-
-Answer B:\n${alt2.text}`;
+          const comparisonPrompt = `You are a verifier. Compare Answer A and Answer B to the same user question. Identify disagreements and rate overall agreement 0-1.\nReturn JSON with { agreement: number, critical_differences: string[], better_answer: 'A'|'B'|'tie' }.\n\nUser Question:\n${userPrompt}\n\nAnswer A:\n${current}\n\nAnswer B:\n${alt2.text}`;
 
           const verification = await modelRouterService.generate(comparisonPrompt, history, 'system', 'global');
+          verifyMetrics.comparisons++;
 
-          // Parse agreement score if possible
           let agreement = 0.0;
           try {
             const match = verification.match(/\{[\s\S]*\}/);
             if (match) {
               const parsed = JSON.parse(match[0]);
               agreement = typeof parsed.agreement === 'number' ? parsed.agreement : 0;
+              if (agreement < 0.6) verifyMetrics.lowAgreements++;
               if (parsed.better_answer === 'B' && this.options.maxReruns > 0) {
                 current = alt2.text;
               }
             }
           } catch {}
 
-          // 3) If low agreement, attempt one rerun with instruction to reconcile
           if (agreement < 0.6 && this.options.maxReruns > 0) {
-            const reconcilePrompt = `Re-answer the user clearly and accurately. Consider both alternatives above. Avoid hallucinations and cite uncertainties.`;
-            const rerun = await modelRouterService.generateWithMeta(
-              `${reconcilePrompt}\n\nUser: ${userPrompt}`,
-              history,
-              undefined,
-              { disallowProviders: [] }
-            );
+            const rerun = await modelRouterService.generateWithMeta(`Re-answer clearly and accurately. Consider both alternatives above. Avoid hallucinations and cite uncertainties.\n\nUser: ${userPrompt}`, history);
+            verifyMetrics.reruns++;
             current = rerun.text || current;
           }
         } catch (err) {
@@ -103,3 +84,4 @@ Answer B:\n${alt2.text}`;
 }
 
 export const answerVerificationService = new AnswerVerificationService();
+export const getVerificationMetrics = () => ({ ...verifyMetrics });
