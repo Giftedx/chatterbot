@@ -50,6 +50,7 @@ export interface KnowledgeEntry {
 export interface KnowledgeQuery {
   query: string;
   channelId?: string;
+  guildId?: string;
   tags?: string[];
   minConfidence?: number;
   limit?: number;
@@ -144,7 +145,7 @@ export class KnowledgeBaseService {
    */
   async search(query: KnowledgeQuery): Promise<KnowledgeEntry[]> {
     try {
-      const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
+      const { query: searchQuery, channelId, guildId, tags, minConfidence = 0.5, limit = 5 } = query;
 
       // Vector-first search using pgvector if enabled
       if (features.pgvector && process.env.OPENAI_API_KEY) {
@@ -154,7 +155,9 @@ export class KnowledgeBaseService {
           const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: searchQuery });
           const qvec = emb.data?.[0]?.embedding;
           if (qvec && (await pgvectorRepository.init())) {
-            const results = await pgvectorRepository.search({ vector: qvec, topK: limit * 3, filter: {} });
+            const filter: any = {};
+            if (guildId) filter.guildId = guildId;
+            const results = await pgvectorRepository.search({ vector: qvec, topK: limit * 3, filter });
             if (results.length > 0) {
               const mapped = results.map(r => ({
                 id: r.id,
