@@ -57,6 +57,7 @@ import {
 
 import { UltraIntelligenceOrchestrator } from './ultra-intelligence/orchestrator.service.js';
 import { AdvancedMemoryManager } from './advanced-memory/advanced-memory-manager.service.js';
+import { registerMemoryManager } from './memory-registry.js';
 
 
 // Utilities and Others
@@ -161,7 +162,7 @@ export class CoreIntelligenceService {
                 emotionalSensitivity: 0.7,
                 adaptationAggressiveness: 0.6
             });
-            this.memoryManager.initialize().catch(() => {});
+            this.memoryManager.initialize().then(() => registerMemoryManager(this.memoryManager!)).catch(() => {});
         }
 
         if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();

@@ -8,6 +8,7 @@ import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './ui/p
 import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
 import { startTemporalOrchestrationIfEnabled } from './orchestration/temporal/loader.js';
+import { memoryConsolidationScheduler } from './services/schedulers/memory-consolidation.scheduler.js';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -76,6 +77,12 @@ client.once('ready', async () => {
     if (orchestration.started) {
       console.log('🧩 Orchestration worker started.');
     }
+  } catch {}
+
+  // Start memory consolidation scheduler
+  try {
+    memoryConsolidationScheduler.start();
+    console.log('🧠 Memory consolidation scheduler started.');
   } catch {}
 
   // Initialize Enhanced Intelligence if enabled
