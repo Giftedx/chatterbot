@@ -41,6 +41,7 @@
     "@temporalio/client": "^1.12.1",
     "@temporalio/worker": "^1.12.1",
     "@temporalio/workflow": "^1.12.1",
+    "@types/pg": "^8.15.5",
     "ai": "^5.0.11",
     "axios": "^1.10.0",
     "bcrypt": "^6.0.0",
@@ -50,6 +51,7 @@
     "groq-sdk": "^0.6.0",
     "lodash": "^4.17.21",
     "openai": "^4.53.0",
+    "pg": "^8.16.3",
     "sanitize-html": "^2.17.0",
     "zod": "^3.25.76"
   },
