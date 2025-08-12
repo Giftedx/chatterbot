@@ -33,5 +33,31 @@ export function anyFeatureEnabled(featureNames: string[]): boolean {
  * Check if all of the provided features are enabled
  */
 export function allFeaturesEnabled(featureNames: string[]): boolean {
-  return featureNames.every(name => (features as any)[name]);
+type FeatureName = keyof typeof features;
+
+/**
+ * Get feature flag status by name
+ */
+export function getFeatureFlag(featureName: string): boolean {
+  return featureName in features
+    ? features[featureName as FeatureName]
+    : false;
+}
+
+/**
+ * Check if any of the provided features are enabled
+ */
+export function anyFeatureEnabled(featureNames: string[]): boolean {
+  return featureNames.some(
+    name => (name in features ? features[name as FeatureName] : false)
+  );
+}
+
+/**
+ * Check if all of the provided features are enabled
+ */
+export function allFeaturesEnabled(featureNames: string[]): boolean {
+  return featureNames.every(
+    name => (name in features ? features[name as FeatureName] : false)
+  );
 }
