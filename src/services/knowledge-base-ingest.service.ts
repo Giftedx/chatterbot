@@ -26,15 +26,13 @@ export class KnowledgeBaseIngestService {
       create: { guildId, title, url: url || null, checksum }
     } as any);
 
-    // Chunk content into overlapping sections for better retrieval
     const chunks = chunkText(content);
 
-    // Persist chunks and embeddings
     for (let index = 0; index < chunks.length; index++) {
       const chunk = chunks[index];
       const section = `${title}#${index + 1}`;
       const created = await prisma.kBChunk.create({ data: { sourceId: src.id, content: chunk, section } });
-      await knowledgeBaseEmbeddingsService.embedAndStoreChunk(src.id, chunk, section);
+      await knowledgeBaseEmbeddingsService.embedAndStoreChunk(src.id, chunk, section, guildId);
     }
 
     return src.id as any;
