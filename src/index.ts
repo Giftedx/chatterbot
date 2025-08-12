@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Client, GatewayIntentBits, REST, Routes, Interaction, Message } from 'discord.js';
 import { CoreIntelligenceService, CoreIntelligenceConfig } from './services/core-intelligence.service.js';
 import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard.js';
+import { stopAnalyticsDashboard } from './services/analytics-dashboard.js';
 import { healthCheck } from './health.js';
 import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './ui/privacy-consent.handlers.js';
 import { logger } from './utils/logger.js';
@@ -190,7 +191,8 @@ const gracefulShutdown = async (signal: string) => {
       await mcpManagerInstance.shutdown();
       console.log('✅ MCP Manager shutdown complete');
     }
-    
+    try { stopAnalyticsDashboard(); } catch {}
+
     console.log('🤖 Closing Discord connection...');
     client.destroy();
     console.log('✅ Discord connection closed');
