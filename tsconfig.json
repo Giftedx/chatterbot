@@ -10,15 +10,16 @@
     "useUnknownInCatchVariables": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "rootDir": "src",
+    "rootDir": ".",
     "downlevelIteration": true,
     "allowSyntheticDefaultImports": true,
+    "allowJs": true,
+    "baseUrl": ".",
     "types": ["node", "jest"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "tests/**/*"],
   "exclude": [
-    "node_modules",
-    "**/*.test.ts"
+    "node_modules"
   ]
 }
