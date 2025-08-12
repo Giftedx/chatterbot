@@ -751,7 +751,7 @@ The repository includes comprehensive CI pipelines that handle agent-specific re
 - **Performance Metrics**: Integrated performance monitoring
 
 ### Documentation Hierarchy for Agents
-1. **Primary Context**: `.github/COPILOT_INSTRUCTIONS.md` (this file) - Complete architecture overview
+1. **Primary Context**: `.github/COPILOT_INSTRUCTIONS.md` - Complete architecture overview
 2. **Setup Guide**: `.github/COPILOT_AGENT_SETUP.md` - Comprehensive setup instructions
 3. **Quick Reference**: `docs/context/agent-brief.md` - Working agreements and commands
 4. **Architecture**: `docs/ARCHITECTURE.md` - High-level system design
