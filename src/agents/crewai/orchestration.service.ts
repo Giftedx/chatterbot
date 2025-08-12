@@ -1,10 +1,12 @@
-// TASK-030: Introduce CrewAI specialists for domain-specific tasks
+// TASK-030: Enhanced CrewAI specialists for domain-specific tasks with production features
 
-import { getEnvAsBoolean, getEnvAsString } from '../../utils/env.js';
+import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../../utils/env.js';
 import { z } from 'zod';
 import OpenAI from 'openai';
+import { EventEmitter } from 'events';
+import { longTermMemoryService } from '../../memory/long-term-memory.service.js';
 
-// Agent role definitions
+// Enhanced Agent role definitions with advanced capabilities
 const AgentRoleSchema = z.object({
   role: z.string(),
   goal: z.string(),
@@ -16,7 +18,20 @@ const AgentRoleSchema = z.object({
   max_iter: z.number().default(5),
   memory: z.boolean().default(true),
   step_callback: z.function().optional(),
-  system_template: z.string().optional()
+  system_template: z.string().optional(),
+  
+  // Enhanced attributes
+  expertise_level: z.enum(['junior', 'mid', 'senior', 'expert', 'principal']).default('senior'),
+  communication_style: z.enum(['direct', 'collaborative', 'analytical', 'creative', 'diplomatic']).default('collaborative'),
+  decision_making: z.enum(['autonomous', 'collaborative', 'consensus', 'delegated']).default('collaborative'),
+  learning_style: z.enum(['experiential', 'theoretical', 'practical', 'adaptive']).default('adaptive'),
+  risk_tolerance: z.enum(['conservative', 'moderate', 'aggressive', 'calculated']).default('moderate'),
+  performance_metrics: z.object({
+    success_rate: z.number().min(0).max(1).default(0.85),
+    avg_completion_time_hours: z.number().default(2),
+    collaboration_score: z.number().min(0).max(1).default(0.8),
+    innovation_index: z.number().min(0).max(1).default(0.7)
+  }).optional()
 });
 
 const TaskSchema = z.object({
@@ -28,13 +43,24 @@ const TaskSchema = z.object({
   context: z.array(z.string()).default([]),
   output_json: z.object({}).optional(),
   output_pydantic: z.object({}).optional(),
-  callback: z.function().optional()
+  callback: z.function().optional(),
+  
+  // Enhanced task attributes
+  priority: z.enum(['low', 'medium', 'high', 'critical']).default('medium'),
+  complexity: z.enum(['simple', 'moderate', 'complex', 'expert']).default('moderate'),
+  estimated_duration_hours: z.number().default(1),
+  dependencies: z.array(z.string()).default([]),
+  deliverables: z.array(z.string()).default([]),
+  acceptance_criteria: z.array(z.string()).default([]),
+  required_skills: z.array(z.string()).default([]),
+  collaboration_required: z.boolean().default(false),
+  external_dependencies: z.array(z.string()).default([])
 });
 
 const CrewConfigSchema = z.object({
   agents: z.array(AgentRoleSchema),
   tasks: z.array(TaskSchema),
-  process: z.enum(['sequential', 'hierarchical']).default('sequential'),
+  process: z.enum(['sequential', 'hierarchical', 'democratic', 'specialist_rotation']).default('sequential'),
   verbose: z.number().min(0).max(2).default(1),
   manager_llm: z.string().optional(),
   function_calling_llm: z.string().optional(),
@@ -43,13 +69,32 @@ const CrewConfigSchema = z.object({
   language: z.string().default('en'),
   memory: z.boolean().default(false),
   cache: z.boolean().default(true),
-  output_log_file: z.string().optional()
+  output_log_file: z.string().optional(),
+  
+  // Enhanced crew configuration
+  max_execution_time_hours: z.number().default(8),
+  quality_gates: z.array(z.object({
+    stage: z.string(),
+    criteria: z.array(z.string()),
+    required_approval: z.boolean().default(false)
+  })).default([]),
+  risk_management: z.object({
+    max_budget_usd: z.number().default(100),
+    escalation_contacts: z.array(z.string()).default([]),
+    fallback_strategies: z.array(z.string()).default([])
+  }).optional(),
+  success_metrics: z.object({
+    min_quality_score: z.number().min(0).max(1).default(0.8),
+    max_cost_overrun_percent: z.number().default(20),
+    stakeholder_satisfaction_target: z.number().min(0).max(1).default(0.85)
+  }).optional()
 });
 
 type AgentRole = z.infer<typeof AgentRoleSchema>;
 type Task = z.infer<typeof TaskSchema>;
 type CrewConfig = z.infer<typeof CrewConfigSchema>;
 
+// Enhanced result tracking with comprehensive metrics
 interface CrewResult {
   id: string;
   timestamp: Date;
@@ -59,24 +104,50 @@ interface CrewResult {
     total_tasks: number;
     execution_time_ms: number;
     outputs: Array<{
+      task_id: string;
       task_description: string;
       agent_role: string;
       output: string;
       execution_time: number;
       tokens_used?: number;
+      quality_score?: number;
+      completion_percentage: number;
+      dependencies_met: boolean;
+      deliverables_completed: string[];
     }>;
     final_output: string;
     success: boolean;
     error_details?: string[];
+    quality_gates_passed: number;
+    total_quality_gates: number;
   };
   metrics: {
     efficiency_score: number;
     quality_score: number;
     collaboration_score: number;
+    innovation_score: number;
+    cost_effectiveness: number;
+    stakeholder_satisfaction: number;
     token_usage: Record<string, number>;
+    performance_by_agent: Record<string, {
+      tasks_completed: number;
+      avg_completion_time: number;
+      quality_score: number;
+      collaboration_rating: number;
+    }>;
   };
+  business_impact: {
+    objectives_achieved: string[];
+    kpis_improved: Record<string, number>;
+    roi_estimate: number;
+    time_saved_hours: number;
+    cost_incurred_usd: number;
+  };
+  lessons_learned: string[];
+  recommendations: string[];
 }
 
+// Enhanced specialist agent definition
 interface SpecialistAgent {
   role: string;
   expertise: string[];
@@ -84,69 +155,283 @@ interface SpecialistAgent {
   limitations: string[];
   preferred_tasks: string[];
   collaboration_style: string;
+  
+  // Advanced attributes
+  domain_knowledge: Record<string, number>; // 0-1 expertise level per domain
+  certification_level: 'junior' | 'mid' | 'senior' | 'expert' | 'principal';
+  years_of_experience: number;
+  success_rate_by_task_type: Record<string, number>;
+  preferred_communication_channels: string[];
+  availability_hours: {
+    timezone: string;
+    working_hours: [number, number]; // [start_hour, end_hour]
+    days_available: number[]; // 0-6 for Sunday-Saturday
+  };
+  performance_history: {
+    avg_task_completion_time: number;
+    quality_consistency_score: number;
+    innovation_contributions: number;
+    mentoring_capability: number;
+  };
 }
 
-export class CrewAIOrchestrationService {
+// Domain-specific crew templates
+interface CrewTemplate {
+  name: string;
+  description: string;
+  domain: string;
+  objective_patterns: string[];
+  recommended_agents: string[];
+  typical_tasks: Task[];
+  success_criteria: string[];
+  estimated_duration_hours: number;
+  required_tools: string[];
+}
+
+export class CrewAIOrchestrationService extends EventEmitter {
   private openai: OpenAI;
   private isInitialized = false;
   private specialists: Map<string, SpecialistAgent> = new Map();
   private activeCrews: Map<string, CrewResult> = new Map();
   private executionHistory: CrewResult[] = [];
+  private crewTemplates: Map<string, CrewTemplate> = new Map();
+  
+  // Performance tracking
+  private performanceMetrics = {
+    total_crews_executed: 0,
+    successful_crews: 0,
+    failed_crews: 0,
+    average_execution_time_hours: 0,
+    total_cost_usd: 0,
+    average_quality_score: 0,
+    specialist_utilization: new Map<string, number>()
+  };
 
-  // Predefined specialist agents
+  // Configuration
+  private config = {
+    max_concurrent_crews: getEnvAsNumber('CREWAI_MAX_CONCURRENT', 3),
+    default_budget_limit_usd: getEnvAsNumber('CREWAI_BUDGET_LIMIT', 50),
+    quality_threshold: getEnvAsNumber('CREWAI_QUALITY_THRESHOLD', 0.8),
+    enable_learning: getEnvAsBoolean('CREWAI_ENABLE_LEARNING', true),
+    auto_optimize: getEnvAsBoolean('CREWAI_AUTO_OPTIMIZE', true)
+  };
+
+  // Enhanced specialist pool with domain expertise
   private defaultSpecialists: SpecialistAgent[] = [
     {
-      role: 'Senior Software Engineer',
-      expertise: ['software_development', 'architecture', 'code_review', 'debugging', 'optimization'],
-      capabilities: ['code_generation', 'refactoring', 'testing', 'documentation', 'deployment'],
-      limitations: ['ui_design', 'marketing', 'business_strategy'],
-      preferred_tasks: ['implement_feature', 'debug_issue', 'optimize_performance', 'review_code'],
-      collaboration_style: 'analytical_detailed'
+      role: 'Principal Software Architect',
+      expertise: ['software_architecture', 'system_design', 'microservices', 'scalability', 'performance'],
+      capabilities: ['architecture_design', 'technology_selection', 'code_review', 'mentoring', 'technical_leadership'],
+      limitations: ['marketing', 'sales', 'graphic_design'],
+      preferred_tasks: ['design_architecture', 'review_design', 'optimize_performance', 'lead_technical_decisions'],
+      collaboration_style: 'strategic_technical_leadership',
+      domain_knowledge: {
+        'software_development': 0.95,
+        'cloud_computing': 0.90,
+        'data_engineering': 0.80,
+        'security': 0.85,
+        'devops': 0.88
+      },
+      certification_level: 'principal',
+      years_of_experience: 15,
+      success_rate_by_task_type: {
+        'architecture_design': 0.95,
+        'code_review': 0.92,
+        'performance_optimization': 0.90,
+        'technical_leadership': 0.93
+      },
+      preferred_communication_channels: ['technical_docs', 'architecture_diagrams', 'code_reviews'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [9, 17],
+        days_available: [1, 2, 3, 4, 5]
+      },
+      performance_history: {
+        avg_task_completion_time: 4.2,
+        quality_consistency_score: 0.94,
+        innovation_contributions: 0.87,
+        mentoring_capability: 0.91
+      }
     },
     {
-      role: 'Data Scientist',
-      expertise: ['machine_learning', 'statistics', 'data_analysis', 'predictive_modeling', 'visualization'],
-      capabilities: ['data_preprocessing', 'model_training', 'feature_engineering', 'analysis_reporting'],
-      limitations: ['web_development', 'infrastructure', 'legal_compliance'],
-      preferred_tasks: ['analyze_data', 'build_model', 'create_insights', 'predict_trends'],
-      collaboration_style: 'hypothesis_driven'
+      role: 'Senior Data Scientist',
+      expertise: ['machine_learning', 'deep_learning', 'statistics', 'data_analysis', 'mlops'],
+      capabilities: ['model_development', 'data_pipeline_design', 'feature_engineering', 'model_deployment', 'research'],
+      limitations: ['web_development', 'mobile_development', 'graphic_design'],
+      preferred_tasks: ['build_ml_models', 'analyze_datasets', 'optimize_algorithms', 'research_methodologies'],
+      collaboration_style: 'research_driven_analytical',
+      domain_knowledge: {
+        'machine_learning': 0.95,
+        'statistics': 0.92,
+        'data_engineering': 0.85,
+        'research': 0.88,
+        'python': 0.90
+      },
+      certification_level: 'senior',
+      years_of_experience: 8,
+      success_rate_by_task_type: {
+        'model_development': 0.91,
+        'data_analysis': 0.94,
+        'research': 0.89,
+        'optimization': 0.87
+      },
+      preferred_communication_channels: ['jupyter_notebooks', 'research_papers', 'data_visualizations'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [10, 18],
+        days_available: [1, 2, 3, 4, 5]
+      },
+      performance_history: {
+        avg_task_completion_time: 6.1,
+        quality_consistency_score: 0.88,
+        innovation_contributions: 0.92,
+        mentoring_capability: 0.75
+      }
     },
     {
-      role: 'Product Manager',
-      expertise: ['product_strategy', 'user_research', 'market_analysis', 'feature_prioritization'],
-      capabilities: ['roadmap_planning', 'stakeholder_management', 'requirements_gathering', 'metrics_analysis'],
-      limitations: ['technical_implementation', 'detailed_coding', 'infrastructure'],
-      preferred_tasks: ['define_requirements', 'prioritize_features', 'analyze_market', 'plan_roadmap'],
-      collaboration_style: 'strategic_collaborative'
+      role: 'Expert Product Manager',
+      expertise: ['product_strategy', 'user_research', 'market_analysis', 'agile_methodologies', 'stakeholder_management'],
+      capabilities: ['roadmap_planning', 'requirements_gathering', 'user_story_creation', 'metrics_analysis', 'competitive_analysis'],
+      limitations: ['technical_implementation', 'design_execution', 'legal_compliance'],
+      preferred_tasks: ['define_product_strategy', 'prioritize_features', 'analyze_user_feedback', 'plan_releases'],
+      collaboration_style: 'user_centric_collaborative',
+      domain_knowledge: {
+        'product_management': 0.94,
+        'user_experience': 0.87,
+        'business_strategy': 0.89,
+        'market_analysis': 0.91,
+        'agile_methodologies': 0.93
+      },
+      certification_level: 'expert',
+      years_of_experience: 12,
+      success_rate_by_task_type: {
+        'product_strategy': 0.93,
+        'user_research': 0.89,
+        'feature_prioritization': 0.95,
+        'stakeholder_management': 0.87
+      },
+      preferred_communication_channels: ['user_stories', 'product_specs', 'roadmap_documents'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [8, 16],
+        days_available: [1, 2, 3, 4, 5]
+      },
+      performance_history: {
+        avg_task_completion_time: 3.8,
+        quality_consistency_score: 0.91,
+        innovation_contributions: 0.85,
+        mentoring_capability: 0.89
+      }
     },
     {
-      role: 'DevOps Engineer',
-      expertise: ['infrastructure', 'deployment', 'monitoring', 'security', 'automation'],
-      capabilities: ['ci_cd_setup', 'container_orchestration', 'cloud_management', 'performance_tuning'],
-      limitations: ['business_strategy', 'ui_design', 'content_creation'],
-      preferred_tasks: ['setup_infrastructure', 'automate_deployment', 'monitor_systems', 'ensure_security'],
-      collaboration_style: 'systematic_reliable'
+      role: 'Senior DevOps Engineer',
+      expertise: ['infrastructure_automation', 'ci_cd', 'kubernetes', 'cloud_platforms', 'monitoring'],
+      capabilities: ['infrastructure_as_code', 'container_orchestration', 'deployment_automation', 'security_implementation'],
+      limitations: ['frontend_development', 'ui_design', 'content_creation'],
+      preferred_tasks: ['automate_deployments', 'setup_monitoring', 'optimize_infrastructure', 'implement_security'],
+      collaboration_style: 'automation_focused_reliable',
+      domain_knowledge: {
+        'devops': 0.95,
+        'cloud_computing': 0.93,
+        'security': 0.87,
+        'automation': 0.96,
+        'monitoring': 0.91
+      },
+      certification_level: 'senior',
+      years_of_experience: 10,
+      success_rate_by_task_type: {
+        'infrastructure_setup': 0.96,
+        'automation': 0.94,
+        'monitoring_setup': 0.92,
+        'security_implementation': 0.89
+      },
+      preferred_communication_channels: ['infrastructure_diagrams', 'automation_scripts', 'monitoring_dashboards'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [7, 15],
+        days_available: [1, 2, 3, 4, 5, 6]
+      },
+      performance_history: {
+        avg_task_completion_time: 5.2,
+        quality_consistency_score: 0.93,
+        innovation_contributions: 0.79,
+        mentoring_capability: 0.82
+      }
     },
     {
-      role: 'UX Designer',
-      expertise: ['user_experience', 'interface_design', 'usability', 'user_research', 'prototyping'],
-      capabilities: ['wireframing', 'user_journey_mapping', 'design_systems', 'accessibility_review'],
+      role: 'Senior UX/UI Designer',
+      expertise: ['user_experience_design', 'interface_design', 'design_systems', 'user_research', 'prototyping'],
+      capabilities: ['wireframing', 'user_journey_mapping', 'design_system_creation', 'usability_testing', 'accessibility_design'],
       limitations: ['backend_development', 'data_science', 'infrastructure'],
-      preferred_tasks: ['design_interface', 'improve_usability', 'research_users', 'create_prototypes'],
-      collaboration_style: 'user_centered_iterative'
+      preferred_tasks: ['design_user_interfaces', 'conduct_user_research', 'create_design_systems', 'test_usability'],
+      collaboration_style: 'user_centered_creative',
+      domain_knowledge: {
+        'design': 0.95,
+        'user_experience': 0.94,
+        'user_research': 0.89,
+        'accessibility': 0.87,
+        'design_tools': 0.92
+      },
+      certification_level: 'senior',
+      years_of_experience: 9,
+      success_rate_by_task_type: {
+        'interface_design': 0.94,
+        'user_research': 0.91,
+        'design_systems': 0.88,
+        'usability_testing': 0.93
+      },
+      preferred_communication_channels: ['design_mockups', 'user_personas', 'prototypes'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [9, 17],
+        days_available: [1, 2, 3, 4, 5]
+      },
+      performance_history: {
+        avg_task_completion_time: 4.7,
+        quality_consistency_score: 0.89,
+        innovation_contributions: 0.93,
+        mentoring_capability: 0.78
+      }
     },
     {
-      role: 'Research Analyst',
-      expertise: ['research_methodology', 'information_synthesis', 'trend_analysis', 'competitive_intelligence'],
-      capabilities: ['market_research', 'literature_review', 'data_collection', 'report_writing'],
+      role: 'Expert Research Analyst',
+      expertise: ['market_research', 'competitive_analysis', 'trend_forecasting', 'data_synthesis', 'strategic_insights'],
+      capabilities: ['primary_research', 'secondary_research', 'data_analysis', 'report_writing', 'presentation_creation'],
       limitations: ['software_development', 'design_implementation', 'technical_architecture'],
-      preferred_tasks: ['conduct_research', 'analyze_competition', 'synthesize_information', 'forecast_trends'],
-      collaboration_style: 'thorough_evidence_based'
+      preferred_tasks: ['conduct_market_research', 'analyze_competitors', 'synthesize_insights', 'forecast_trends'],
+      collaboration_style: 'evidence_based_thorough',
+      domain_knowledge: {
+        'research_methodologies': 0.96,
+        'market_analysis': 0.94,
+        'competitive_intelligence': 0.92,
+        'data_analysis': 0.88,
+        'strategic_planning': 0.85
+      },
+      certification_level: 'expert',
+      years_of_experience: 11,
+      success_rate_by_task_type: {
+        'market_research': 0.95,
+        'competitive_analysis': 0.93,
+        'trend_forecasting': 0.87,
+        'insight_synthesis': 0.91
+      },
+      preferred_communication_channels: ['research_reports', 'data_presentations', 'market_briefings'],
+      availability_hours: {
+        timezone: 'UTC',
+        working_hours: [8, 16],
+        days_available: [1, 2, 3, 4, 5]
+      },
+      performance_history: {
+        avg_task_completion_time: 7.3,
+        quality_consistency_score: 0.92,
+        innovation_contributions: 0.81,
+        mentoring_capability: 0.85
+      }
     },
     {
-      role: 'Content Strategist',
-      expertise: ['content_creation', 'storytelling', 'brand_voice', 'audience_engagement', 'seo'],
-      capabilities: ['copywriting', 'content_planning', 'social_media_strategy', 'campaign_development'],
+      role: 'Senior Content Strategist',
+      expertise: ['content_strategy', 'storytelling', 'brand_voice', 'seo_optimization', 'content_marketing'],
+      capabilities: ['content_planning', 'copywriting', 'editorial_calendars', 'brand_development', 'campaign_strategy'],
       limitations: ['technical_development', 'data_modeling', 'infrastructure'],
       preferred_tasks: ['create_content', 'develop_strategy', 'optimize_messaging', 'engage_audience'],
       collaboration_style: 'creative_adaptive'
