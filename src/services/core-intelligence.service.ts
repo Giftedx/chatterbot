@@ -10,7 +10,7 @@ import {
     TextBasedChannel
 } from 'discord.js';
 import { URL } from 'url';
-
+import _ from 'lodash';
 // MCP specific
 import { MCPManager } from './mcp-manager.service.js';
 import { UnifiedMCPOrchestratorService, MCPOrchestrationResult } from './core/mcp-orchestrator.service.js';
@@ -590,7 +590,8 @@ export class CoreIntelligenceService {
             if (isDM && isAdmin) {
                 const { getDiagnoseKeywords } = await import('../config/admin-config.js');
                 const kws = getDiagnoseKeywords();
-                const re = new RegExp(`\\b(${kws.join('|')})\\b`, 'i');
+                const safeKws = kws.map(kw => _.escapeRegExp(kw));
+                const re = new RegExp(`\\b(${safeKws.join('|')})\\b`, 'i');
                 if (re.test(promptText)) {
                     const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
                     const providers = getProviderStatuses();
