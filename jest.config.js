@@ -23,6 +23,9 @@ export default {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
     }],
+    '^.+\\.(js|jsx)$': ['ts-jest', {
+      useESM: true,
+    }],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   testTimeout: 30000,
