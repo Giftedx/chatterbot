@@ -529,54 +529,39 @@ export class CoreIntelligenceService {
     }
 
     public async handleMessage(message: Message): Promise<void> {
+        // Unified pipeline for all free-form messages:
+        // 1) Privacy/consent checks (opt-in via /chat once, then DM fallback)
+        // 2) Moderation (text and attachments)
+        // 3) Unified message analysis (intents, tools, attachments)
+        // 4) MCP tool orchestration and retrieval (web, memory, RAG)
+        // 5) Model routing and generation (multi-provider)
+        // 6) Verification (self-critique, cross-model compare, auto-rerun)
+        // 7) Personalization and memory updates
+        // 8) Deliver response with UI enhancements
         try {
-            if (message.author.bot || message.content.startsWith('/')) return;
-
-            const userId = message.author.id;
-
-            // Opt-in required (tests may pre-mark opted-in users)
-            let isOptedIn = false;
-            if (process.env.NODE_ENV === 'test' && this.optedInUsers.has(userId)) {
-                isOptedIn = true;
-            } else {
-                isOptedIn = await this.userConsentService.isUserOptedIn(userId);
-            }
-            if (!isOptedIn) return;
-
-            // Cooldown
-            if (this.withinCooldown(userId, 8000)) return;
-
-            // Gating: only respond when addressed, mentioned, or in personal thread/DM
-            const respond = await this.shouldRespond(message);
-            if (!respond) return;
-
-            // Intent detection (latent controls). If handled, stop.
-            const ctrl = this.classifyControlIntent(message.content);
-            if (ctrl.intent !== 'NONE') {
-                const handled = await this.handleControlIntent(ctrl.intent, ctrl.payload, message);
-                if (handled) return;
-            }
-
-            // Update activity
-            await this.userConsentService.updateUserActivity(userId);
-            this.optedInUsers.add(userId);
-
-            if ('sendTyping' in message.channel) await message.channel.sendTyping();
-            const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
-
-            // Log incoming
-            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: message.id, role: 'user', content: message.content } }); } catch (err) { logger.warn('[CoreIntelSvc] Failed to log user message', { messageId: message.id, error: err }); }
-
-            const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
-            await message.reply(responseOptions);
-
-            // Log assistant reply
-            try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch (err) { logger.error('[CoreIntelSvc] Failed to log assistant reply:', { messageId: message.id, error: err }); }
-        } catch (error) {
-            logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
-            console.error('Failed to send reply', error);
-            try { await message.reply({ content: '🤖 Sorry, I encountered an error while processing your message. Please try again later.' }); } catch {}
+            // Reuse existing path used by slash handling
+            await this.processChatMessage(message);
+        } catch (e) {
+            logger.error('[CoreIntelSvc] handleMessage failed', e);
         }
+    }
+
+    private async processChatMessage(message: Message): Promise<void> {
+        // Existing logic is composed across: _performModeration, _analyzeInput, _executeMcpPipeline,
+        // _aggregateAgenticContext, _generateAgenticResponse, answer verification, personalization, and final send.
+        // Delegate to existing pipeline by reusing existing public methods as needed.
+        const fakeInteractionLike: any = { // minimal shape for reuse
+            id: message.id,
+            user: { id: message.author.id, username: message.author.username },
+            channelId: message.channelId,
+            guildId: message.guildId,
+            options: { getString: () => message.content, getAttachment: () => null },
+            isChatInputCommand: () => true,
+            deferred: false,
+            replied: false,
+            isRepliable: () => false
+        };
+        await this.processChatCommand(fakeInteractionLike);
     }
 
     private async _processPromptAndGenerateResponse(

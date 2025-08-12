@@ -3,13 +3,9 @@ import { Client, GatewayIntentBits, REST, Routes, Interaction, Message } from 'd
 import { CoreIntelligenceService, CoreIntelligenceConfig } from './services/core-intelligence.service.js';
 import { startAnalyticsDashboardIfEnabled } from './services/analytics-dashboard.js';
 import { healthCheck } from './health.js';
-import { agenticCommands } from './commands/agentic-commands.js';
-import { privacyCommands, handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './commands/privacy-commands.js';
-import { memoryCommands } from './commands/memory-commands.js';
+import { handlePrivacyModalSubmit, handlePrivacyButtonInteraction } from './commands/privacy-commands.js';
 import { logger } from './utils/logger.js';
 import { enhancedIntelligenceActivation } from './services/enhanced-intelligence-activation.service.js';
-// Import AgenticIntelligenceService if its direct command handling is to be preserved outside CoreIntelligenceService
-// import { agenticIntelligenceService } from './services/agentic-intelligence.service.js';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -61,12 +57,10 @@ const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list
 const coreCommands = coreIntelligenceService.buildCommands().map(cmd => cmd.toJSON());
-const { diagnosticsCommands } = await import('./commands/diagnostics-commands.js');
 
 // Hide extra commands: do not register privacy/memory/agentic by default
 const allCommands = [
-  ...coreCommands,
-  ...diagnosticsCommands.map(cmd => cmd.data.toJSON())
+  ...coreCommands
 ];
 
 client.once('ready', async () => {
@@ -158,62 +152,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
     return;
   }
 
-  // Handle privacy commands
-  if (interaction.isChatInputCommand()) {
-    const privacyCommand = privacyCommands.find(cmd => cmd.data.name === interaction.commandName);
-    if (privacyCommand) {
-      try {
-        await privacyCommand.execute(interaction);
-      } catch (error) {
-        logger.error('Error executing privacy command:', { commandName: interaction.commandName, error });
-        const errReply = { content: 'An error occurred with this privacy command.', ephemeral: true };
-        if (interaction.replied || interaction.deferred) await interaction.followUp(errReply).catch(e => logger.error("FollowUp Error", e));
-        else await interaction.reply(errReply).catch(e => logger.error("Reply Error", e));
-      }
-      return;
-    }
-
-    // Handle memory commands
-    const memoryCommand = memoryCommands.find(cmd => cmd.data.name === interaction.commandName);
-    if (memoryCommand) {
-      try {
-        await memoryCommand.execute(interaction);
-      } catch (error) {
-        logger.error('Error executing memory command:', { commandName: interaction.commandName, error });
-        const errReply = { content: 'An error occurred with this memory command.', ephemeral: true };
-        if (interaction.replied || interaction.deferred) await interaction.followUp(errReply).catch(e => logger.error("FollowUp Error", e));
-        else await interaction.reply(errReply).catch(e => logger.error("Reply Error", e));
-      }
-      return;
-    }
-  }
-
-  // Agentic commands can be handled separately if they are not integrated into CoreIntelligenceService's command map.
-  // For full consolidation, CoreIntelligenceService's handleInteraction would internally route agentic commands too.
-  // This example keeps agentic command handling separate for now if they have distinct logic not fitting CoreIntelligenceService.
-  if (interaction.isChatInputCommand()) {
-    const diag = diagnosticsCommands.find(cmd => cmd.data.name === interaction.commandName);
-    if (diag) {
-      try { await diag.execute(interaction as any); } catch (e) { console.error(e); }
-      return;
-    }
-  }
-
-  if (enableAgenticFeatures && interaction.isChatInputCommand()) {
-    const agenticCommand = agenticCommands.find(cmd => cmd.data.name === interaction.commandName);
-    if (agenticCommand) {
-      try {
-        await agenticCommand.execute(interaction);
-      } catch (error) {
-        logger.error('Error executing agentic command:', { commandName: interaction.commandName, error });
-        // Generic error reply
-        const errReply = { content: 'An error occurred with this agentic command.', ephemeral: true };
-        if (interaction.replied || interaction.deferred) await interaction.followUp(errReply).catch(e => logger.error("FollowUp Error", e));
-        else await interaction.reply(errReply).catch(e => logger.error("Reply Error", e));
-      }
-      return; // Agentic command handled
-    }
-  }
+  // No other commands are exposed; everything routes through CoreIntelligenceService
 
   // All other interactions (including core /chat) go to CoreIntelligenceService
   await coreIntelligenceService.handleInteraction(interaction);
