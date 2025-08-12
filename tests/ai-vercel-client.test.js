@@ -1,4 +1,4 @@
-import { VercelAIClient } from '../src/ai/providers/vercel/client';
+import { VercelAIClient } from '../src/ai/providers/vercel/client.js';
 
 describe('VercelAIClient', () => {
   const prevFlag = process.env.FEATURE_VERCEL_AI;

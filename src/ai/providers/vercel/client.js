@@ -1,23 +1,27 @@
 // Feature-flagged AI provider wrapper that can be expanded later.
 // Does not import external SDK unless FEATURE_VERCEL_AI=true.
-import { features } from '../../config/feature-flags.js';
-import { getOptionalEnv } from '../../utils/env.js';
-import { logger } from '../../utils/logger.js';
+import { features } from '../../../config/feature-flags.js';
+import { getOptionalEnv } from '../../../utils/env.js';
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
-export class VercelAIClient {
-  private enabled: boolean;
-  private model: string;
-  private apiKey: string | undefined;
+// Simple logger for this module to avoid complex imports in .js version
+const logger = {
+  debug: (message, context) => {
+    if (process.env.NODE_ENV !== 'test') {
+      console.log(`DEBUG: ${message}`, context ? JSON.stringify(context) : '');
+    }
+  }
+};
 
-  constructor(config: { model?: string } = {}) {
+export class VercelAIClient {
+  constructor(config = {}) {
     this.enabled = features.vercelAI;
     this.model = config.model ?? getOptionalEnv('AI_MODEL', DEFAULT_MODEL);
     this.apiKey = getOptionalEnv('AI_API_KEY'); // Optional until enabled; enforced when enabled
   }
 
-  ensureEnabled(): void {
+  ensureEnabled() {
     if (!this.enabled) {
       throw new Error('Vercel AI provider is disabled. Set FEATURE_VERCEL_AI=true to enable.');
     }
@@ -27,17 +31,7 @@ export class VercelAIClient {
   }
 
   // Minimal text generation API to be wired to an SDK later.
-  async generateText({ prompt, temperature = 0.7, maxTokens = 512 }: {
-    prompt?: string;
-    temperature?: number;
-    maxTokens?: number;
-  }): Promise<{
-    model: string;
-    output: string;
-    usage: { promptTokens: number; completionTokens: number };
-    temperature: number;
-    maxTokens: number;
-  }> {
+  async generateText({ prompt, temperature = 0.7, maxTokens = 512 }) {
     this.ensureEnabled();
     logger.debug('generateText called', { model: this.model, maxTokens });
     // Deterministic stub to ensure safe behavior without external dependencies.
