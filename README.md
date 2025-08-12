@@ -106,7 +106,7 @@ MIT © 2025
 - Optional internal enhancements (flag-controlled):
   - LangGraph-driven intent conditioning (`FEATURE_LANGGRAPH=true`) to improve tone/precision.
   - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations.
-  - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop.
+  - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop. Optionally append tool summaries in the final answer with `FEATURE_TOOL_SUMMARY=true`.
   - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
 
 Environment flags (see `env.example`):
@@ -131,8 +131,15 @@ FEATURE_VERCEL_AI=false
 FEATURE_LANGGRAPH=false
 FEATURE_OPENAI_RESPONSES=false
 FEATURE_OPENAI_RESPONSES_TOOLS=false
+FEATURE_TOOL_SUMMARY=false
 FEATURE_RERANK=false
 COHERE_API_KEY=...
+
+### Metrics and telemetry
+- Telemetry snapshot: GET `/api/telemetry` (last N provider/model selections with latency)
+- Verification metrics: GET `/api/verification-metrics`
+- KB stats: GET `/api/kb-stats`
+- Enable dashboard: `ENABLE_ANALYTICS_DASHBOARD=true` (lightweight endpoints)
 ```
 
 ### Optional streaming (internal)
