@@ -6,6 +6,12 @@
 import { prisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
 
+function cosineSim(a: Float32Array, b: Float32Array): number {
+  let dot = 0, na = 0, nb = 0;
+  for (let i = 0; i < a.length && i < b.length; i++) { dot += a[i]*b[i]; na += a[i]*a[i]; nb += b[i]*b[i]; }
+  return dot / (Math.sqrt(na) * Math.sqrt(nb) + 1e-8);
+}
+
 export interface KnowledgeEntry {
   id: string;
   content: string;
@@ -119,33 +125,50 @@ export class KnowledgeBaseService {
     try {
       const { query: searchQuery, channelId, tags, minConfidence = 0.5, limit = 5 } = query;
 
-      // If we have embeddings stored, prefer semantic retrieval by cosine similarity approximation
-      // Note: Prisma doesn't support vector ops natively on sqlite; this is a placeholder for future pgvector/milvus.
-      // For now, we fallback to keyword search and confidence ordering.
-      // Simple keyword-based search (can be enhanced with vector embeddings)
+      // Attempt vector retrieval via KBChunk if embeddings exist
+      try {
+        const chunks = await prisma.kBChunk.findMany({ take: 200 });
+        if (chunks && chunks.length > 0 && process.env.OPENAI_API_KEY) {
+          const OpenAI = (await import('openai')).default;
+          const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+          const emb = await client.embeddings.create({ model: 'text-embedding-3-small', input: searchQuery });
+          const qvec = emb.data?.[0]?.embedding;
+          if (qvec) {
+            const q = new Float32Array(qvec);
+            const scored = (chunks as Array<{ id: string; content: string; embedding: Buffer | null; sourceId: string; createdAt: Date }>).map((c) => {
+              const vec = c.embedding ? new Float32Array(Buffer.from(c.embedding).buffer) : new Float32Array();
+              return { chunk: c, score: vec.length ? cosineSim(q, vec) : 0 };
+            }).sort((a: { score: number }, b: { score: number }) => b.score - a.score).slice(0, limit);
+            // Map back to KnowledgeEntry-like objects as a fallback
+            return scored.map((s: { chunk: any; score: number }) => ({
+              id: s.chunk.id,
+              content: s.chunk.content,
+              source: 'kb_chunk',
+              sourceId: s.chunk.sourceId,
+              sourceUrl: null,
+              channelId: null,
+              authorId: null,
+              tags: null,
+              confidence: Math.max(minConfidence, Math.min(0.99, s.score)),
+              createdAt: s.chunk.createdAt,
+              updatedAt: s.chunk.createdAt
+            } as any));
+          }
+        }
+      } catch {}
+
+      // Fallback to keyword-based search
       const whereClause: Record<string, unknown> = {
         confidence: { gte: minConfidence }
       };
-
-      if (channelId) {
-        whereClause.channelId = channelId;
-      }
-
-      if (tags && tags.length > 0) {
-        // For JSON string tags, we'll filter after query
-        // This is a simplified approach - in production, consider using a proper search engine
-      }
+      if (channelId) whereClause.channelId = channelId;
 
       const entries = await prisma.knowledgeEntry.findMany({
         where: whereClause,
-        orderBy: [
-          { confidence: 'desc' },
-          { updatedAt: 'desc' }
-        ],
+        orderBy: [ { confidence: 'desc' }, { updatedAt: 'desc' } ],
         take: limit * 3
       });
 
-      // Filter by relevance (simple keyword matching for now)
       const relevantEntries = (entries as KnowledgeEntry[])
         .map((entry) => ({ entry, score: this.calculateRelevance(searchQuery, entry.content) }))
         .filter((e) => e.score > 0.2)

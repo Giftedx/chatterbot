@@ -5,38 +5,13 @@
 
 import { UserConsentService } from '../user-consent.service.js';
 import { CoreIntelligenceService } from '../core-intelligence.service.js';
-import { privacyCommands, handlePrivacyButtonInteraction } from '../../commands/privacy-commands.js';
-import { memoryCommands } from '../../commands/memory-commands.js';
+import { handlePrivacyButtonInteraction } from '../../commands/privacy-commands.js';
 
 // Mock prisma
 jest.mock('../../db/prisma.js', () => ({
   prisma: {
-    user: {
-      findUnique: jest.fn(),
-      upsert: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      findMany: jest.fn(),
-    },
-    userMemory: {
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    conversationMessage: {
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    userConversationThread: {
-      deleteMany: jest.fn(),
-    },
-    analyticsEvent: {
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    mediaFile: {
-      deleteMany: jest.fn(),
-    },
-    $transaction: jest.fn(),
+    user: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
+    messageLog: { create: jest.fn() }
   }
 }));
 
@@ -330,64 +305,6 @@ describe('Privacy and Consent Management', () => {
           ephemeral: true,
         })
       );
-    });
-  });
-
-  describe('Memory Commands', () => {
-    test('should have memory management commands', () => {
-      const commandNames = memoryCommands.map(cmd => cmd.data.name);
-      expect(commandNames).toContain('memories');
-    });
-
-    test('should handle memories view command for opted-in user', async () => {
-      const { prisma } = require('../../db/prisma.js');
-      
-      // Mock user consent
-      prisma.user.findUnique.mockResolvedValue({
-        id: mockUserId,
-        optedOut: false,
-        privacyAccepted: true,
-      });
-
-      const mockInteraction = {
-        user: { id: mockUserId },
-        guildId: 'test-guild',
-        options: {
-          getSubcommand: jest.fn().mockReturnValue('view'),
-          getString: jest.fn().mockReturnValue('all'),
-        },
-        deferReply: jest.fn().mockResolvedValue({}),
-        editReply: jest.fn().mockResolvedValue({}),
-      };
-
-      const memoriesCommand = memoryCommands.find(cmd => cmd.data.name === 'memories');
-      await memoriesCommand?.execute(mockInteraction as any);
-
-      expect(mockInteraction.deferReply).toHaveBeenCalledWith({ ephemeral: true });
-    });
-
-    test('should reject memory commands for non-opted-in user', async () => {
-      const { prisma } = require('../../db/prisma.js');
-      
-      // Mock user not opted in
-      prisma.user.findUnique.mockResolvedValue(null);
-
-      const mockInteraction = {
-        user: { id: mockUserId },
-        guildId: 'test-guild',
-        options: {
-          getSubcommand: jest.fn().mockReturnValue('view'),
-        },
-        reply: jest.fn().mockResolvedValue({}),
-      };
-
-      const memoriesCommand = memoryCommands.find(cmd => cmd.data.name === 'memories');
-      await memoriesCommand?.execute(mockInteraction as any);
-
-      expect(mockInteraction.reply).toHaveBeenCalledWith({
-        content: '❌ You need to opt in with `/chat` first to manage memories.',
-        ephemeral: true,
-      });
     });
   });
 

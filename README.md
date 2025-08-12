@@ -14,6 +14,7 @@
 - Strong moderation, graceful degradation, model fallback
 - Observability: health, metrics, analytics dashboard (optional)
 - New: Smart media generation (images, GIFs) and speech replies (TTS)
+- New: DM-only admin diagnose support (see Observability & Ops)
 
 ---
 
@@ -28,9 +29,7 @@ cp env.example .env
 # Optional: STABILITY_API_KEY (images), TENOR_API_KEY (GIFs), ELEVENLABS_API_KEY (TTS)
 
 # 3) Initialize database (SQLite by default)
-npx prisma migrate dev --name init  # first time
-# If you’ve pulled recent changes with new models:
-npx prisma migrate dev --name single_chat_models
+npx prisma migrate dev --name init
 
 # 4) Run in dev
 npm run dev
@@ -47,61 +46,17 @@ Note: No other slash commands are exposed by default. Natural-language privacy c
 
 ---
 
-### Configuration
-Required
-```env
-DISCORD_TOKEN=your_discord_bot_token
-DISCORD_CLIENT_ID=your_discord_app_id
-GEMINI_API_KEY=your_google_gemini_key
-```
-
-Optional
-```env
-# Feature flags
-ENABLE_ENHANCED_INTELLIGENCE=false
-
-# Analytics dashboard
-ENABLE_ANALYTICS_DASHBOARD=false
-ANALYTICS_DASHBOARD_PORT=3001
-
-# Logging
-LOG_LEVEL=info
-NODE_ENV=development
-
-# Media providers
-STABILITY_API_KEY=your_stability_ai_api_key_here
-TENOR_API_KEY=your_tenor_api_key_here
-ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
-ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
-```
-
-Notes
-- Default DB is SQLite. Set `DATABASE_URL` to switch (e.g., Postgres). If Postgres+pgvector is available, embeddings can be stored there; otherwise remain in SQLite bytes fields or external stores.
-- Media generation and TTS gracefully degrade when provider keys are missing (placeholders or disable feature).
-
----
-
-### Architecture (high level)
-- Gateway: discord.js v14 with Message Content intent
-- Orchestrator: gating → moderation → intent detect → retrieve (history + memories + KB) → plan/answer/critique → post-process → auto-learn → log
-- Memory engine: durable facts/preferences/projects/relationships/style; summaries per user; time-decayed recency
-- Guild Knowledge Base (RAG): auto-ingests shared files/links, chunks+embeds, ranks by recency and relevance
-- Moderation: pre/post filters, safe-complete
-- Observability: metrics, traces, transcripts (sampling), feature flags, A/B harness
-- Media: Phase 4 tools for image generation, GIF search, and TTS with intelligent triggers
-
-Key models (Prisma)
-- `User` with `dmPreferred`, `lastThreadId`, `pauseUntil`
-- `Memory`, `Summary`, `KBSource`, `KBChunk`, `MessageLog`, `IntentLog`, `StyleProfile`
-- Existing aggregates remain (`UserMemory`, etc.) for backward compatibility
-
----
-
-### Privacy (short, friendly)
-- The bot remembers helpful, long-lived details to personalize replies.
-- You can say “delete my data” or “export my data” any time; the bot will DM you and complete it quietly.
-
-For administrators: internals and guardrails live in code; end users only see `/chat` and natural language controls.
+### Processing pipeline (robust, autonomous)
+The bot runs a single, well-defined pipeline for every message:
+1. Privacy and consent checks (opt-in with `/chat` once)
+2. Moderation (text + attachments)
+3. Unified message analysis (intents, domains, complexity, attachments)
+4. Retrieval (conversation history, memories, knowledge base RAG)
+5. Tool/MCP orchestration as needed (web search, scraping, browser, etc.)
+6. Model routing across providers (OpenAI/Anthropic/Gemini/Groq/Mistral/compatible)
+7. Answer verification (self-critique, cross-model comparison, optional auto-rerun)
+8. Personalization and memory update (durable memory and summaries)
+9. Response delivery with enhanced UI (threads/DMs, attachments)
 
 ---
 
@@ -109,6 +64,19 @@ For administrators: internals and guardrails live in code; end users only see `/
 - Health: GET `/health`
 - Metrics: GET `/metrics`
 - Optional dashboard: set `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001`
+- DM-only admin diagnose (no commands):
+  - DM the bot with phrases like “diagnose”, “status”, “health”, “providers”, “telemetry”, or “kb”.
+  - Only users recognized as admins (via RBAC) will receive a DM summary of provider availability, recent model usage, and knowledge base stats.
+  - Configure keywords via `DIAGNOSE_KEYWORDS` env (comma-separated).
+- Verification metrics (for tuning): exported via code (`getVerificationMetrics`) and can be logged periodically to observe low-agreement rates and reruns.
+
+---
+
+### Knowledge Base RAG
+- Lightweight embeddings path using OpenAI `text-embedding-3-small` stored in `KBChunk.embedding` (bytes).
+- Search prefers vector similarity if chunks exist; else keyword relevance.
+- Ingestion helper: `KnowledgeBaseIngestService.addSource(guildId, title, content, url?)` to add and embed new content.
+- Background ingestion (optional): set `KB_INGEST_CHANNEL_ID` to automatically ingest URLs posted in that channel.
 
 ---
 
@@ -130,3 +98,27 @@ docker run --rm -it \
 ```
 
 MIT © 2025
+
+## Multi-Provider Model Routing and Verification
+
+- Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
+- Automatic routing selects the best model based on signals (coding, long context, safety, latency).
+- Cross-model answer verification and self-critique can be enabled to improve factuality and reasoning.
+
+Environment flags (see `env.example`):
+
+```
+DEFAULT_PROVIDER=gemini
+# Providers
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GROQ_API_KEY=...
+MISTRAL_API_KEY=...
+OPENAI_COMPAT_API_KEY=...
+OPENAI_COMPAT_BASE_URL=...
+
+# Verification
+ENABLE_ANSWER_VERIFICATION=true
+CROSS_MODEL_VERIFICATION=true
+MAX_RERUNS=1
+```

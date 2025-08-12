@@ -3,9 +3,11 @@
  * Provides REST endpoints for bot analytics and metrics
  */
 
-import { createServer } from 'http';
-import { URL } from 'url';
-import { getDetailedStats, getUsageMetrics } from './analytics.js';
+import http from 'http';
+import { logger } from '../utils/logger.js';
+
+let server: http.Server | null = null;
+let metricsInterval: NodeJS.Timeout | null = null;
 
 export interface DashboardConfig {
   port: number;
@@ -25,7 +27,7 @@ const DEFAULT_CONFIG: DashboardConfig = {
  * Analytics Dashboard HTTP Server
  */
 export class AnalyticsDashboard {
-  private server: ReturnType<typeof createServer> | null = null;
+  private server: ReturnType<typeof http.createServer> | null = null;
   private config: DashboardConfig;
 
   constructor(config: Partial<DashboardConfig> = {}) {
@@ -37,7 +39,7 @@ export class AnalyticsDashboard {
    */
   start(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.server = createServer(this.handleRequest.bind(this));
+      this.server = http.createServer(this.handleRequest.bind(this));
       
       this.server.listen(this.config.port, this.config.host, () => {
         console.log(`📊 Analytics Dashboard API running on http://${this.config.host}:${this.config.port}`);
@@ -118,39 +120,43 @@ export class AnalyticsDashboard {
         this.sendJson(res, { status: 'ok', service: 'Analytics Dashboard API' });
         break;
 
-      case '/api/stats': {
-        const stats = await getDetailedStats();
-        this.sendJson(res, stats);
-        break;
-      }
-
       case '/api/metrics': {
-        const timeRange = params.get('timeRange') as 'today' | 'week' | 'month' | 'all' || 'all';
-        const metrics = await getUsageMetrics(timeRange);
-        this.sendJson(res, metrics);
+        // Minimal metrics endpoint; extend as needed
+        this.sendJson(res, { message: 'Metrics endpoint - extend as needed' });
         break;
       }
 
-      case '/api/overview': {
-        const [overviewStats, overviewMetrics] = await Promise.all([
-          getDetailedStats(),
-          getUsageMetrics('today')
-        ]);
-        
-        this.sendJson(res, {
-          summary: {
-            totalCommands: overviewStats.total,
-            commandsToday: overviewStats.commandsToday,
-            successRate: overviewStats.successRate,
-            activeUsers: overviewStats.topUsers.length,
-            activeGuilds: overviewStats.topGuilds.length
-          },
-          todayMetrics: overviewMetrics,
-          trends: {
-            hourlyDistribution: overviewStats.hourlyDistribution,
-            dailyTrend: overviewStats.dailyTrend.slice(-7) // Last 7 days
-          }
-        });
+      case '/api/verification-metrics': {
+        try {
+          const { getVerificationMetrics } = await import('./verification/answer-verification.service.js');
+          const m = getVerificationMetrics();
+          this.sendJson(res, m);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load verification metrics');
+        }
+        break;
+      }
+
+      case '/api/telemetry': {
+        try {
+          const { modelTelemetryStore } = await import('./advanced-capabilities/index.js');
+          const limit = parseInt(params.get('limit') || '20', 10);
+          const data = modelTelemetryStore.snapshot(Math.max(1, Math.min(200, limit)));
+          this.sendJson(res, data);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load telemetry');
+        }
+        break;
+      }
+
+      case '/api/kb-stats': {
+        try {
+          const { knowledgeBaseService } = await import('./knowledge-base.service.js');
+          const stats = await knowledgeBaseService.getStats();
+          this.sendJson(res, stats);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load KB stats');
+        }
         break;
       }
 
@@ -185,12 +191,38 @@ export const analyticsDashboard = new AnalyticsDashboard();
  * Start analytics dashboard if environment variable is set
  */
 export function startAnalyticsDashboardIfEnabled(): void {
-  if (process.env.ENABLE_ANALYTICS_DASHBOARD === 'true') {
-    const port = process.env.ANALYTICS_DASHBOARD_PORT ? parseInt(process.env.ANALYTICS_DASHBOARD_PORT) : 3001;
-    
-    const dashboard = new AnalyticsDashboard({ port });
-    dashboard.start().catch(error => {
-      console.error('Failed to start analytics dashboard:', error);
+  if (process.env.ENABLE_ANALYTICS_DASHBOARD !== 'true') return;
+
+  if (!server) {
+    const port = parseInt(process.env.ANALYTICS_DASHBOARD_PORT || '3001', 10);
+    server = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('Analytics dashboard is running.\n');
     });
+    server.listen(port, () => logger.info(`Analytics dashboard listening on :${port}`));
+  }
+
+  // Start periodic verification metrics logging every 15 minutes
+  if (!metricsInterval) {
+    metricsInterval = setInterval(async () => {
+      try {
+        const { getVerificationMetrics } = await import('./verification/answer-verification.service.js');
+        const m = getVerificationMetrics();
+        logger.info('[VerificationMetrics] Snapshot', m as any);
+      } catch (e) {
+        logger.warn('Failed to emit verification metrics', { error: String(e) });
+      }
+    }, 15 * 60 * 1000);
+  }
+}
+
+export function stopAnalyticsDashboard(): void {
+  if (metricsInterval) {
+    clearInterval(metricsInterval);
+    metricsInterval = null;
+  }
+  if (server) {
+    server.close();
+    server = null;
   }
 }

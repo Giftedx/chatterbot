@@ -10,7 +10,7 @@ import {
     TextBasedChannel
 } from 'discord.js';
 import { URL } from 'url';
-
+import _ from 'lodash';
 // MCP specific
 import { MCPManager } from './mcp-manager.service.js';
 import { UnifiedMCPOrchestratorService, MCPOrchestrationResult } from './core/mcp-orchestrator.service.js';
@@ -442,99 +442,97 @@ export class CoreIntelligenceService {
         return Boolean(inPersonalThread || mentionedBot || addressed);
     }
 
-    private classifyControlIntent(text: string): { intent: string; payload?: any } {
-        const t = text.toLowerCase();
-        // DELETE / EXPORT
-        if (/\b(delete|remove) my data\b|\bforget me\b/.test(t)) return { intent: 'DELETE' };
-        if (/\bexport my data\b|\bdata export\b|\bwhat do you know about me\b/.test(t)) return { intent: 'EXPORT' };
-        // PAUSE / RESUME
-        const pauseMatch = t.match(/\bpause(?: for)?\s+(\d+)\s*(minute|minutes|hour|hours)?/);
-        if (pauseMatch) {
-          const n = parseInt(pauseMatch[1], 10);
-          const unit = pauseMatch[2] || 'minutes';
-          const minutes = /hour/.test(unit) ? n * 60 : n;
-          return { intent: 'PAUSE', payload: { minutes } };
+    private classifyControlIntent(content: string): { intent: 'NONE' | 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD'; payload?: any } {
+        const text = content.toLowerCase();
+        if (/\bpause\b/.test(text)) {
+            const m = text.match(/\b(\d{1,4})\s*(min|mins|minutes|hour|hours|hr|hrs)?\b/);
+            let minutes = 60;
+            if (m) {
+                const val = parseInt(m[1], 10);
+                const unit = m[2] || 'minutes';
+                minutes = /hour|hr/.test(unit) ? val * 60 : val;
+            }
+            return { intent: 'PAUSE', payload: { minutes } };
         }
-        if (/\bpause\b|\bstop\b/.test(t)) return { intent: 'PAUSE', payload: { minutes: 60 } };
-        if (/\bresume\b|\bcontinue\b/.test(t)) return { intent: 'RESUME' };
-        // MOVE
-        if (/\bswitch to dm\b|\bdm(s)?\b|\btalk in dm\b/.test(t)) return { intent: 'MOVE_DM' };
-        if (/\btalk here\b|\bstay here\b/.test(t)) return { intent: 'MOVE_THREAD' };
-        if (/\bnew topic\b|\bstart over\b|\brestart\b/.test(t)) return { intent: 'NEW_TOPIC' };
+        if (/\bresume\b/.test(text)) return { intent: 'RESUME' };
+        if (/\bexport\b.*\bdata\b/.test(text) || /\bmy\s+data\b.*\bexport\b/.test(text)) return { intent: 'EXPORT' };
+        if (/\b(delete|forget)\b.*\bmy\s+data\b/.test(text)) return { intent: 'DELETE' };
+        if (/\bmove\b.*\b(dm|direct messages?)\b/.test(text) || /\bswitch\b.*\bdm\b/.test(text)) return { intent: 'MOVE_DM' };
+        if (/\bmove\b.*\bthread\b/.test(text) || /\bswitch\b.*\bthread\b/.test(text)) return { intent: 'MOVE_THREAD' };
         return { intent: 'NONE' };
     }
 
-      private async handleControlIntent(intent: string, payload: any, messageOrInteraction: Message | ChatInputCommandInteraction): Promise<boolean> {
-    const targetUser = 'user' in messageOrInteraction ? (messageOrInteraction as ChatInputCommandInteraction).user : (messageOrInteraction as Message).author;
-    const userId = targetUser.id;
-    const guildId = (messageOrInteraction as any).guildId || null;
-
-    const logIntent = async (type: string, pl?: any) => {
-      try { await prisma.intentLog.create({ data: { userId, type, payload: pl ?? undefined } }); } catch (err) { console.error('Failed to log intent:', err); }
-    };
-
-    const dm = await targetUser.createDM();
-
-        switch (intent) {
-          case 'PAUSE': {
-            const minutes = Math.max(1, Math.min(1440, payload?.minutes ?? 60));
-            const resumeAt = await this.userConsentService.pauseUser(userId, minutes);
-            await dm.send(`⏸️ Paused for ${minutes} minutes. I’ll be quiet until <t:${Math.floor((resumeAt?.getTime() || Date.now())/1000)}:t>.`);
-            await logIntent('PAUSE', { minutes });
-            return true;
-          }
-          case 'RESUME': {
-            await this.userConsentService.resumeUser(userId);
-            await dm.send('▶️ Resumed. I’m listening again.');
-            await logIntent('RESUME');
-            return true;
-          }
-          case 'DELETE': {
-            await dm.send('🔒 Got it. Deleting your data now…');
-            const ok = await this.userConsentService.forgetUser(userId);
-            await dm.send(ok ? '✅ Done. Your data has been deleted.' : '❌ I couldn’t delete your data. Please try again.');
-            await logIntent('DELETE');
-            return true;
-          }
-          case 'EXPORT': {
-            const data = await this.userConsentService.exportUserData(userId);
-            if (!data) { await dm.send('❌ I couldn’t export your data right now. Please try later.'); await logIntent('EXPORT', { ok: false }); return true; }
-            const json = JSON.stringify(data, null, 2);
-            await dm.send({ content: '📥 Your data export is ready.', files: [{ attachment: Buffer.from(json, 'utf-8'), name: 'export.json' }] });
-            await logIntent('EXPORT', { ok: true });
-            return true;
-          }
-          case 'MOVE_DM': {
-            await this.userConsentService.setDmPreference(userId, true);
-            await dm.send('📩 Okay! I’ll reply in DMs from now on.');
-            await logIntent('MOVE_DM');
-            return true;
-          }
-          case 'MOVE_THREAD': {
-            await this.userConsentService.setDmPreference(userId, false);
-            await dm.send('🧵 Got it. I’ll reply in your thread here.');
-            await logIntent('MOVE_THREAD');
-            return true;
-          }
-          case 'NEW_TOPIC': {
-            // Clear lastThreadId to force a fresh thread next time
-            await this.userConsentService.setLastThreadId(userId, null);
-            await dm.send('🆕 New topic set. I’ll start a fresh thread next time.');
-            await logIntent('NEW_TOPIC');
-            return true;
-          }
-          default:
+    private async handleControlIntent(intent: 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD', payload: any, message: Message): Promise<boolean> {
+        try {
+            const userId = message.author.id;
+            if (intent === 'PAUSE') {
+                const minutes = Math.max(1, Math.min(1440, payload?.minutes || 60));
+                const when = await this.userConsentService.pauseUser(userId, minutes);
+                if (when) await message.reply(`⏸️ Paused for ${minutes} minutes. I’ll resume at <t:${Math.floor(when.getTime()/1000)}:t>.`);
+                return true;
+            }
+            if (intent === 'RESUME') {
+                await this.userConsentService.resumeUser(userId);
+                await message.reply('▶️ Resumed.');
+                return true;
+            }
+            if (intent === 'EXPORT') {
+                const data = await this.userConsentService.exportUserData(userId);
+                if (!data) { await message.reply('❌ No data found to export.'); return true; }
+                const dm = await message.author.createDM();
+                const json = Buffer.from(JSON.stringify(data, null, 2), 'utf8');
+                await dm.send({ content: '📥 Your data export:', files: [{ attachment: json, name: `data-export-${new Date().toISOString().split('T')[0]}.json` }] });
+                await message.reply('✅ I’ve sent your data export via DM.');
+                return true;
+            }
+            if (intent === 'DELETE') {
+                await message.reply('⚠️ To confirm deletion, please type: DELETE ALL MY DATA');
+                // Minimal confirm flow: watch next message from user in same channel
+                const filter = (m: Message) => m.author.id === userId && m.channelId === message.channelId;
+                const ch = message.channel as unknown as TextBasedChannel;
+                const collected = await (ch as any).awaitMessages({ filter, max: 1, time: 30000 }).catch(() => null);
+                const confirm = collected && collected.first()?.content?.trim() === 'DELETE ALL MY DATA';
+                if (!confirm) { await (ch as any).send('❌ Data deletion cancelled.'); return true; }
+                const ok = await this.userConsentService.forgetUser(userId);
+                await (ch as any).send(ok ? '✅ All your data has been permanently deleted.' : '❌ Failed to delete data. Please try again.');
+                return true;
+            }
+            if (intent === 'MOVE_DM') {
+                await this.userConsentService.setDmPreference(userId, true);
+                const dm = await message.author.createDM();
+                await dm.send('📩 Switched to DM. You can continue here.');
+                await message.reply('✅ Check your DMs—continuing there.');
+                return true;
+            }
+            if (intent === 'MOVE_THREAD') {
+                // If a thread exists, reuse; else create
+                const channel = message.channel as any;
+                if (channel?.isThread?.()) { await message.reply('🧵 We’re already in a thread.'); return true; }
+                if (channel?.threads?.create) {
+                    const thread = await channel.threads.create({ name: `chat-${message.author.username}-${Date.now()}`, autoArchiveDuration: 10080 });
+                    await this.userConsentService.setLastThreadId(userId, thread.id);
+                    await thread.send(`👋 Moved here for a tidy conversation. Continue, ${message.author.toString()}.`);
+                    await message.reply(`🧵 Created a thread: <#${thread.id}>`);
+                    return true;
+                }
+                await message.reply('❌ I couldn’t create a thread here.');
+                return true;
+            }
+            return false;
+        } catch (err) {
+            logger.warn('[CoreIntelSvc] Control intent handling failed', { err: String(err) });
             return false;
         }
     }
 
     public async handleMessage(message: Message): Promise<void> {
+        // Unified pipeline for free-form messages
         try {
             if (message.author.bot || message.content.startsWith('/')) return;
 
             const userId = message.author.id;
 
-            // Opt-in required (tests may pre-mark opted-in users)
+            // Opt-in gating
             let isOptedIn = false;
             if (process.env.NODE_ENV === 'test' && this.optedInUsers.has(userId)) {
                 isOptedIn = true;
@@ -546,27 +544,27 @@ export class CoreIntelligenceService {
             // Cooldown
             if (this.withinCooldown(userId, 8000)) return;
 
-            // Gating: only respond when addressed, mentioned, or in personal thread/DM
+            // Only respond when addressed, mentioned, DM, or in personal thread
             const respond = await this.shouldRespond(message);
             if (!respond) return;
 
-            // Intent detection (latent controls). If handled, stop.
+            // Control intents (pause/resume/export/delete/move)
             const ctrl = this.classifyControlIntent(message.content);
             if (ctrl.intent !== 'NONE') {
-                const handled = await this.handleControlIntent(ctrl.intent, ctrl.payload, message);
+                const handled = await this.handleControlIntent(ctrl.intent as any, ctrl.payload, message);
                 if (handled) return;
             }
 
-            // Update activity
             await this.userConsentService.updateUserActivity(userId);
             this.optedInUsers.add(userId);
 
-            if ('sendTyping' in message.channel) await message.channel.sendTyping();
+            if ('sendTyping' in message.channel) await (message.channel as any).sendTyping();
             const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(att => ({ name: att.name, url: att.url, contentType: att.contentType }));
 
             // Log incoming
             try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: message.id, role: 'user', content: message.content } }); } catch (err) { logger.warn('[CoreIntelSvc] Failed to log user message', { messageId: message.id, error: err }); }
 
+            // Full processing pipeline; uiContext = message
             const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
             await message.reply(responseOptions);
 
@@ -574,7 +572,6 @@ export class CoreIntelligenceService {
             try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch (err) { logger.error('[CoreIntelSvc] Failed to log assistant reply:', { messageId: message.id, error: err }); }
         } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
-            console.error('Failed to send reply', error);
             try { await message.reply({ content: '🤖 Sorry, I encountered an error while processing your message. Please try again later.' }); } catch {}
         }
     }
@@ -585,6 +582,37 @@ export class CoreIntelligenceService {
     ): Promise<any> {
         const startTime = Date.now();
         const analyticsData = { guildId: guildId || undefined, userId, commandOrEvent: uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate', promptLength: promptText.length, attachmentCount: commonAttachments.length, startTime };
+
+        // DM-only admin diagnose trigger
+        try {
+            const isDM = !guildId;
+            const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'stats', { guildId: guildId || undefined, channelId, userId });
+            if (isDM && isAdmin) {
+                const { getDiagnoseKeywords } = await import('../config/admin-config.js');
+                const kws = getDiagnoseKeywords();
+                const safeKws = kws.map(kw => _.escapeRegExp(kw));
+                const re = new RegExp(`\\b(${safeKws.join('|')})\\b`, 'i');
+                if (re.test(promptText)) {
+                    const { getProviderStatuses, modelTelemetryStore } = await import('./advanced-capabilities/index.js');
+                    const providers = getProviderStatuses();
+                    const telemetry = modelTelemetryStore.snapshot(10);
+                    const { knowledgeBaseService } = await import('./knowledge-base.service.js');
+                    const kb = await knowledgeBaseService.getStats();
+                    const lines: string[] = [];
+                    lines.push('Providers:');
+                    for (const p of providers) lines.push(`- ${p.name}: ${p.available ? 'available' : 'not set'}`);
+                    lines.push('\nRecent model usage:');
+                    for (const t of telemetry) lines.push(`- ${t.provider}/${t.model} in ${Math.round(t.latencyMs)}ms ${t.success ? '✅' : '❌'}`);
+                    lines.push('\nKnowledge Base:');
+                    lines.push(`- Total entries: ${kb.totalEntries}`);
+                    lines.push(`- Avg confidence: ${kb.averageConfidence.toFixed(2)}`);
+                    lines.push(`- Recent additions (7d): ${kb.recentAdditions}`);
+                    return { content: lines.join('\n') };
+                }
+            }
+        } catch (diagErr) {
+            // Non-fatal
+        }
 
         try {
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'start_processing', isSuccess: true, duration: 0 });
@@ -682,19 +710,21 @@ export class CoreIntelligenceService {
                 uiContext, history, capabilities, unifiedAnalysis, analyticsData
             );
 
-            // Optional self-critique and refinement
+            // Answer verification and refinement (self-critique + cross-model with auto-rerun)
             try {
-                if (process.env.ENABLE_SELF_CRITIQUE === 'true' && uiContext && 'id' in uiContext) {
-                    const { SelfCritiqueService } = await import('./self-critique.service.js');
-                    const critiqueSvc = new SelfCritiqueService();
-                    const refined = await critiqueSvc.critiqueAndRefine(
-                        promptText,
-                        fullResponseText,
-                        history
-                    );
-                    if (refined && refined !== fullResponseText) {
-                        fullResponseText = refined;
-                    }
+                const { AnswerVerificationService } = await import('./verification/answer-verification.service.js');
+                const verifier = new AnswerVerificationService({
+                  enabled: process.env.ENABLE_ANSWER_VERIFICATION === 'true' || process.env.ENABLE_SELF_CRITIQUE === 'true',
+                  crossModel: process.env.CROSS_MODEL_VERIFICATION === 'true',
+                  maxReruns: Number(process.env.MAX_RERUNS || 1)
+                });
+                const refined = await verifier.verifyAndImprove(
+                  promptText,
+                  fullResponseText,
+                  history
+                );
+                if (refined && refined !== fullResponseText) {
+                  fullResponseText = refined;
                 }
             } catch (e) {
                 logger.debug('[CoreIntelSvc] Self-critique skipped', { error: String(e) });

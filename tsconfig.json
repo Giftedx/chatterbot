@@ -7,6 +7,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "strict": true,
+    "useUnknownInCatchVariables": false,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "rootDir": "src",
@@ -16,5 +17,8 @@
     "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "**/*.test.ts"
+  ]
 }

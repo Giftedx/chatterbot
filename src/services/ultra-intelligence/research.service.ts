@@ -281,29 +281,23 @@ export class UltraIntelligentResearchService {
         try {
             // Primary web search
             const searchParams: BraveWebSearchParams = {
-                q: query,
-                count: depth === 'expert' ? 20 : depth === 'comprehensive' ? 15 : 10,
-                offset: 0,
-                mkt: 'en-US',
-                safesearch: 'moderate',
-                textDecorations: false,
-                textFormat: 'Raw'
+                query,
+                count: depth === 'expert' ? 20 : depth === 'comprehensive' ? 15 : 10
             };
 
             const searchResult = await braveWebSearch(searchParams);
             
-            if (searchResult?.webPages?.value) {
-                for (const page of searchResult.webPages.value) {
+            if (searchResult?.results?.length) {
+                for (const page of searchResult.results) {
                     sources.push({
                         url: page.url,
-                        title: page.name,
+                        title: page.title,
                         snippet: page.snippet,
-                        credibility: this.assessCredibility(page.url, page.name),
+                        credibility: this.assessCredibility(page.url, page.title),
                         relevance: this.assessRelevance(page.snippet, query),
-                        recency: this.assessRecency(page.dateLastCrawled),
+                        recency: 0,
                         type: this.categorizeSource(page.url),
-                        domain: this.extractDomain(page.url),
-                        lastUpdated: page.dateLastCrawled ? new Date(page.dateLastCrawled) : undefined
+                        domain: this.extractDomain(page.url)
                     });
                 }
             }
@@ -355,29 +349,26 @@ export class UltraIntelligentResearchService {
         for (const gQuery of gamingQueries.slice(0, 2)) { // Limit to prevent too many requests
             try {
                 const searchResult = await braveWebSearch({
-                    q: gQuery,
-                    count: 5,
-                    offset: 0,
-                    mkt: 'en-US',
-                    safesearch: 'moderate'
+                    query: gQuery,
+                    count: 5
                 });
 
-                if (searchResult?.webPages?.value) {
-                    for (const page of searchResult.webPages.value) {
+                if (searchResult?.results?.length) {
+                    for (const page of searchResult.results) {
                         sources.push({
                             url: page.url,
-                            title: page.name,
+                            title: page.title,
                             snippet: page.snippet,
-                            credibility: this.assessCredibility(page.url, page.name),
+                            credibility: this.assessCredibility(page.url, page.title),
                             relevance: this.assessRelevance(page.snippet, query),
-                            recency: this.assessRecency(page.dateLastCrawled),
+                            recency: 0,
                             type: this.categorizeSource(page.url),
                             domain: this.extractDomain(page.url)
                         });
                     }
                 }
-            } catch (error) {
-                logger.warn('Gaming-specific search failed', { query: gQuery, error: error.message });
+            } catch (error: any) {
+                logger.warn('Gaming-specific search failed', { query: gQuery, error: String(error?.message || error) });
             }
         }
     }
@@ -396,29 +387,26 @@ export class UltraIntelligentResearchService {
         for (const tQuery of techQueries.slice(0, 2)) {
             try {
                 const searchResult = await braveWebSearch({
-                    q: tQuery,
-                    count: 5,
-                    offset: 0,
-                    mkt: 'en-US',
-                    safesearch: 'moderate'
+                    query: tQuery,
+                    count: 5
                 });
 
-                if (searchResult?.webPages?.value) {
-                    for (const page of searchResult.webPages.value) {
+                if (searchResult?.results?.length) {
+                    for (const page of searchResult.results) {
                         sources.push({
                             url: page.url,
-                            title: page.name,
+                            title: page.title,
                             snippet: page.snippet,
-                            credibility: this.assessCredibility(page.url, page.name),
+                            credibility: this.assessCredibility(page.url, page.title),
                             relevance: this.assessRelevance(page.snippet, query),
-                            recency: this.assessRecency(page.dateLastCrawled),
+                            recency: 0,
                             type: this.categorizeSource(page.url),
                             domain: this.extractDomain(page.url)
                         });
                     }
                 }
-            } catch (error) {
-                logger.warn('Technical search failed', { query: tQuery, error: error.message });
+            } catch (error: any) {
+                logger.warn('Technical search failed', { query: tQuery, error: String(error?.message || error) });
             }
         }
     }
@@ -615,7 +603,6 @@ export class UltraIntelligentResearchService {
         if (content.length > MAX_CONTENT_LENGTH) {
             safeContent = content.slice(0, MAX_CONTENT_LENGTH);
         }
-        const findings: string[] = [];
         // Split into sentences and limit the number processed
         const sentences = safeContent.split(/[.!?]+/).filter(s => s.trim().length > 20).slice(0, MAX_SENTENCES);
         
