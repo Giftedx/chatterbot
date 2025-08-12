@@ -41,6 +41,8 @@ npm run dev
 - `/chat prompt [attachment]`
   - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
   - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
+  - Optional: choose provider with `/chat ... provider: [Auto|OpenAI|Anthropic|Gemini|Groq|Mistral|OpenAI Compatible]`. If omitted, the router auto-selects based on context and latency.
+  - Optional: choose mode with `/chat ... mode: [Auto|Speed|Quality]`. “Speed” biases for low-latency models; “Quality” allows higher-latency picks.
 
 Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
 
@@ -121,4 +123,8 @@ OPENAI_COMPAT_BASE_URL=...
 ENABLE_ANSWER_VERIFICATION=true
 CROSS_MODEL_VERIFICATION=true
 MAX_RERUNS=1
+
+# Optional advanced SDK integrations
+FEATURE_VERCEL_AI=false
+FEATURE_LANGGRAPH=false
 ```

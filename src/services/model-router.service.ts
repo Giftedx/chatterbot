@@ -21,6 +21,10 @@ export interface GenerationMeta {
   model: string;
 }
 
+interface RouterPreferences {
+  latencyPreference?: RoutingSignal['latencyPreference'];
+}
+
 export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
@@ -41,7 +45,7 @@ export class ModelRouterService {
     if (process.env.OPENAI_COMPAT_API_KEY && process.env.OPENAI_COMPAT_BASE_URL) this.openaiCompat = new OpenAICompatProvider();
   }
 
-  private buildRoutingSignal(prompt: string, history: ChatMessage[]): RoutingSignal {
+  private buildRoutingSignal(prompt: string, history: ChatMessage[], overrideLatency?: RoutingSignal['latencyPreference']): RoutingSignal {
     const text = [
       ...history.map(h => h.parts.map(p => (p as any).text || '').join(' ')),
       prompt
@@ -51,7 +55,7 @@ export class ModelRouterService {
     const needsMultimodal = /http(s)?:\/\/.+\.(png|jpg|jpeg|gif)/.test(text);
     const needsHighSafety = /suicide|self-harm|hate|nsfw|explicit|medical|legal/.test(text);
     const domain: RoutingSignal['domain'] = /leetcode|stack overflow|docker|k8s|node|python|typescript|react|error|exception/.test(text) ? 'technical' : 'general';
-    const latencyPreference: RoutingSignal['latencyPreference'] = /urgent|quick|fast|now/.test(text) ? 'low' : 'normal';
+    const latencyPreference: RoutingSignal['latencyPreference'] = overrideLatency || (/urgent|quick|fast|now/.test(text) ? 'low' : 'normal');
     return { mentionsCode, requiresLongContext, needsMultimodal, needsHighSafety, domain, latencyPreference };
   }
 
@@ -106,9 +110,10 @@ export class ModelRouterService {
     prompt: string,
     history: ChatMessage[],
     systemPrompt?: string,
-    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {}
+    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {},
+    preferences: RouterPreferences = {}
   ): Promise<GenerationMeta> {
-    const signal = this.buildRoutingSignal(prompt, history);
+    const signal = this.buildRoutingSignal(prompt, history, preferences.latencyPreference);
     const selected = modelRegistry.selectBestModel(signal, constraints) || { provider: this.defaultProvider, model: '', displayName: '', contextWindowK: 0, costTier: 'low', speedTier: 'fast', strengths: [], modalities: ['text'], bestFor: [], safetyLevel: 'standard' };
     const text = await this.callProvider(selected as ModelCard, prompt, history, systemPrompt);
     return { text, provider: selected.provider as ProviderName, model: selected.model };
@@ -119,9 +124,11 @@ export class ModelRouterService {
     history: ChatMessage[],
     userId: string,
     guildId: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {},
+    preferences: RouterPreferences = {}
   ): Promise<string> {
-    const meta = await this.generateWithMeta(prompt, history, systemPrompt);
+    const meta = await this.generateWithMeta(prompt, history, systemPrompt, constraints, preferences);
     return meta.text;
   }
 

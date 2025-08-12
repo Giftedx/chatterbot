@@ -47,6 +47,9 @@ import { UserMemoryService } from '../memory/user-memory.service.js';
 import { ProcessingContext as EnhancedProcessingContext, MessageAnalysis as EnhancedMessageAnalysis } from './enhanced-intelligence/types.js';
 import { modelRouterService } from './model-router.service.js';
 import { knowledgeBaseService } from './knowledge-base.service.js';
+import type { ProviderName } from '../config/models.js';
+import { getEnvAsBoolean } from '../utils/env.js';
+import { langGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 // Advanced Capabilities
 import { 
@@ -246,7 +249,33 @@ export class CoreIntelligenceService {
             .setName('chat')
             .setDescription('Engage with intelligent conversation features.')
             .addStringOption(option => option.setName('prompt').setDescription('Your message, question, or request.').setRequired(true))
-            .addAttachmentOption(option => option.setName('attachment').setDescription('Optional file attachment.').setRequired(false));
+            .addAttachmentOption(option => option.setName('attachment').setDescription('Optional file attachment.').setRequired(false))
+            .addStringOption(option =>
+                option
+                  .setName('provider')
+                  .setDescription('Preferred model/provider (optional)')
+                  .setRequired(false)
+                  .addChoices(
+                    { name: 'Auto', value: 'auto' },
+                    { name: 'OpenAI', value: 'openai' },
+                    { name: 'Anthropic', value: 'anthropic' },
+                    { name: 'Gemini', value: 'gemini' },
+                    { name: 'Groq', value: 'groq' },
+                    { name: 'Mistral', value: 'mistral' },
+                    { name: 'OpenAI Compatible', value: 'openai_compat' }
+                  )
+              )
+            .addStringOption(option =>
+                option
+                  .setName('mode')
+                  .setDescription('Speed/quality preference (optional)')
+                  .setRequired(false)
+                  .addChoices(
+                    { name: 'Auto', value: 'auto' },
+                    { name: 'Speed', value: 'speed' },
+                    { name: 'Quality', value: 'quality' }
+                  )
+              );
         commands.push(chatCommand as SlashCommandBuilder);
         return commands;
     }
@@ -983,12 +1012,40 @@ export class CoreIntelligenceService {
               }
             } catch (error) { logger.warn('Failed to fetch RAG context, continuing without it.', { error }); }
 
-            const fullResponseText: string = await modelRouterService.generate(
-              typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery,
+            // Optional: derive intent with LangGraph to condition a concise, precise system prompt
+            let systemPrompt: string | undefined;
+            if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
+              try {
+                const state = await langGraphWorkflow.run({ query: ragPrefixedQuery });
+                if (state && (state as any).intent) {
+                  systemPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+                }
+              } catch {}
+            }
+
+            // Optional: respect user preferred provider from slash option
+            let constraints: { disallowProviders?: ProviderName[]; preferProvider?: ProviderName } = {};
+            let preferences: { latencyPreference?: 'low' | 'normal' } = {};
+            try {
+              const maybeProvider = (uiContext as any)?.options?.getString?.('provider');
+              if (maybeProvider && maybeProvider !== 'auto') {
+                constraints = { preferProvider: maybeProvider as ProviderName };
+              }
+              const maybeMode = (uiContext as any)?.options?.getString?.('mode');
+              if (maybeMode === 'speed') preferences.latencyPreference = 'low';
+              if (maybeMode === 'quality') preferences.latencyPreference = 'normal';
+            } catch {}
+
+            const groundedQuery = typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery;
+
+            const meta = await modelRouterService.generateWithMeta(
+              groundedQuery,
               history,
-              userId,
-              guildId || 'default'
+              systemPrompt,
+              constraints,
+              preferences
             );
+            const fullResponseText: string = meta.text;
             const agenticResponse: AgenticResponse = {
               response: fullResponseText,
               confidence: 0.8,
