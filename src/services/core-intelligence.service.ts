@@ -55,6 +55,9 @@ import {
   type EnhancedResponse 
 } from './advanced-capabilities/index.js';
 
+import { UltraIntelligenceOrchestrator } from './ultra-intelligence/orchestrator.service.js';
+import { AdvancedMemoryManager } from './advanced-memory/advanced-memory-manager.service.js';
+
 
 // Utilities and Others
 import { logger } from '../utils/logger.js';
@@ -124,6 +127,8 @@ export class CoreIntelligenceService {
     private behaviorAnalytics?: UserBehaviorAnalyticsService;
     private smartRecommendations?: SmartRecommendationService;
     private advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
+    private memoryManager?: AdvancedMemoryManager;
+    private ultra?: UltraIntelligenceOrchestrator;
 
     constructor(config: CoreIntelligenceConfig) {
         this.config = config;
@@ -142,6 +147,24 @@ export class CoreIntelligenceService {
         this.capabilityService = intelligenceCapabilityService;
         this.userMemoryService = new UserMemoryService();
         this.userConsentService = UserConsentService.getInstance();
+
+        if (config.enableEnhancedMemory) {
+            this.memoryManager = new AdvancedMemoryManager({
+                enableEpisodicMemory: true,
+                enableSocialIntelligence: true,
+                enableEmotionalIntelligence: true,
+                enableSemanticClustering: true,
+                enableMemoryConsolidation: true,
+                memoryDecayRate: 0.05,
+                maxMemoriesPerUser: 1000,
+                importanceThreshold: 0.3,
+                consolidationInterval: 60 * 60 * 1000,
+                socialAnalysisDepth: 'moderate',
+                emotionalSensitivity: 0.7,
+                adaptationAggressiveness: 0.6
+            });
+            this.memoryManager.initialize().catch(() => {});
+        }
 
         if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
         if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
@@ -1074,6 +1097,22 @@ export class CoreIntelligenceService {
             logger.error(`[CoreIntelSvc] Error in _updateStateAndAnalytics: ${errorMessage}`, { error, stack: errorStack, ...analyticsData });
             this.recordAnalyticsInteraction({ ...analyticsData, step: 'state_update_error', isSuccess: false, error: errorMessage, duration: Date.now() - analyticsData.startTime });
         }
+    }
+
+    private async enhanceAndPersistMemory(userId: string, channelId: string, guildId: string | undefined, content: string, response: string) {
+        if (!this.memoryManager) return response;
+        const context = {
+            userId,
+            channelId,
+            guildId,
+            conversationId: `${channelId}:${userId}`,
+            participants: [userId],
+            content,
+            timestamp: new Date()
+        };
+        await this.memoryManager.storeConversationMemory(context);
+        const enhanced = await this.memoryManager.enhanceResponse(response, context);
+        return enhanced.enhancedResponse;
     }
 
     private async handleButtonPress(interaction: ButtonInteraction): Promise<void> {
