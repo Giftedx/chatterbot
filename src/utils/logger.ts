@@ -158,7 +158,7 @@ export class Logger {
     if (this.enableJson) {
       // JSON format for production parsing
       const safe = { ...entry } as LogEntry & { error?: { message?: string } };
-      if (safe.error?.message) safe.error.message = redact(safe.error.message);
+      if (safe.error?.message) safe.error.message = redact(safe.error.message) || safe.error.message;
       console.log(JSON.stringify(safe));
     } else {
       // Human-readable format for development

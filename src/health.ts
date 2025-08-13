@@ -5,6 +5,7 @@
 
 import { createServer, type IncomingMessage, type ServerResponse, type Server as HttpServer } from 'http';
 import { logger } from './utils/logger.js';
+import { modelTelemetryStore, providerHealthStore } from './services/advanced-capabilities/index.js';
 
 let totalRequests = 0;
 let healthRequests = 0;
@@ -26,6 +27,10 @@ interface HealthStatus {
     gemini: boolean;
     database: boolean;
     moderation: boolean;
+  };
+  providers?: {
+    health: ReturnType<typeof providerHealthStore.snapshot>;
+    recent: ReturnType<typeof modelTelemetryStore.snapshot>;
   };
 }
 
@@ -110,6 +115,10 @@ export class HealthCheck {
         gemini: !!process.env.GEMINI_API_KEY,
         database: !!process.env.DATABASE_URL,
         moderation: true // Always enabled as it's built-in
+      },
+      providers: {
+        health: providerHealthStore.snapshot(),
+        recent: modelTelemetryStore.snapshot(20)
       }
     };
   }
