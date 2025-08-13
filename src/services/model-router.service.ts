@@ -150,6 +150,11 @@ export class ModelRouterService {
     return { text, provider: preferred.provider, model: preferred.model };
   }
 
+  async generate(prompt: string, history: ChatMessage[], _userId?: string, _guildId?: string, systemPrompt?: string): Promise<string> {
+    const meta = await this.generateWithMeta(prompt, history, systemPrompt);
+    return meta.text;
+  }
+
   async stream(prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<AsyncGenerator<string>> {
     // For simplicity, fallback to non-streaming in tests
     const meta = await this.generateWithMeta(prompt, history, systemPrompt);
