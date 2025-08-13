@@ -25,7 +25,8 @@
     "deploy:analytics": "echo 'No docker-compose.yml in repo; use ENABLE_ANALYTICS_DASHBOARD to start built-in dashboard'",
     "db:migrate": "npx prisma migrate deploy",
     "db:studio": "npx prisma studio",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.2",
@@ -82,7 +83,8 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.6.0",
     "typedoc": "^0.28.0",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "husky": "^9.1.6"
   },
   "engines": {
     "node": ">=18.0.0"

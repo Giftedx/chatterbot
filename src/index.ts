@@ -10,6 +10,8 @@ import { enhancedIntelligenceActivation } from './services/enhanced-intelligence
 import { startTemporalOrchestrationIfEnabled } from './orchestration/temporal/loader.js';
 import { memoryConsolidationScheduler } from './services/schedulers/memory-consolidation.scheduler.js';
 import { vectorMaintenanceScheduler } from './services/schedulers/vector-maintenance.scheduler.js';
+import { runWithTrace } from './utils/async-context.js';
+import crypto from 'node:crypto';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -151,52 +153,60 @@ client.once('ready', async () => {
 });
 
 client.on('interactionCreate', async (interaction: Interaction) => {
-  // Handle privacy modal submissions
-  if (interaction.isModalSubmit()) {
-    if (interaction.customId.startsWith('forget_me_confirm') || interaction.customId.startsWith('privacy_')) {
-      await handlePrivacyModalSubmit(interaction);
-      return;
-    }
-  }
-
-  // Handle privacy button interactions
-  if (interaction.isButton()) {
-    if (interaction.customId.startsWith('privacy_') || interaction.customId.startsWith('data_') || interaction.customId.startsWith('delete_')) {
-      await handlePrivacyButtonInteraction(interaction);
-      return;
-    }
-  }
-
-  // Handle MCP consent button interactions
-  if (interaction.isButton() && interaction.customId.startsWith('mcp_consent_')) {
+  const traceId = crypto.randomUUID();
+  await runWithTrace(traceId, async () => {
     try {
-      // Initialize MCP integration service if not done
-      if (mcpManagerInstance) {
-        const { MCPIntegrationService } = await import('./services/mcp-integration.service.js');
-        const mcpIntegration = new MCPIntegrationService(mcpManagerInstance);
-        await mcpIntegration.handleConsentInteraction(interaction);
+      // Handle privacy modal submissions
+      if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('forget_me_confirm') || interaction.customId.startsWith('privacy_')) {
+          await handlePrivacyModalSubmit(interaction);
+          return;
+        }
       }
-    } catch (error) {
-      logger.error('Error handling MCP consent interaction:', { error: String(error) });
-      if (!interaction.replied) {
-        await interaction.reply({ content: 'An error occurred processing your consent decision.', ephemeral: true });
+
+      // Handle privacy button interactions
+      if (interaction.isButton()) {
+        if (interaction.customId.startsWith('privacy_') || interaction.customId.startsWith('data_') || interaction.customId.startsWith('delete_')) {
+          await handlePrivacyButtonInteraction(interaction);
+          return;
+        }
       }
+
+      // Handle MCP consent button interactions
+      if (interaction.isButton() && interaction.customId.startsWith('mcp_consent_')) {
+        try {
+          if (mcpManagerInstance) {
+            const { MCPIntegrationService } = await import('./services/mcp-integration.service.js');
+            const mcpIntegration = new MCPIntegrationService(mcpManagerInstance);
+            await mcpIntegration.handleConsentInteraction(interaction);
+          }
+        } catch (error) {
+          logger.error('Error handling MCP consent interaction', error as Error, { metadata: { traceId } });
+          if (!interaction.replied) {
+            await interaction.reply({ content: 'An error occurred processing your consent decision.', ephemeral: true });
+          }
+        }
+        return;
+      }
+
+      await coreIntelligenceService.handleInteraction(interaction);
+    } catch (err) {
+      logger.error('Unhandled error in interactionCreate', err as Error, { metadata: { traceId } });
     }
-    return;
-  }
-
-  // No other commands are exposed; everything routes through CoreIntelligenceService
-
-  // All other interactions (including core /chat) go to CoreIntelligenceService
-  await coreIntelligenceService.handleInteraction(interaction);
+  });
 });
 
 
 client.on('messageCreate', async (message: Message) => {
   if (message.author.bot || message.content.startsWith('/')) return;
-
-  // Message handling is now primarily through CoreIntelligenceService
-  await coreIntelligenceService.handleMessage(message);
+  const traceId = crypto.randomUUID();
+  await runWithTrace(traceId, async () => {
+    try {
+      await coreIntelligenceService.handleMessage(message);
+    } catch (err) {
+      logger.error('Unhandled error in messageCreate', err as Error, { metadata: { traceId } });
+    }
+  });
 });
 
 
@@ -242,5 +252,13 @@ const gracefulShutdown = async (signal: string) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // For nodemon
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', reason as Error);
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception', err);
+});
 
 client.login(DISCORD_TOKEN);
