@@ -45,6 +45,8 @@ export interface BraveWebSearchResult {
     snippet: string;
     rank: number;
   }>;
+  // Accept alternative shape used by some mocks/tests
+  webPages?: { value: Array<{ url: string; name: string; snippet: string; dateLastCrawled?: string }> };
 }
 export async function braveWebSearch(
   params: BraveWebSearchParams

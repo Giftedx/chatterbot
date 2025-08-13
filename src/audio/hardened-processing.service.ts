@@ -1,7 +1,7 @@
 // TASK-032: Harden speech/audio processing stack
 
 import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../utils/env.js';
-import { ElevenLabsApi } from '@elevenlabs/elevenlabs-js';
+// Note: ElevenLabs client is dynamically imported at runtime to avoid ESM/type issues in tests
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -165,7 +165,7 @@ interface AudioProcessingMetrics {
 }
 
 export class HardenedAudioProcessingService extends EventEmitter {
-  private elevenLabsClient: ElevenLabsApi | null = null;
+  private elevenLabsClient: any | null = null;
   private isInitialized = false;
   private config: AudioProcessingConfig;
   private processingQueue: Map<string, { status: string; progress: number }> = new Map();
@@ -206,6 +206,13 @@ export class HardenedAudioProcessingService extends EventEmitter {
     // Load configuration with security defaults
     this.config = AudioProcessingConfigSchema.parse({
       max_file_size_mb: getEnvAsNumber('AUDIO_MAX_FILE_SIZE_MB', 25),
+      quality_thresholds: {
+        min_sample_rate: 8000,
+        max_sample_rate: 48000,
+        min_bit_depth: 16,
+        min_snr_db: 10,
+        max_silence_ratio: 0.8
+      },
       security: {
         scan_for_malware: getEnvAsBoolean('AUDIO_SCAN_MALWARE', true),
         validate_headers: getEnvAsBoolean('AUDIO_VALIDATE_HEADERS', true),
@@ -232,11 +239,17 @@ export class HardenedAudioProcessingService extends EventEmitter {
     try {
       // Initialize ElevenLabs client if API key is available
       const elevenLabsApiKey = getEnvAsString('ELEVENLABS_API_KEY');
-      if (elevenLabsApiKey) {
-        this.elevenLabsClient = new ElevenLabsApi({
-          apiKey: elevenLabsApiKey,
-          timeout: 60000
-        });
+      if (elevenLabsApiKey && process.env.NODE_ENV !== 'test') {
+        try {
+          const mod: any = await import('@elevenlabs/elevenlabs-js');
+          const Ctor = mod?.ElevenLabs || mod?.default;
+          if (Ctor) {
+            this.elevenLabsClient = new Ctor({ apiKey: elevenLabsApiKey });
+          }
+        } catch (_) {
+          // Swallow import errors silently; synthesis will be disabled
+          this.elevenLabsClient = null;
+        }
       }
 
       // Test audio processing capabilities
@@ -281,7 +294,9 @@ export class HardenedAudioProcessingService extends EventEmitter {
       } else if (validatedInput.source instanceof Buffer) {
         audioBuffer = validatedInput.source;
       } else {
-        audioBuffer = Buffer.from(validatedInput.source);
+        // ArrayBuffer case
+        const ab = validatedInput.source as ArrayBuffer;
+        audioBuffer = Buffer.from(new Uint8Array(ab));
       }
 
       this.processingQueue.set(processingId, { status: 'validating', progress: 20 });
@@ -803,8 +818,27 @@ export class HardenedAudioProcessingService extends EventEmitter {
   }
 
   private async downloadAudioFromUrl(url: string): Promise<Buffer> {
-    // Placeholder for URL download with security checks
-    throw new Error('URL download not implemented in this demo');
+    try {
+      const { default: axios } = await import('axios');
+      const resp = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; HardenedAudio/1.0)',
+          'Accept': 'audio/*,application/octet-stream;q=0.9,*/*;q=0.8'
+        },
+        maxContentLength: this.config.max_file_size_mb * 1024 * 1024
+      });
+      const contentType = String(resp.headers['content-type'] || 'application/octet-stream');
+      const allowed = (this.config.supported_formats || []).some(fmt => contentType.includes(fmt) || url.toLowerCase().endsWith(fmt));
+      if (!allowed) {
+        // Still return buffer but warn; upstream validation will run
+        console.warn(`Downloaded content-type not in supported formats: ${contentType}`);
+      }
+      return Buffer.from(resp.data);
+    } catch (error) {
+      throw new Error(`Audio URL download failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private createBasicQualityMetrics(buffer: Buffer): AudioQualityMetrics {
@@ -829,7 +863,7 @@ export class HardenedAudioProcessingService extends EventEmitter {
   private async validateAudioProcessingCapabilities(): Promise<void> {
     // Test basic audio processing capabilities
     const testBuffer = Buffer.alloc(1024);
-    await this.analyzeAudioQuality(testBuffer, { source: testBuffer, channels: 1 });
+    await this.analyzeAudioQuality(testBuffer, { source: testBuffer, channels: 1, duration_limit_seconds: 60, noise_reduction: true, normalize_volume: true, quality_threshold: 0.5 });
     console.log('✅ Audio processing capabilities validated');
   }
 

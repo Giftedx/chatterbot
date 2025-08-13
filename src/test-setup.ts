@@ -4,7 +4,7 @@
  */
 
 // Setup global mocks before other imports
-jest.mock('@prisma/client', () => require('./__mocks__/@prisma/client.js'));
+// Note: @prisma/client is mapped via jest.config.js moduleNameMapper to our manual mock
 
 // Suppress console output during tests except for errors
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {

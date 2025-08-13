@@ -1,9 +1,16 @@
 // TASK-021: Implement long-term memory subsystem with persistence
 
 import { getEnvAsBoolean, getEnvAsNumber } from '../utils/env.js';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import cron from 'node-cron';
+
+// Try to use PrismaClient when available, otherwise fallback to shared prisma wrapper in tests
+let PrismaClientCtor: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const mod = require('@prisma/client');
+  PrismaClientCtor = mod?.PrismaClient || mod?.default?.PrismaClient || null;
+} catch {}
 
 // Memory schemas
 const MemorySchema = z.object({
@@ -74,7 +81,7 @@ export interface MemoryStats {
 }
 
 export class LongTermMemoryService {
-  private prisma: PrismaClient;
+  private prisma: any;
   private consolidationRules: z.infer<typeof ConsolidationRuleSchema>[] = [];
   private memoryCache: Map<string, Memory> = new Map();
   private clusterCache: Map<string, z.infer<typeof MemoryClusterSchema>> = new Map();
@@ -87,7 +94,13 @@ export class LongTermMemoryService {
   private readonly CONSOLIDATION_INTERVAL: number;
 
   constructor() {
-    this.prisma = new PrismaClient();
+    if (PrismaClientCtor) {
+      this.prisma = new PrismaClientCtor();
+    } else {
+      // Fallback to shared prisma wrapper (mock in tests)
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      this.prisma = require('../db/prisma.js').prisma;
+    }
     this.MAX_MEMORIES_PER_USER = getEnvAsNumber('MAX_MEMORIES_PER_USER', 1000);
     this.MEMORY_DECAY_RATE = getEnvAsNumber('MEMORY_DECAY_RATE', 0.01);
     this.IMPORTANCE_THRESHOLD = getEnvAsNumber('MEMORY_IMPORTANCE_THRESHOLD', 0.3);
@@ -279,6 +292,18 @@ export class LongTermMemoryService {
       console.error('Failed to retrieve memories:', error);
       throw error;
     }
+  }
+
+  async queryMemories(params: { userId: string; query: string; limit?: number; semantic_search?: boolean }): Promise<{ memories: Memory[]; insights: string[] }> {
+    const memories = await this.retrieveMemories({
+      userId: params.userId,
+      query: params.query,
+      limit: params.limit ?? 10,
+      semantic_search: params.semantic_search ?? true,
+      include_associations: true
+    });
+    const insights: string[] = memories.slice(0, 3).map(m => `Related: ${m.content.substring(0, 100)}...`);
+    return { memories, insights };
   }
 
   async deleteMemory(memoryId: string, userId: string): Promise<boolean> {
@@ -612,7 +637,9 @@ export class LongTermMemoryService {
 
   async shutdown(): Promise<void> {
     try {
-      await this.prisma.$disconnect();
+      if (this.prisma && typeof this.prisma.$disconnect === 'function') {
+        await this.prisma.$disconnect();
+      }
       console.log('🔌 Long-term memory service shutdown complete');
     } catch (error) {
       console.error('Error during memory service shutdown:', error);

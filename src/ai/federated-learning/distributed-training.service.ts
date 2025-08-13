@@ -274,28 +274,24 @@ export class FederatedLearningService extends EventEmitter {
   }
 
   private validateClient(client: FederatedClient): boolean {
-    return (
-      client.id &&
-      client.name &&
-      client.type &&
-      client.capabilities &&
-      client.location &&
-      client.data_statistics &&
-      client.reputation_score >= 0 &&
-      client.reputation_score <= 1
-    );
+    const hasId = typeof client.id === 'string' && client.id.length > 0;
+    const hasName = typeof client.name === 'string' && client.name.length > 0;
+    const hasType = typeof client.type === 'string' && client.type.length > 0;
+    const hasCapabilities = client.capabilities != null;
+    const hasLocation = client.location != null;
+    const hasStats = client.data_statistics != null;
+    const repInRange = typeof client.reputation_score === 'number' && client.reputation_score >= 0 && client.reputation_score <= 1;
+    return Boolean(hasId && hasName && hasType && hasCapabilities && hasLocation && hasStats && repInRange);
   }
 
   private validateModel(model: FederatedModel): boolean {
-    return (
-      model.id &&
-      model.name &&
-      model.type &&
-      model.architecture &&
-      model.architecture.parameters > 0 &&
-      model.performance_metrics &&
-      model.privacy_settings
-    );
+    const hasId = typeof model.id === 'string' && model.id.length > 0;
+    const hasName = typeof model.name === 'string' && model.name.length > 0;
+    const hasType = typeof model.type === 'string' && model.type.length > 0;
+    const hasArch = model.architecture != null && typeof model.architecture.parameters === 'number' && model.architecture.parameters > 0;
+    const hasPerf = model.performance_metrics != null;
+    const hasPrivacy = model.privacy_settings != null && typeof model.privacy_settings.differential_privacy === 'boolean';
+    return Boolean(hasId && hasName && hasType && hasArch && hasPerf && hasPrivacy);
   }
 
   async startFederatedTraining(

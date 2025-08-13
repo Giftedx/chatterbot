@@ -60,7 +60,7 @@ export async function simulateFactCheck(results: unknown[]): Promise<any> {
     disputed_claims: totalClaims - verifiedClaims,
     confidence_score: 0.8 + Math.random() * 0.15,
     conflicts: results.slice(0, Math.floor(totalClaims * 0.1)).map(r => ({
-      claim: r.summary,
+      claim: (r as any).summary,
       conflict_type: 'source_disagreement',
       severity: 'low'
     }))
@@ -74,7 +74,7 @@ export function generateResearchRecommendations(query: string, results: unknown[
     `Cross-reference findings across different source types`
   ];
   
-  if (results.some(r => r.source_type === 'news')) {
+  if (results.some(r => (r as any).source_type === 'news')) {
     recommendations.push('Verify recent developments with authoritative sources');
   }
   

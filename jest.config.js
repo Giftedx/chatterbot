@@ -1,7 +1,7 @@
 export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
-    '^(.*)\\.js$': '$1',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
     // Discord.js ESM mapping
     '^discord\\.js$': '<rootDir>/src/__mocks__/discord.js',
     // Prisma client mapping

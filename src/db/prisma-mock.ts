@@ -19,6 +19,7 @@ export class MockPrismaClient {
   private knowledgeEntries = new Map();
   private escalationTickets = new Map();
   private interactionLogs = new Map();
+  private users = new Map();
 
   // Auto-increment counters
   private counters = {
@@ -61,6 +62,20 @@ export class MockPrismaClient {
       const deleted = this.personas.get(query.where.id);
       this.personas.delete(query.where.id);
       return deleted;
+    },
+    upsert: async (query: any) => {
+      const where = query.where || { id: this.counters.personas };
+      const existing = this.personas.get(where.id);
+      if (existing) {
+        const updated = { ...existing, ...query.update, updatedAt: new Date() };
+        this.personas.set(where.id, updated);
+        return updated;
+      } else {
+        const id = where.id || this.counters.personas++;
+        const created = { id, ...query.create, createdAt: new Date(), updatedAt: new Date() };
+        this.personas.set(id, created);
+        return created;
+      }
     }
   };
 
@@ -76,6 +91,11 @@ export class MockPrismaClient {
     },
     count: async () => {
       return this.analyticsEvents.size;
+    },
+    deleteMany: async () => {
+      const count = this.analyticsEvents.size;
+      this.analyticsEvents.clear();
+      return { count };
     }
   };
 
@@ -236,6 +256,59 @@ export class MockPrismaClient {
     }
   };
 
+  user = {
+    upsert: async (query: any) => {
+      const whereId = query.where?.id || query.where?.username || 'unknown';
+      const existing = this.users.get(whereId);
+      if (existing) {
+        const updated = { ...existing, ...query.update };
+        this.users.set(whereId, updated);
+        return updated;
+      } else {
+        const created = { id: whereId, ...query.create };
+        this.users.set(whereId, created);
+        return created;
+      }
+    },
+    findUnique: async (query: any) => {
+      const whereId = query.where?.id || query.where?.username;
+      return this.users.get(whereId) || null;
+    },
+    update: async (query: any) => {
+      const whereId = query.where?.id;
+      const existing = this.users.get(whereId) || {};
+      const updated = { ...existing, ...query.data };
+      this.users.set(whereId, updated);
+      return updated;
+    },
+    findMany: async (query?: any) => {
+      return Array.from(this.users.values());
+    },
+    delete: async (query: any) => {
+      const whereId = query.where?.id;
+      const existing = this.users.get(whereId) || null;
+      this.users.delete(whereId);
+      return existing;
+    }
+  };
+
+  conversationMessage = {
+    findMany: async (query: any) => {
+      return Array.from(this.conversationMessages.values());
+    },
+    deleteMany: async (query: any) => {
+      const count = this.conversationMessages.size;
+      this.conversationMessages.clear();
+      return { count };
+    },
+    create: async (data: any) => {
+      const id = this.counters.conversationMessages++;
+      const msg = { id, ...data.data };
+      this.conversationMessages.set(id, msg);
+      return msg;
+    }
+  };
+
   knowledgeEntry = {
     create: async (data: any) => {
       const id = `knowledge_${this.counters.knowledgeEntries++}`;
@@ -282,7 +355,18 @@ export class MockPrismaClient {
   }
   
   async $transaction(fn: any) {
-    return Promise.resolve(fn(this));
+    if (typeof fn === 'function') {
+      return await fn(this);
+    }
+    if (Array.isArray(fn)) {
+      // Execute sequentially and return results
+      const results = [] as any[];
+      for (const op of fn) {
+        results.push(await op);
+      }
+      return results;
+    }
+    return [];
   }
 
   // Clear all data (useful for test cleanup)
@@ -297,6 +381,7 @@ export class MockPrismaClient {
     this.knowledgeEntries.clear();
     this.escalationTickets.clear();
     this.interactionLogs.clear();
+    this.users.clear();
     
     // Reset counters
     Object.keys(this.counters).forEach(key => {

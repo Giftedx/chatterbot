@@ -6,14 +6,8 @@
 import { UserConsentService } from '../user-consent.service.js';
 import { CoreIntelligenceService } from '../core-intelligence.service.js';
 import { handlePrivacyButtonInteraction } from '../../commands/privacy-commands.js';
-
-// Mock prisma
-jest.mock('../../db/prisma.js', () => ({
-  prisma: {
-    user: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
-    messageLog: { create: jest.fn() }
-  }
-}));
+import { privacyCommands } from '../../commands/privacy-commands.js';
+// Use moduleNameMapper for @prisma/client and our db/prisma uses that; avoid overriding here
 
 // Mock logger first before any imports
 jest.mock('../../utils/logger.js', () => ({

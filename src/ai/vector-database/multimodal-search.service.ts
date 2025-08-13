@@ -3,7 +3,20 @@
 // Based on 2025 research in multi-modal embeddings and vector search optimization
 
 import { EventEmitter } from 'events';
-import { openai } from '../../providers/openai/client.js';
+// Safe OpenAI client import with test fallback
+let openai: any;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  openai = require('../../providers/openai/client.js').openai;
+} catch {
+  openai = {
+    embeddings: {
+      create: async (_args: any) => ({
+        data: [{ embedding: Array.from({ length: 1536 }, () => Math.random() - 0.5) }]
+      })
+    }
+  };
+}
 import { getEnvAsString, getEnvAsBoolean } from '../../utils/env.js';
 
 interface VectorDocument {
@@ -582,8 +595,10 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
   private cacheEmbedding(key: string, embedding: number[]): void {
     if (this.embeddingCache.size >= this.config.max_cache_size) {
       // Remove oldest entries (simple FIFO)
-      const oldestKey = this.embeddingCache.keys().next().value;
-      this.embeddingCache.delete(oldestKey);
+      const iter = this.embeddingCache.keys().next();
+      if (!iter.done) {
+        this.embeddingCache.delete(iter.value as string);
+      }
     }
     this.embeddingCache.set(key, embedding);
   }

@@ -797,7 +797,11 @@ export class CausalAIReasoningService extends EventEmitter {
       // Estimate causal effect based on query type
       let causalEffect: CausalAnalysisResult['causal_effect'];
       let causalPathAnalysis: CausalAnalysisResult['causal_path_analysis'];
-      let counterfactualReasoning: CausalAnalysisResult['counterfactual_reasoning'];
+      let counterfactualReasoning: CausalAnalysisResult['counterfactual_reasoning'] = {
+        observed_outcome: 0,
+        counterfactual_outcome: 0,
+        individual_treatment_effect: 0
+      };
 
       switch (query.query_type) {
         case 'ate':
@@ -838,11 +842,7 @@ export class CausalAIReasoningService extends EventEmitter {
         causal_effect: causalEffect,
         identification_strategy: identificationResult,
         causal_path_analysis: causalPathAnalysis,
-        counterfactual_reasoning: counterfactualReasoning || {
-          observed_outcome: 0,
-          counterfactual_outcome: 0,
-          individual_treatment_effect: 0
-        },
+        counterfactual_reasoning: counterfactualReasoning,
         explanation
       };
 

@@ -492,7 +492,7 @@ export class AdvancedReasoningOrchestrator {
         );
         
         const totalProcessingTime = Date.now() - startTime;
-        synthesizedResponse.metadata.processingTime = totalProcessingTime;
+        synthesizedResponse.metadata.processingTime = Math.max(1, totalProcessingTime);
         
         return synthesizedResponse;
     }
