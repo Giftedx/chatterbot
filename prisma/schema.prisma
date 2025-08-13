@@ -8,8 +8,12 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
+
+// Note: Default DATABASE_URL is SQLite. For Docker, it defaults to file:/data/dev.db.
+// For local dev, use file:./prisma/dev.db in your .env. Do not switch Prisma to Postgres unless you plan migrations.
+
 
 model Persona {
   id           Int      @id @default(autoincrement())

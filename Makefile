@@ -53,3 +53,15 @@ clean: ## Clean build artifacts and caches
 	rm -rf .nyc_output/
 	rm -rf .agent-metrics/
 	npm cache clean --force
+
+up: ## Start via docker compose
+	docker compose up -d --build
+
+down: ## Stop and remove compose stack
+	docker compose down
+
+logs: ## Tail bot service logs
+	docker compose logs -f bot
+
+ps: ## Show compose services
+	docker compose ps

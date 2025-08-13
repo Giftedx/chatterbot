@@ -6,39 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Docker Compose: volume‑backed SQLite, auto‑migrations, healthchecks
+- Multi‑stage Node 20 image; non‑root runtime; tini for signals
+- Setup wizard (`npm run setup`) to guide API key collection and `.env` generation
+- README and docs rewrite; GHCR publish workflow
 
-### Added
-- Core Intelligence Service as unified entry point for all intelligence modes
-- Hierarchical intelligence system (Core → Enhanced → Agentic)
-- Comprehensive modular intelligence services architecture
-- MCP (Model Context Protocol) integration for external tools
-- Personalization engine with user behavior analytics
-- Enhanced memory system with conversation history
-- Smart context orchestration for complex queries
-- Advanced performance monitoring and analytics
-
-### Changed
-- **[BREAKING]** Migrated from `/optin` command to `/chat` command as primary interface
-- **[BREAKING]** Replaced UnifiedIntelligenceService with CoreIntelligenceService
-- **[BREAKING]** Automatic user opt-in for `/chat` command (no manual opt-in required)
-- Updated all documentation to reflect `/chat` command usage
-- Improved TypeScript import consistency with `.js` extensions
-- Enhanced error handling and graceful degradation patterns
-- Optimized service architecture for better performance
-
-### Removed
-- **[BREAKING]** UnifiedIntelligenceService (`src/services/unified-intelligence.service.ts`)
-- Legacy `/optin` command references throughout codebase
-- Redundant service overlaps identified in architectural analysis
-- Deprecated command structures and manual opt-in requirements
-- Obsolete test files for removed services
-
-### Fixed
-- Import statement consistency across TypeScript modules
-- Service overlap issues in intelligence architecture
-- Memory management and caching optimization
-- TypeScript compilation improvements
-- Test reliability and coverage gaps
+## 0.2.0
+- Initial public release; core pipeline, providers, health/metrics
 
 ## [0.1.0] - 2024-01-XX
 

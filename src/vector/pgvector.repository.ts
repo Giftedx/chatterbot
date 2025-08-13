@@ -31,7 +31,7 @@ export class PgvectorRepository {
     try {
       const pg = await import('pg');
       const Client = (pg as any).Client || (pg as any).default?.Client;
-      this.client = new Client({ connectionString: process.env.DATABASE_URL });
+      this.client = new Client({ connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL });
       if (this.client && typeof (this.client as any).connect === 'function') {
         await this.client.connect();
       }

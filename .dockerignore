@@ -13,6 +13,7 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.example
 
 # Database files
 prisma/dev.db*
@@ -56,3 +57,7 @@ jest.config.js
 # src/ - source code
 # prisma/ - database schema and migrations
 # Dockerfile, docker-compose.yml - for deployment
+agent-debug-*
+# Local mounts we don't need in build context
+logs/
+kb/
