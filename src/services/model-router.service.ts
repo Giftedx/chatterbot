@@ -8,9 +8,13 @@ import { MistralProvider } from '../providers/mistral.provider.js';
 import { OpenAICompatProvider } from '../providers/openai-compatible.provider.js';
 import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
-import { modelTelemetryStore } from './advanced-capabilities/index.js';
+import { modelTelemetryStore, providerHealthStore } from './advanced-capabilities/index.js';
 import { getEnvAsBoolean } from '../utils/env.js';
 import { OpenAIResponsesProvider } from '../providers/openai-responses.provider.js';
+import { retry } from '../utils/retry.js';
+import { getTraceId } from '../utils/async-context.js';
+import { logger } from '../utils/logger.js';
+import { withSpan } from '../utils/tracing.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -68,76 +72,88 @@ export class ModelRouterService {
   }
 
   private async callProvider(card: ModelCard, prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<string> {
+    // short-circuit unhealthy provider if error rate is high
+    const health = providerHealthStore.get(card.provider);
+    if (health && health.errorCount >= 5 && health.errorCount > health.successCount * 2 && Date.now() - health.lastUpdated < 60_000) {
+      throw new Error(`Provider ${card.provider} temporarily unhealthy`);
+    }
     const mapped = history.map(m => ({ role: (m.role === 'model' ? 'assistant' : (m.role as 'user' | 'assistant' | 'system')), content: m.parts.map(p => (p as any).text || '').join(' ') }));
     const start = Date.now();
+    const traceId = getTraceId();
     try {
       let out = '';
-      switch (card.provider) {
-        case 'openai':
-          if (!this.openai) throw new Error('OpenAI provider not available');
-          if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
-            if (!this.openaiResponsesTools && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES_TOOLS', false)) {
-              try {
-                const { OpenAIResponsesToolsProvider } = await import('../providers/openai-responses-tools.provider.js');
-                this.openaiResponsesTools = new OpenAIResponsesToolsProvider();
-              } catch {}
-            }
-            if (this.openaiResponsesTools) {
-              out = await this.openaiResponsesTools.generate(prompt, mapped, systemPrompt, card.model);
-            } else if (this.openaiResponses) {
-              out = await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+      const exec = async () => {
+        switch (card.provider) {
+          case 'openai':
+            if (!this.openai) throw new Error('OpenAI provider not available');
+            if (getEnvAsBoolean('FEATURE_OPENAI_RESPONSES', false)) {
+              if (!this.openaiResponsesTools && getEnvAsBoolean('FEATURE_OPENAI_RESPONSES_TOOLS', false)) {
+                try {
+                  const { OpenAIResponsesToolsProvider } = await import('../providers/openai-responses-tools.provider.js');
+                  this.openaiResponsesTools = new OpenAIResponsesToolsProvider();
+                } catch {}
+              }
+              if (this.openaiResponsesTools) {
+                return await this.openaiResponsesTools.generate(prompt, mapped, systemPrompt, card.model);
+              } else if (this.openaiResponses) {
+                return await this.openaiResponses.generate(prompt, mapped, systemPrompt, card.model);
+              } else {
+                return await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+              }
             } else {
-              out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+              return await this.openai.generate(prompt, mapped, systemPrompt, card.model);
             }
-          } else {
-            out = await this.openai.generate(prompt, mapped, systemPrompt, card.model);
+          case 'anthropic':
+            if (!this.anthropic) throw new Error('Anthropic provider not available');
+            return await this.anthropic.generate(prompt, mapped as any, systemPrompt, card.model);
+          case 'groq':
+            if (!this.groq) throw new Error('Groq provider not available');
+            return await this.groq.generate(prompt, mapped, systemPrompt, card.model);
+          case 'mistral':
+            if (!this.mistral) throw new Error('Mistral provider not available');
+            return await this.mistral.generate(prompt, mapped, systemPrompt, card.model);
+          case 'openai_compat':
+            if (!this.openaiCompat) throw new Error('OpenAI-compatible provider not available');
+            return await this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
+          case 'gemini':
+            return await this.gemini.generateResponse(prompt, history, 'user', 'global');
+          default: {
+            if (getEnvAsBoolean('FEATURE_VERCEL_AI', false)) {
+              const { vercelAIProvider } = await import('../providers/vercel-ai.provider.js');
+              return await vercelAIProvider.generate(prompt, mapped, systemPrompt, card.model);
+            }
+            return await this.gemini.generateResponse(prompt, history, 'user', 'global');
           }
-          break;
-        case 'anthropic':
-          if (!this.anthropic) throw new Error('Anthropic provider not available');
-          out = await this.anthropic.generate(prompt, mapped as any, systemPrompt, card.model);
-          break;
-        case 'groq':
-          if (!this.groq) throw new Error('Groq provider not available');
-          out = await this.groq.generate(prompt, mapped, systemPrompt, card.model);
-          break;
-        case 'mistral':
-          if (!this.mistral) throw new Error('Mistral provider not available');
-          out = await this.mistral.generate(prompt, mapped, systemPrompt, card.model);
-          break;
-        case 'openai_compat':
-          if (!this.openaiCompat) throw new Error('OpenAI-compatible provider not available');
-          out = await this.openaiCompat.generate(prompt, mapped, systemPrompt, card.model);
-          break;
-        case 'gemini':
-          out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
-          break;
-        default: {
-          // Optional Vercel AI provider path if enabled
-          if (getEnvAsBoolean('FEATURE_VERCEL_AI', false)) {
-            const { vercelAIProvider } = await import('../providers/vercel-ai.provider.js');
-            out = await vercelAIProvider.generate(prompt, mapped, systemPrompt, card.model);
-            break;
-          }
-          out = await this.gemini.generateResponse(prompt, history, 'user', 'global');
         }
-      }
+      };
+
+      out = await retry(exec, {
+        retries: 2,
+        minDelayMs: 300,
+        maxDelayMs: 3000,
+        onRetry: (error, attempt, delay) =>
+          logger.warn('Model call retry', { metadata: { provider: card.provider, model: card.model, attempt, delay, error: String(error), traceId } })
+      });
+
       const latencyMs = Date.now() - start;
       modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: true });
+      providerHealthStore.update({ provider: card.provider, model: card.model, latencyMs, success: true });
       try {
         const { prisma } = await import('../db/prisma.js');
         if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
-          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: true } });
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: true, traceId } });
         }
       } catch {}
       return out;
     } catch (e) {
       const latencyMs = Date.now() - start;
       modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: false });
+      providerHealthStore.update({ provider: card.provider, model: card.model, latencyMs, success: false });
+      logger.error('Model call failed', e as Error, { metadata: { provider: card.provider, model: card.model, traceId } });
       try {
         const { prisma } = await import('../db/prisma.js');
         if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
-          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: false } });
+          await prisma.modelSelection.create({ data: { provider: card.provider, model: card.model, latencyMs, success: false, traceId } });
         }
       } catch {}
       throw e;
@@ -145,9 +161,27 @@ export class ModelRouterService {
   }
 
   async generateWithMeta(prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<GenerationMeta> {
-    const preferred = modelRegistry.selectModel(prompt, history);
-    const text = await this.callProvider(preferred, prompt, history, systemPrompt);
-    return { text, provider: preferred.provider, model: preferred.model };
+    return await withSpan('router.generateWithMeta', async () => {
+      // if circuit breaker tripped for preferred provider, allow fallback
+      const preferred = modelRegistry.selectModel(prompt, history);
+      let text: string;
+      try {
+        text = await withSpan('router.callProvider', async () => this.callProvider(preferred, prompt, history, systemPrompt), {
+          provider: preferred.provider,
+          model: preferred.model
+        });
+      } catch (err) {
+        // Fallback to next available model
+        const fallback = modelRegistry.listAvailableModels().find(m => m.provider !== preferred.provider) || preferred;
+        text = await withSpan('router.callProvider', async () => this.callProvider(fallback, prompt, history, systemPrompt), {
+          provider: fallback.provider,
+          model: fallback.model,
+          fallback: true
+        });
+        return { text, provider: fallback.provider, model: fallback.model };
+      }
+      return { text, provider: preferred.provider, model: preferred.model };
+    }, { route: 'auto' });
   }
 
   async generate(prompt: string, history: ChatMessage[], _userId?: string, _guildId?: string, systemPrompt?: string): Promise<string> {

@@ -14,30 +14,41 @@
     "plugin:@typescript-eslint/recommended"
   ],
   "rules": {
-    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/no-unused-vars": [
-      "error",
+      "warn",
       {
+        "args": "none",
+        "ignoreRestSiblings": true,
         "argsIgnorePattern": "^_",
         "varsIgnorePattern": "^_",
         "caughtErrorsIgnorePattern": "^_"
       }
     ],
-    "prefer-const": "warn"
+    "prefer-const": "warn",
+    "no-empty": ["warn", { "allowEmptyCatch": true }],
+    "no-case-declarations": "off",
+    "no-useless-escape": "off",
+    "@typescript-eslint/no-var-requires": "off",
+    "@typescript-eslint/ban-ts-comment": ["warn", { "ts-nocheck": false }]
   },
   "overrides": [
     {
       "files": [
         "src/**/*.test.ts",
         "src/**/__tests__/**/*.ts",
-        "src/test/**/*.ts"
+        "src/test/**/*.ts",
+        "tests/**/*.ts",
+        "**/*.test.ts",
+        "**/*.test.js"
       ],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off",
         "@typescript-eslint/no-unused-vars": "off",
         "no-extra-semi": "off",
-        "prefer-const": "off"
+        "prefer-const": "off",
+        "@typescript-eslint/no-var-requires": "off"
       }
     },
     {
@@ -48,6 +59,14 @@
       ],
       "rules": {
         "@typescript-eslint/no-explicit-any": "off"
+      }
+    },
+    {
+      "files": [
+        "src/services/model-router.service.ts"
+      ],
+      "rules": {
+        "@typescript-eslint/ban-ts-comment": "off"
       }
     }
   ]

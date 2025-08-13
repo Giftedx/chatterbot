@@ -143,19 +143,30 @@ export class Logger {
       return;
     }
 
+    const redact = (text: string | undefined) => {
+      if (!text) return text;
+      const patterns = [
+        /(sk-)[a-zA-Z0-9]{10,}/g, // API keys
+        /(xox[baprs]-)[a-zA-Z0-9-]{10,}/g,
+        /(eyJ[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]{10,}\.[A-Za-z0-9-_]{10,})/g // JWT
+      ];
+      let out = text;
+      for (const p of patterns) out = out.replace(p, '$1***');
+      return out;
+    };
+
     if (this.enableJson) {
       // JSON format for production parsing
-      console.log(JSON.stringify(entry));
+      const safe = { ...entry } as LogEntry & { error?: { message?: string } };
+      if (safe.error?.message) safe.error.message = redact(safe.error.message) || safe.error.message;
+      console.log(JSON.stringify(safe));
     } else {
       // Human-readable format for development
       const timestamp = entry.timestamp.substring(11, 19); // HH:MM:SS
       const level = this.formatLevel(entry.level);
       const context = this.formatContext(entry.context);
-      const error = entry.error ? ` [${entry.error.name}: ${entry.error.message}]` : '';
-      
+      const error = entry.error ? ` [${entry.error.name}: ${redact(entry.error.message)}]` : '';
       console.log(`${timestamp} ${level} ${entry.message}${context}${error}`);
-      
-      // Show stack trace for errors in development
       if (entry.error?.stack && entry.level === LogLevel.ERROR) {
         console.log(entry.error.stack);
       }

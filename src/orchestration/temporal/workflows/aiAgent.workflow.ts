@@ -36,9 +36,9 @@ const analysis = proxyActivities<typeof analysisActivities>({
 });
 
 // Workflow signals for human-in-the-loop operations
-export const humanApproval = defineSignal<boolean>('humanApproval');
-export const workflowCancel = defineSignal<string>('workflowCancel');
-export const workflowPause = defineSignal<boolean>('workflowPause');
+export const humanApproval = defineSignal<[boolean]>('humanApproval');
+export const workflowCancel = defineSignal<[string]>('workflowCancel');
+export const workflowPause = defineSignal<[boolean]>('workflowPause');
 
 // Workflow interfaces
 export interface AIAgentRequest {
@@ -225,7 +225,7 @@ Respond thoughtfully and comprehensively.`;
 
   // If quality is below threshold, attempt improvement
   if (qualityScore < (request.options?.qualityThreshold || 0.7)) {
-    const improvementPrompt = `Improve the following response based on these issues: ${qualityAnalysis.details.issues?.join(', ')}
+    const improvementPrompt = `Improve the following response based on these issues: ${Array.isArray((qualityAnalysis.details as any).issues) ? (qualityAnalysis.details as any).issues.join(', ') : 'general improvements'}
 
 Original response: ${llmResult.content}
 

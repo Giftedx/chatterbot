@@ -43,9 +43,14 @@ export function getEnvAsNumber(key: string, defaultValue: number = 0): number {
 /**
  * Get an environment variable as a string with optional default
  */
+export function getEnvAsString(key: string): string | undefined;
+export function getEnvAsString(key: string, defaultValue: string): string;
 export function getEnvAsString(key: string, defaultValue?: string): string | undefined {
   const value = process.env[key];
-  return value || defaultValue;
+  if (defaultValue !== undefined) {
+    return value ?? defaultValue;
+  }
+  return value;
 }
 
 /**
