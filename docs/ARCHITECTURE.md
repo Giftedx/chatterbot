@@ -6,6 +6,8 @@ This document orients contributors and AI agents to the system at a high level.
 - Language: TypeScript
 - Tooling: ESLint, Jest, TypeDoc, Docker
 - Data/ORM: Prisma (SQLite by default)
+- Vector Search: Postgres + pgvector (optional; feature-flagged)
+- Observability: OpenTelemetry tracing via OTLP exporter
 - Deployment: Docker, Railway (railway.json)
 
 ## 2. High-Level Components
@@ -13,7 +15,8 @@ This document orients contributors and AI agents to the system at a high level.
   - `services/core-intelligence.service.ts`: single entry orchestrator for `/chat` and free-form messages
   - `services/model-router.service.ts`: multi-provider routing + telemetry
   - `services/verification/answer-verification.service.ts`: critique + cross-model verification
-  - `services/knowledge-base.service.ts`: KB search + lightweight RAG via `KBChunk` embeddings
+  - `services/knowledge-base.service.ts`: KB search (pgvector-first when enabled) with Cohere rerank (optional)
+  - `vector/pgvector-enhanced.repository.ts`: vector store and hybrid search helpers for Postgres
   - `providers/*`: LLM provider wrappers
 - `prisma/`: Database schema and migrations
 - `docs/`: Project documentation
@@ -27,8 +30,8 @@ This document orients contributors and AI agents to the system at a high level.
 ## 4. Pipeline Overview
 1. Privacy & consent check
 2. Moderation (text and attachments)
-3. Unified message analysis (intents, domains, complexity)
-4. Retrieval (history, durable memory, KB via `KBChunk` + embeddings)
+3. Unified message analysis (intents, domains, complexity) with input sanitization
+4. Retrieval (history, durable memory, KB via pgvector when enabled, fallback to embedded chunks)
 5. MCP/tool orchestration (web, scraping, browser) as needed
 6. Model routing (OpenAI/Anthropic/Gemini/Groq/Mistral/compatible) with telemetry
 7. Answer verification (self-critique, cross-model, optional auto-rerun)
@@ -39,11 +42,11 @@ This document orients contributors and AI agents to the system at a high level.
 - Error handling: Fail fast, typed errors where possible
 - Configuration: `.env` (see `env.example`)
 - Logging: Structured logs, avoid sensitive data
+- Tracing: OpenTelemetry started at boot; spans around routing and retrieval
 - Security: See `SECURITY.md` (RBAC, consent, moderation)
 
 ## 6. Build & Test Pipelines
-- CI runs install, lint, tests. Typecheck/Build are expected to pass locally.
-- Coverage via Jest when enabled.
+- CI runs install, typecheck, lint, tests, build. Coverage via Jest when enabled.
 
 ## 7. Coding Standards
 - Formatting: Prettier (.prettierrc.json)

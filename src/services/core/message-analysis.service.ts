@@ -9,6 +9,19 @@ import { Message, Attachment } from 'discord.js';
 import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
 
+function sanitizeUserInput(raw: string): string {
+  const injectionPatterns = [
+    /ignore\s+previous/gi,
+    /system\s*:/gi,
+    /assistant\s*:/gi,
+    /developer\s*:/gi,
+    /###/g,
+  ];
+  let text = raw.slice(0, 2000);
+  for (const pat of injectionPatterns) text = text.replace(pat, '[FILTERED]');
+  return text;
+}
+
 export interface AttachmentAnalysis {
   type: 'image' | 'audio' | 'document' | 'video' | 'unknown';
   analysisNeeded: boolean;
@@ -72,7 +85,8 @@ export class UnifiedMessageAnalysisService {
     userCapabilities?: UserCapabilities
   ): Promise<UnifiedMessageAnalysis> {
     
-    const content = typeof message === 'string' ? message : message.content;
+    const rawContent = typeof message === 'string' ? message : message.content;
+    const content = sanitizeUserInput(rawContent);
     const messageAttachments = Array.isArray(attachments) 
       ? attachments 
       : Array.from((message as Message).attachments?.values() || []);
