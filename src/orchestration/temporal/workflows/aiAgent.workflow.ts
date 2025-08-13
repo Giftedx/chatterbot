@@ -18,45 +18,21 @@ import type * as memoryActivities from '../activities/memory.activities.js';
 import type * as multimodalActivities from '../activities/multimodal.activities.js';
 import type * as analysisActivities from '../activities/analysis.activities.js';
 
-// Create activity proxies with retry policies
+// Create activity proxies with timeouts (retry policies are configured at worker level)
 const llm = proxyActivities<typeof llmActivities>({
-  startToCloseTimeout: '2 minutes',
-  retryPolicy: {
-    initialInterval: '1s',
-    maximumInterval: '10s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '2 minutes'
 });
 
 const memory = proxyActivities<typeof memoryActivities>({
-  startToCloseTimeout: '30s',
-  retryPolicy: {
-    initialInterval: '1s',
-    maximumInterval: '5s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '30s'
 });
 
 const multimodal = proxyActivities<typeof multimodalActivities>({
-  startToCloseTimeout: '5 minutes',
-  retryPolicy: {
-    initialInterval: '2s',
-    maximumInterval: '30s',
-    backoffCoefficient: 2,
-    maximumAttempts: 2
-  }
+  startToCloseTimeout: '5 minutes'
 });
 
 const analysis = proxyActivities<typeof analysisActivities>({
-  startToCloseTimeout: '1 minute',
-  retryPolicy: {
-    initialInterval: '1s',
-    maximumInterval: '5s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '1 minute'
 });
 
 // Workflow signals for human-in-the-loop operations
@@ -105,17 +81,23 @@ export async function aiAgentWorkflow(request: AIAgentRequest): Promise<AIAgentR
   const steps: AIAgentResult['steps'] = [];
   const memoryUpdates: string[] = [];
   
-  // Setup signal handlers
-  setHandler(humanApproval, (approval: boolean) => {
-    approved = approval;
+  // Setup signal handlers with proper type guards
+  setHandler(humanApproval, (approval) => {
+    if (typeof approval === 'boolean') {
+      approved = approval;
+    }
   });
   
-  setHandler(workflowPause, (pause: boolean) => {
-    paused = pause;
+  setHandler(workflowPause, (pause) => {
+    if (typeof pause === 'boolean') {
+      paused = pause;
+    }
   });
   
-  setHandler(workflowCancel, (reason: string) => {
-    cancelled = true;
+  setHandler(workflowCancel, (reason) => {
+    if (typeof reason === 'string') {
+      cancelled = true;
+    }
   });
 
   // Step 1: Initial task analysis

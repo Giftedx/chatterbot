@@ -1,11 +1,36 @@
 // Continuation of the advanced LangGraph workflow implementation
 // This file contains the remaining workflow nodes and utility methods
 
-// This would be added to the workflow.ts file after the assess_context node
+// Type definitions for workflow components
+interface WorkflowState {
+  query: string;
+  reasoning_steps: string[];
+  execution_path: string[];
+  metadata?: {
+    context?: {
+      requires_research?: boolean;
+      complexity?: 'simple' | 'moderate' | 'high' | 'expert';
+      time_sensitivity?: 'immediate' | 'standard' | 'relaxed';
+    };
+  };
+  [key: string]: unknown;
+}
+
+interface WorkflowTool {
+  name: string;
+  description: string;
+  execute: (params: Record<string, unknown>) => Promise<unknown>;
+}
+
+interface LangGraphWorkflow {
+  addNode: (name: string, fn: (state: WorkflowState) => Promise<WorkflowState>) => void;
+  addEdge: (from: string, to: string) => void;
+  addConditionalEdges: (from: string, fn: (state: WorkflowState) => string, mapping: Record<string, string>) => void;
+}
 
 // Enhanced Research Node with comprehensive data gathering
-export const createResearchNode = (workflow: any, tools: any) => {
-  workflow.addNode('conduct_research', async (state: any) => {
+export const createResearchNode = (workflow: LangGraphWorkflow, tools: WorkflowTool[]) => {
+  workflow.addNode('conduct_research', async (state: WorkflowState): Promise<WorkflowState> => {
     const nodeStartTime = Date.now();
     
     if (!state.metadata?.context?.requires_research) {
@@ -17,17 +42,17 @@ export const createResearchNode = (workflow: any, tools: any) => {
     }
 
     try {
-      const researchTool = tools.find((t: any) => t.name === 'advanced_research');
+      const researchTool = tools.find((t: WorkflowTool) => t.name === 'advanced_research');
       
       // Determine research parameters based on context
-      const context = state.metadata.context;
+      const context = state.metadata?.context;
       const researchParams = {
         query: state.query,
-        sources: context.complexity === 'expert' ? 10 : context.complexity === 'high' ? 7 : 5,
-        depth: context.complexity === 'expert' ? 'comprehensive' : 
-               context.complexity === 'high' ? 'deep' : 'moderate',
-        time_range: context.time_sensitivity === 'immediate' ? 'day' : 
-                   context.time_sensitivity === 'standard' ? 'week' : 'month',
+        sources: context?.complexity === 'expert' ? 10 : context?.complexity === 'high' ? 7 : 5,
+        depth: context?.complexity === 'expert' ? 'comprehensive' : 
+               context?.complexity === 'high' ? 'deep' : 'moderate',
+        time_range: context?.time_sensitivity === 'immediate' ? 'day' : 
+                   context?.time_sensitivity === 'standard' ? 'week' : 'month',
         source_types: context.domain === 'science' ? ['academic', 'expert', 'web'] : 
                      context.domain === 'technology' ? ['web', 'expert', 'news'] : 
                      ['web', 'news'],
@@ -83,8 +108,8 @@ export const createResearchNode = (workflow: any, tools: any) => {
 };
 
 // Enhanced Analysis Node with multi-dimensional analysis
-export const createAnalysisNode = (workflow: any, tools: any) => {
-  workflow.addNode('perform_analysis', async (state: any) => {
+export const createAnalysisNode = (workflow: unknown, tools: unknown) => {
+  workflow.addNode('perform_analysis', async (state: unknown) => {
     const nodeStartTime = Date.now();
     
     if (!state.metadata?.context?.requires_analysis) {
@@ -96,11 +121,11 @@ export const createAnalysisNode = (workflow: any, tools: any) => {
     }
 
     try {
-      const analysisTool = tools.find((t: any) => t.name === 'comprehensive_analysis');
+      const analysisTool = tools.find((t: unknown) => t.name === 'comprehensive_analysis');
       const context = state.metadata.context;
       
       // Determine analysis types based on context and domain
-      let analysisTypes = ['logical'];
+      const analysisTypes: string[] = ['logical'];
       
       if (context.domain === 'science' || context.domain === 'technology') {
         analysisTypes.push('statistical', 'causal');
@@ -178,8 +203,8 @@ export const createAnalysisNode = (workflow: any, tools: any) => {
 };
 
 // Enhanced Verification Node with rigorous fact-checking
-export const createVerificationNode = (workflow: any, tools: any) => {
-  workflow.addNode('verify_claims', async (state: any) => {
+export const createVerificationNode = (workflow: unknown, tools: unknown) => {
+  workflow.addNode('verify_claims', async (state: unknown) => {
     const nodeStartTime = Date.now();
     
     if (!state.metadata?.context?.requires_verification) {
@@ -191,7 +216,7 @@ export const createVerificationNode = (workflow: any, tools: any) => {
     }
 
     try {
-      const verificationTool = tools.find((t: any) => t.name === 'rigorous_verification');
+      const verificationTool = tools.find((t: unknown) => t.name === 'rigorous_verification');
       const context = state.metadata.context;
       
       // Extract claims from research and analysis results
@@ -199,7 +224,7 @@ export const createVerificationNode = (workflow: any, tools: any) => {
       
       // Add claims from research results
       if (state.research_results) {
-        state.research_results.forEach((research: any) => {
+        state.research_results.forEach((research: unknown) => {
           if (research.key_findings) {
             claims.push(...research.key_findings);
           }
@@ -208,7 +233,7 @@ export const createVerificationNode = (workflow: any, tools: any) => {
       
       // Add claims from analysis results
       if (state.analysis_results) {
-        state.analysis_results.forEach((analysis: any) => {
+        state.analysis_results.forEach((analysis: unknown) => {
           if (analysis.synthesized_insights) {
             claims.push(...analysis.synthesized_insights);
           }
@@ -224,7 +249,7 @@ export const createVerificationNode = (workflow: any, tools: any) => {
         claims: claims.slice(0, 10), // Limit to 10 claims for performance
         verification_methods: ['source_check', 'cross_reference', 'logical_consistency'],
         confidence_threshold: context.quality_requirements?.min_confidence || 0.7,
-        sources: state.research_results?.map((r: any) => r.summary) || [],
+        sources: state.research_results?.map((r: unknown) => r.summary) || [],
         expert_domains: [context.domain]
       };
 
@@ -286,8 +311,8 @@ export const createVerificationNode = (workflow: any, tools: any) => {
 };
 
 // Enhanced Synthesis Node with comprehensive response generation
-export const createSynthesisNode = (workflow: any) => {
-  workflow.addNode('synthesize_response', async (state: any) => {
+export const createSynthesisNode = (workflow: unknown) => {
+  workflow.addNode('synthesize_response', async (state: unknown) => {
     const nodeStartTime = Date.now();
     
     try {
@@ -306,7 +331,7 @@ export const createSynthesisNode = (workflow: any) => {
       // Research Findings
       if (hasResearch) {
         final_answer += `## Research Findings\n\n`;
-        state.research_results?.forEach((result: any, i: number) => {
+        state.research_results?.forEach((result: unknown, i: number) => {
           final_answer += `### Research Phase ${i + 1}\n`;
           final_answer += `**Query**: ${result.query || state.query}\n`;
           final_answer += `**Sources**: ${result.metadata?.sources_searched || 'Multiple'} sources analyzed\n`;
@@ -329,7 +354,7 @@ export const createSynthesisNode = (workflow: any) => {
       // Analysis Results
       if (hasAnalysis) {
         final_answer += `## Analysis Results\n\n`;
-        state.analysis_results?.forEach((result: any, i: number) => {
+        state.analysis_results?.forEach((result: unknown, i: number) => {
           final_answer += `### Analysis Phase ${i + 1}\n`;
           final_answer += `**Analysis Types**: ${result.metadata?.analysis_types?.join(', ') || 'Comprehensive'}\n`;
           final_answer += `**Depth Level**: ${result.metadata?.depth_level || 'Detailed'}\n`;
@@ -365,7 +390,7 @@ export const createSynthesisNode = (workflow: any) => {
       // Verification Results
       if (hasVerification) {
         final_answer += `## Verification Results\n\n`;
-        state.verification_results?.forEach((result: any, i: number) => {
+        state.verification_results?.forEach((result: unknown, i: number) => {
           final_answer += `### Verification Phase ${i + 1}\n`;
           final_answer += `**Claims Processed**: ${result.claims_processed || 0}\n`;
           final_answer += `**Average Confidence**: ${(result.summary?.average_confidence * 100)?.toFixed(1) || 'Unknown'}%\n\n`;
@@ -384,19 +409,19 @@ export const createSynthesisNode = (workflow: any) => {
       const confidenceScores = [];
       
       if (hasResearch) {
-        const researchConfidence = state.research_results?.reduce((acc: number, r: any) => 
+        const researchConfidence = state.research_results?.reduce((acc: number, r: unknown) => 
           acc + (r.metadata?.confidence || 0), 0) / (state.research_results?.length || 1);
         confidenceScores.push(researchConfidence);
       }
       
       if (hasAnalysis) {
-        const analysisConfidence = state.analysis_results?.reduce((acc: number, r: any) => 
+        const analysisConfidence = state.analysis_results?.reduce((acc: number, r: unknown) => 
           acc + (r.metadata?.overall_confidence || 0), 0) / (state.analysis_results?.length || 1);
         confidenceScores.push(analysisConfidence);
       }
       
       if (hasVerification) {
-        const verificationConfidence = state.verification_results?.reduce((acc: number, r: any) => 
+        const verificationConfidence = state.verification_results?.reduce((acc: number, r: unknown) => 
           acc + (r.summary?.average_confidence || 0), 0) / (state.verification_results?.length || 1);
         confidenceScores.push(verificationConfidence);
       }
@@ -410,7 +435,7 @@ export const createSynthesisNode = (workflow: any) => {
         confidence_score < (context?.quality_requirements?.min_confidence || 0.7) ||
         context?.complexity === 'expert' ||
         context?.quality_requirements?.peer_review_needed ||
-        (state.verification_results?.some((r: any) => r.summary?.refuted_claims > 0));
+        (state.verification_results?.some((r: unknown) => r.summary?.refuted_claims > 0));
 
       // Add final recommendations and conclusion
       final_answer += `## Conclusion\n\n`;
@@ -480,8 +505,8 @@ export const createSynthesisNode = (workflow: any) => {
 };
 
 // Enhanced Quality Check Node with comprehensive validation
-export const createQualityCheckNode = (workflow: any) => {
-  workflow.addNode('quality_check', async (state: any) => {
+export const createQualityCheckNode = (workflow: unknown) => {
+  workflow.addNode('quality_check', async (state: unknown) => {
     const nodeStartTime = Date.now();
     
     try {
@@ -522,8 +547,8 @@ export const createQualityCheckNode = (workflow: any) => {
       
       // Evidence requirement check
       if (context?.quality_requirements?.evidence_required) {
-        const hasEvidence = state.research_results?.some((r: any) => r.key_findings?.length > 0) ||
-                           state.verification_results?.some((v: any) => v.summary?.verified_claims > 0);
+        const hasEvidence = state.research_results?.some((r: unknown) => r.key_findings?.length > 0) ||
+                           state.verification_results?.some((v: unknown) => v.summary?.verified_claims > 0);
         if (!hasEvidence) {
           issues.push('Evidence required but not provided');
         }
@@ -531,7 +556,7 @@ export const createQualityCheckNode = (workflow: any) => {
       
       // Citation requirement check
       if (context?.quality_requirements?.citations_required) {
-        const hasCitations = state.research_results?.some((r: any) => r.results?.length > 0);
+        const hasCitations = state.research_results?.some((r: unknown) => r.results?.length > 0);
         if (!hasCitations) {
           warnings.push('Citations recommended but not included');
         }
@@ -551,11 +576,11 @@ export const createQualityCheckNode = (workflow: any) => {
       }
       
       // Bias and uncertainty checks
-      if (state.analysis_results?.some((a: any) => a.bias_assessment?.bias_severity === 'high')) {
+      if (state.analysis_results?.some((a: unknown) => a.bias_assessment?.bias_severity === 'high')) {
         warnings.push('High bias detected in analysis results');
       }
       
-      if (state.analysis_results?.some((a: any) => a.uncertainty_assessment?.overall_uncertainty > 0.4)) {
+      if (state.analysis_results?.some((a: unknown) => a.uncertainty_assessment?.overall_uncertainty > 0.4)) {
         warnings.push('High uncertainty detected in analysis results');
       }
       

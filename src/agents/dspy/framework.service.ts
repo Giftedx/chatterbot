@@ -2,7 +2,7 @@
 // Implements Stanford DSPy for structured prompting, optimization, and systematic AI reasoning
 
 import { EventEmitter } from 'events';
-import { getEnvAsBoolean, getEnvAsString } from '../../utils/env.js';
+import { getEnvAsString } from '../../utils/env.js';
 import { z } from 'zod';
 import OpenAI from 'openai';
 
@@ -612,7 +612,7 @@ class DSPyFrameworkService extends EventEmitter {
   private buildPrompt(
     signature: DSPySignature, 
     inputs: Record<string, unknown>, 
-    mode: string
+    _mode: string
   ): string {
     let prompt = `${signature.instructions}\n\n`;
 

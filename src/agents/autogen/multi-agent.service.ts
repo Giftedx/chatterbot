@@ -2,7 +2,7 @@
 // Implements Microsoft AutoGen for advanced multi-agent conversations and collaborative problem solving
 
 import { EventEmitter } from 'events';
-import { getEnvAsBoolean, getEnvAsString } from '../../utils/env.js';
+import { getEnvAsString } from '../../utils/env.js';
 import { z } from 'zod';
 import OpenAI from 'openai';
 

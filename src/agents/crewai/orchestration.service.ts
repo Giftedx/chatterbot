@@ -4,7 +4,6 @@ import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../../utils/env
 import { z } from 'zod';
 import OpenAI from 'openai';
 import { EventEmitter } from 'events';
-import { longTermMemoryService } from '../../memory/long-term-memory.service.js';
 
 // Enhanced Agent role definitions with advanced capabilities
 const AgentRoleSchema = z.object({
@@ -479,7 +478,7 @@ export class CrewAIOrchestrationService extends EventEmitter {
     objective: string,
     domain: string,
     complexity: 'simple' | 'moderate' | 'complex' | 'enterprise' = 'moderate',
-    timeframe?: string
+    _timeframe?: string
   ): Promise<CrewConfig> {
     await this.init();
 
@@ -522,7 +521,7 @@ export class CrewAIOrchestrationService extends EventEmitter {
     }
   }
 
-  async executeCrew(crewConfig: CrewConfig): Promise<CrewResult> {
+  async executeCrew(_crewConfig: CrewConfig): Promise<CrewResult> {
     await this.init();
     
     const executionId = `crew_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -886,7 +885,7 @@ Expected output: ${task.expected_output}`;
 
   private async synthesizeFinalOutput(
     taskOutputs: Array<{ task_description: string; agent_role: string; output: string }>,
-    crewConfig: CrewConfig
+    _crewConfig: CrewConfig
   ): Promise<string> {
     try {
       const synthesisPrompt = `Synthesize the following crew outputs into a comprehensive final result:
@@ -923,6 +922,7 @@ Please provide a cohesive synthesis that:
     totalExecutionTime: number,
     totalTokens: number
   ): CrewResult['metrics'] {
+    // Calculate efficiency score using average task time
     const avgTaskTime = taskOutputs.reduce((sum, task) => sum + task.execution_time, 0) / taskOutputs.length;
     const efficiencyScore = Math.max(0, 1 - (totalExecutionTime / (taskOutputs.length * 30000))); // 30s baseline per task
 

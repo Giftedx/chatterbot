@@ -1,6 +1,6 @@
 import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../../utils/env.js';
 import { StateGraph, END, START, MemorySaver } from '@langchain/langgraph';
-import { BaseMessage, HumanMessage, AIMessage, SystemMessage } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { Runnable } from '@langchain/core/runnables';
 import { StructuredTool } from '@langchain/core/tools';
 import { ChatOpenAI } from '@langchain/openai';
@@ -124,7 +124,7 @@ const advancedResearchTool = new StructuredTool({
     fact_check: z.boolean().default(true),
     real_time: z.boolean().default(false)
   }),
-  func: async (input: any) => {
+  func: async (input: unknown) => {
     const startTime = Date.now();
     
     try {
@@ -172,7 +172,7 @@ const advancedResearchTool = new StructuredTool({
           coverage_score: 0.75 + Math.random() * 0.2
         },
         summary: `Comprehensive research completed for "${input.query}" with ${consolidated_results.length} high-quality sources`,
-        key_findings: consolidated_results.slice(0, 3).map((r: any) => r.summary || 'Key finding'),
+        key_findings: consolidated_results.slice(0, 3).map((r: unknown) => r.summary || 'Key finding'),
         conflicting_information: fact_check_results?.conflicts || [],
         recommended_actions: generateResearchRecommendations(input.query, consolidated_results)
       };
@@ -198,7 +198,7 @@ const comprehensiveAnalysisTool = new StructuredTool({
     bias_check: z.boolean().default(true),
     uncertainty_analysis: z.boolean().default(true)
   }),
-  func: async (input: any) => {
+  func: async (input: unknown) => {
     const startTime = Date.now();
     
     try {
@@ -268,7 +268,7 @@ const rigorousVerificationTool = new StructuredTool({
     sources: z.array(z.string()).optional().describe('Authoritative sources to check against'),
     expert_domains: z.array(z.string()).optional().describe('Expert domains for validation')
   }),
-  func: async (input: any) => {
+  func: async (input: unknown) => {
     const startTime = Date.now();
     
     try {
@@ -312,11 +312,11 @@ const rigorousVerificationTool = new StructuredTool({
         claims_processed: input.claims.length,
         verification_results,
         summary: {
-          verified_claims: verification_results.filter((r: any) => r.overall_verdict === 'verified').length,
-          refuted_claims: verification_results.filter((r: any) => r.overall_verdict === 'refuted').length,
-          partial_claims: verification_results.filter((r: any) => r.overall_verdict === 'partial').length,
-          unknown_claims: verification_results.filter((r: any) => r.overall_verdict === 'unknown').length,
-          average_confidence: verification_results.reduce((sum: number, r: any) => sum + r.confidence, 0) / verification_results.length
+          verified_claims: verification_results.filter((r: unknown) => r.overall_verdict === 'verified').length,
+          refuted_claims: verification_results.filter((r: unknown) => r.overall_verdict === 'refuted').length,
+          partial_claims: verification_results.filter((r: unknown) => r.overall_verdict === 'partial').length,
+          unknown_claims: verification_results.filter((r: unknown) => r.overall_verdict === 'unknown').length,
+          average_confidence: verification_results.reduce((sum: number, r: unknown) => sum + r.confidence, 0) / verification_results.length
         },
         metadata: {
           verification_methods: input.verification_methods,
@@ -401,15 +401,15 @@ export class AdvancedLangGraphWorkflow extends EventEmitter {
           iteration_count: { value: null, default: () => 0 },
           max_iterations: { value: null, default: () => this.config.max_iterations },
           execution_path: { value: (x: string[], y: string[]) => x.concat(y), default: () => [] },
-          decision_points: { value: (x: any[], y: any[]) => x.concat(y), default: () => [] },
-          tool_usage: { value: (x: any[], y: any[]) => x.concat(y), default: () => [] },
+          decision_points: { value: (x: unknown[], y: unknown[]) => x.concat(y), default: () => [] },
+          tool_usage: { value: (x: unknown[], y: unknown[]) => x.concat(y), default: () => [] },
           performance_metrics: { value: null, default: () => ({
             total_execution_time_ms: 0,
             node_timings: {},
             api_calls: 0,
             cost_estimate_usd: 0
           }) },
-          checkpoints: { value: (x: any[], y: any[]) => x.concat(y), default: () => [] },
+          checkpoints: { value: (x: unknown[], y: unknown[]) => x.concat(y), default: () => [] },
           user_context: { value: null, default: () => ({}) }
         }
       });

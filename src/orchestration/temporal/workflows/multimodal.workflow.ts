@@ -17,43 +17,19 @@ import type * as memoryActivities from '../activities/memory.activities.js';
 
 // Activity proxies with enhanced timeouts for multimodal processing
 const multimodal = proxyActivities<typeof multimodalActivities>({
-  startToCloseTimeout: '10 minutes',
-  retryPolicy: {
-    initialInterval: '5s',
-    maximumInterval: '1m',
-    backoffCoefficient: 2,
-    maximumAttempts: 2
-  }
+  startToCloseTimeout: '10 minutes'
 });
 
 const analysis = proxyActivities<typeof analysisActivities>({
-  startToCloseTimeout: '2 minutes',
-  retryPolicy: {
-    initialInterval: '2s',
-    maximumInterval: '10s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '2 minutes'
 });
 
 const llm = proxyActivities<typeof llmActivities>({
-  startToCloseTimeout: '3 minutes',
-  retryPolicy: {
-    initialInterval: '2s',
-    maximumInterval: '15s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '3 minutes'
 });
 
 const memory = proxyActivities<typeof memoryActivities>({
-  startToCloseTimeout: '1 minute',
-  retryPolicy: {
-    initialInterval: '1s',
-    maximumInterval: '5s',
-    backoffCoefficient: 2,
-    maximumAttempts: 3
-  }
+  startToCloseTimeout: '1 minute'
 });
 
 export const multimodalProcessingCancel = defineSignal<string>('multimodalProcessingCancel');
@@ -113,9 +89,11 @@ export async function multimodalProcessingWorkflow(
   const startTime = Date.now();
   let cancelled = false;
   
-  // Setup cancellation handler
-  setHandler(multimodalProcessingCancel, (reason: string) => {
-    cancelled = true;
+  // Setup cancellation handler with type guard
+  setHandler(multimodalProcessingCancel, (reason) => {
+    if (typeof reason === 'string') {
+      cancelled = true;
+    }
   });
 
   const processedItems: MultimodalWorkflowResult['processedItems'] = [];

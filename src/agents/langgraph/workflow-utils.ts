@@ -50,7 +50,7 @@ export async function simulateExpertOpinions(query: string): Promise<any[]> {
   }));
 }
 
-export async function simulateFactCheck(results: any[]): Promise<any> {
+export async function simulateFactCheck(results: unknown[]): Promise<any> {
   const totalClaims = results.length;
   const verifiedClaims = Math.floor(totalClaims * (0.7 + Math.random() * 0.2));
   
@@ -67,7 +67,7 @@ export async function simulateFactCheck(results: any[]): Promise<any> {
   };
 }
 
-export function generateResearchRecommendations(query: string, results: any[]): string[] {
+export function generateResearchRecommendations(query: string, results: unknown[]): string[] {
   const recommendations = [
     `Consider exploring ${results.length > 3 ? 'additional' : 'more'} sources for comprehensive coverage`,
     `Focus on peer-reviewed sources for academic rigor`,
@@ -221,7 +221,7 @@ export function generateAnalysisRecommendations(analysisResults: Record<string, 
 }
 
 // Verification utility functions
-export async function applyVerificationMethod(claim: string, method: string, options: any): Promise<any> {
+export async function applyVerificationMethod(claim: string, method: string, options: unknown): Promise<any> {
   const methodMap: Record<string, any> = {
     source_check: {
       result: 'verified',
@@ -268,7 +268,7 @@ export async function applyVerificationMethod(claim: string, method: string, opt
   };
 }
 
-export function synthesizeVerificationResults(results: Record<string, any>): any {
+export function synthesizeVerificationResults(results: Record<string, any>): unknown {
   const verificationMethods = Object.keys(results);
   const verifiedCount = verificationMethods.filter(method => 
     results[method].result === 'verified'
