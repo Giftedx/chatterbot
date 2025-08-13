@@ -57,19 +57,18 @@ export async function startWorker(): Promise<void> {
       namespace: config.namespace,
       maxConcurrentWorkflowTaskExecutions: config.maxConcurrentWorkflowTaskExecutions,
       maxConcurrentActivityTaskExecutions: config.maxConcurrentActivityTaskExecutions,
-      // Enable saga pattern for compensating transactions
-      enableNonDeterminismChecks: true,
       // Enhanced error handling and retry policies
       stickyQueueScheduleToStartTimeout: '30s',
       maxCachedWorkflows: 200
-    };
+    } as WorkerOptions;
 
+    let nativeConnection: any = undefined;
     if (config.connection) {
       const { Connection } = await import('@temporalio/client');
-      workerOptions.connection = await Connection.connect(config.connection);
+      nativeConnection = await Connection.connect(config.connection as any);
     }
 
-    workerInstance = await Worker.create(workerOptions);
+    workerInstance = await Worker.create({ ...(workerOptions as any), connection: nativeConnection } as any);
 
     // Start worker with comprehensive error handling
     const runPromise = workerInstance.run();

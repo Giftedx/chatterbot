@@ -45,7 +45,7 @@ export class AnswerVerificationService {
       if (this.options.crossModel) {
         try {
           const alt = await modelRouterService.generateWithMeta(userPrompt, history);
-          const alt2 = await modelRouterService.generateWithMeta(userPrompt, history, undefined, { disallowProviders: [alt.provider] });
+          const alt2 = await modelRouterService.generateWithMeta(userPrompt, history);
 
           const comparisonPrompt = `You are a verifier. Compare Answer A and Answer B to the same user question. Identify disagreements and rate overall agreement 0-1.\nReturn JSON with { agreement: number, critical_differences: string[], better_answer: 'A'|'B'|'tie' }.\n\nUser Question:\n${userPrompt}\n\nAnswer A:\n${current}\n\nAnswer B:\n${alt2.text}`;
 

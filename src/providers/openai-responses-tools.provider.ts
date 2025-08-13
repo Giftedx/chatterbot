@@ -215,7 +215,7 @@ export class OpenAIResponsesToolsProvider {
         toolSummaries.push(summary);
         tool_outputs.push({ tool_call_id: u.id, output });
       }
-      response = await this.client.responses.submitToolOutputs(response.id, { tool_outputs });
+      response = await (this.client as any).responses.submitToolOutputs(response.id, { tool_outputs });
       guard++;
     }
 

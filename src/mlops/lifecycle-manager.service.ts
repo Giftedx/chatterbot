@@ -179,7 +179,7 @@ export class MLOpsLifecycleManager extends EventEmitter {
   private config: MLOpsConfig;
   private registry: ModelRegistry;
   private alertRules: Map<string, AlertRule> = new Map();
-  private activeMonitoring: Map<string, NodeJS.Timer> = new Map();
+  private activeMonitoring: Map<string, NodeJS.Timeout> = new Map();
 
   // Metrics collection
   private metricsBuffer: PerformanceMetrics[] = [];

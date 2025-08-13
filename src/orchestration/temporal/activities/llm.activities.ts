@@ -15,7 +15,6 @@ export interface LLMDraftRequest {
 export interface LLMDraftResponse {
   content: string;
   modelUsed: string;
-  tokensUsed?: number;
   processingTime: number;
 }
 
@@ -29,36 +28,23 @@ export async function llmDraft(request: LLMDraftRequest): Promise<LLMDraftRespon
   try {
     // Dynamic import to avoid loading providers unless needed
     const { modelRouterService } = await import('../../../services/model-router.service.js');
-    
-    const messages = [];
-    if (systemPrompt) {
-      messages.push({ role: 'system', content: systemPrompt });
-    }
-    
-    // Add conversation history
-    for (const msg of history) {
-      messages.push({ role: msg.role, content: msg.content });
-    }
-    
-    messages.push({ role: 'user', content: prompt });
-    
-    const response = await modelRouterService.generateWithMeta(
+
+    const historyMessages = (history || []).map(h => ({
+      role: (h.role === 'assistant' ? 'model' : (h.role as 'user' | 'system')),
+      parts: [{ text: h.content }] as any
+    })) as any[];
+
+    const meta = await modelRouterService.generateWithMeta(
       prompt,
-      history,
-      {
-        model: modelName,
-        max_tokens: maxTokens,
-        temperature,
-        systemPrompt
-      }
+      historyMessages,
+      systemPrompt
     );
     
     const processingTime = Date.now() - startTime;
     
     return {
-      content: response.response || response.text || '',
-      modelUsed: response.modelUsed || modelName,
-      tokensUsed: response.tokensUsed,
+      content: meta.text || '',
+      modelUsed: meta.model || modelName || 'unknown',
       processingTime
     };
     

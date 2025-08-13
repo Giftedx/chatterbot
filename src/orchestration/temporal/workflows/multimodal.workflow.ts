@@ -32,7 +32,7 @@ const memory = proxyActivities<typeof memoryActivities>({
   startToCloseTimeout: '1 minute'
 });
 
-export const multimodalProcessingCancel = defineSignal<string>('multimodalProcessingCancel');
+export const multimodalProcessingCancel = defineSignal<[string]>('multimodalProcessingCancel');
 
 export interface MultimodalWorkflowRequest {
   userId: string;

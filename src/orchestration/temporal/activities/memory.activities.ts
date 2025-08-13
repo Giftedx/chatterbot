@@ -38,42 +38,37 @@ export async function storeMemory(request: MemoryStoreRequest): Promise<{ memory
   
   try {
     // Dynamic import to avoid loading memory services unless needed
-    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory.manager.js');
-    
-    const memoryManager = new AdvancedMemoryManager();
-    
-    // Store memory with timestamp and type
-    const memoryRecord = {
-      id: `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory-manager.service.js');
+
+    const manager = new AdvancedMemoryManager({
+      enableEpisodicMemory: true,
+      enableSocialIntelligence: true,
+      enableEmotionalIntelligence: true,
+      enableSemanticClustering: false,
+      enableMemoryConsolidation: false,
+      maxMemoriesPerUser: 1000,
+      memoryDecayRate: 0.01,
+      importanceThreshold: 0.3,
+      consolidationInterval: 3600000,
+      socialAnalysisDepth: 'moderate',
+      emotionalSensitivity: 0.7,
+      adaptationAggressiveness: 0.6
+    });
+    await manager.initialize();
+
+    await manager.storeConversationMemory({
       userId,
+      channelId: metadata['channelId'] as string || 'unknown-channel',
+      guildId: metadata['guildId'] as string | undefined,
+      conversationId: metadata['conversationId'] as string || `conv_${Date.now()}`,
+      participants: Array.isArray(metadata['participants']) ? metadata['participants'] as string[] : [userId],
       content,
-      type,
-      metadata: {
-        ...metadata,
-        storedAt: new Date().toISOString(),
-        workflowGenerated: true
-      },
-      embedding
-    };
-    
-    // Store in appropriate memory system based on type
-    switch (type) {
-      case 'episodic':
-        await memoryManager.storeEpisodicMemory(userId, content, metadata);
-        break;
-      case 'semantic':
-        await memoryManager.storeSemanticMemory(userId, content, metadata);
-        break;
-      case 'social':
-        await memoryManager.updateSocialProfile(userId, metadata);
-        break;
-      default:
-        // Store as general memory
-        await memoryManager.storeInteraction(userId, content, 'user', metadata);
-    }
+      attachments: [],
+      timestamp: new Date()
+    });
     
     return {
-      memoryId: memoryRecord.id,
+      memoryId: `memory_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       success: true
     };
     
@@ -95,37 +90,35 @@ export async function searchMemories(request: MemorySearchRequest): Promise<Memo
   const { userId, query, type, limit = 10, threshold = 0.7 } = request;
   
   try {
-    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory.manager.js');
+    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory-manager.service.js');
+
+    const manager = new AdvancedMemoryManager({
+      enableEpisodicMemory: true,
+      enableSocialIntelligence: false,
+      enableEmotionalIntelligence: false,
+      enableSemanticClustering: false,
+      enableMemoryConsolidation: false,
+      maxMemoriesPerUser: 1000,
+      memoryDecayRate: 0.01,
+      importanceThreshold: 0.3,
+      consolidationInterval: 3600000,
+      socialAnalysisDepth: 'basic',
+      emotionalSensitivity: 0.5,
+      adaptationAggressiveness: 0.5
+    });
+    await manager.initialize();
     
-    const memoryManager = new AdvancedMemoryManager();
-    
-    // Search based on type or across all memories
-    let memories: MemoryRecord[] = [];
-    
-    if (type === 'episodic') {
-      const episodicMemories = await memoryManager.searchEpisodicMemories(userId, query, limit);
-      memories = episodicMemories.map(m => ({
-        id: m.id,
-        userId,
-        content: m.content,
-        type: 'episodic',
-        metadata: m.metadata || {},
-        timestamp: m.timestamp,
-        relevanceScore: m.relevanceScore
-      }));
-    } else {
-      // General memory search
-      const searchResults = await memoryManager.retrieveRelevantMemories(userId, query, limit);
-      memories = searchResults.map(m => ({
-        id: m.id || `search_${Date.now()}`,
-        userId,
-        content: m.content || m.text || '',
-        type: m.type || 'general',
-        metadata: m.metadata || {},
-        timestamp: m.timestamp || new Date().toISOString(),
-        relevanceScore: m.relevanceScore || m.score
-      }));
-    }
+    const results = await manager.searchMemories({ userId, content: query, limit });
+
+    let memories: MemoryRecord[] = results.map(r => ({
+      id: r.memory.id,
+      userId: r.memory.userId,
+      content: r.memory.content,
+      type: type || 'episodic',
+      metadata: (r.memory.context as unknown) as Record<string, unknown>,
+      timestamp: r.memory.createdAt.toISOString(),
+      relevanceScore: r.relevance
+    }));
     
     // Filter by relevance threshold
     return memories.filter(m => (m.relevanceScore || 0) >= threshold);
@@ -153,11 +146,26 @@ export async function consolidateMemories(request: {
   const { userId, timeWindow = '24h', strategy } = request;
   
   try {
-    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory.manager.js');
-    
-    const memoryManager = new AdvancedMemoryManager();
-    
-    // Simulate memory consolidation based on strategy
+    const { AdvancedMemoryManager } = await import('../../../services/advanced-memory/advanced-memory-manager.service.js');
+
+    const manager = new AdvancedMemoryManager({
+      enableEpisodicMemory: true,
+      enableSocialIntelligence: false,
+      enableEmotionalIntelligence: false,
+      enableSemanticClustering: false,
+      enableMemoryConsolidation: false,
+      maxMemoriesPerUser: 1000,
+      memoryDecayRate: 0.01,
+      importanceThreshold: 0.3,
+      consolidationInterval: 3600000,
+      socialAnalysisDepth: 'basic',
+      emotionalSensitivity: 0.5,
+      adaptationAggressiveness: 0.5
+    });
+    await manager.initialize();
+
+    await manager.consolidateMemories(userId);
+
     const stats = {
       consolidated: Math.floor(Math.random() * 10) + 1,
       removed: Math.floor(Math.random() * 5),

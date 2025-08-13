@@ -51,7 +51,7 @@ export async function processMultimodal(request: MultimodalProcessRequest): Prom
           break;
           
         case 'sentiment':
-          analysisResult = await multimodalService.analyzeSentiment(content);
+          analysisResult = await multimodalService.analyzeSentiment(String(content));
           break;
           
         case 'transcription':
