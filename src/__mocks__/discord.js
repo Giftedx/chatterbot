@@ -5,6 +5,7 @@ class SlashCommandBuilder {
   constructor() {
     this.name = '';
     this.description = '';
+    this.options = [];
   }
   setName(name) {
     this.name = name; return this;
@@ -16,8 +17,11 @@ class SlashCommandBuilder {
     const option = new CommandOption();
     cb(option);
     this.options = this.options || [];
-    this.options.push(option);
+    this.options.push({ name: option.name, description: option.description, required: option.required, type: 'string' });
     return this;
+  }
+  toJSON() {
+    return { name: this.name, description: this.description, options: this.options };
   }
 }
 

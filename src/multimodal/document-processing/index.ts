@@ -412,15 +412,32 @@ export class DocumentProcessingService {
     fileId: number
   ): Promise<DocumentAnalysisResult | null> {
     try {
-      // Note: In a real implementation, you'd retrieve the MediaFile from database
-      // For now, we'll throw an error indicating this needs implementation
-      throw new Error('Reprocessing requires retrieving MediaFile from database - not implemented in this modular version');
+      // Retrieve existing media file
+      const existing = await this.databaseService.getMediaFileById(fileId);
+      if (!existing) {
+        await this.databaseService.updateProcessingStatus(fileId, 'failed', 'Media file not found');
+        return null;
+      }
+
+      // Only documents are supported here
+      if (existing.fileType !== 'document') {
+        await this.databaseService.updateProcessingStatus(fileId, 'failed', 'Reprocessing supported only for document files');
+        return null;
+      }
+
+      // Reset status before processing
+      await this.databaseService.updateProcessingStatus(fileId, 'processing');
+
+      // Re-run full document processing with defaults
+      const result = await this.processDocument(existing, { ...DOCUMENT_PROCESSING_CONFIG.DEFAULT_OPTIONS });
+      return result;
 
     } catch (error) {
       logger.error('Failed to reprocess document', {
         operation: 'reprocessing',
         metadata: { fileId, error: String(error) }
       });
+      await this.databaseService.updateProcessingStatus(fileId, 'failed', String(error));
       return null;
     }
   }

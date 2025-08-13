@@ -6,6 +6,7 @@
 import { UserConsentService } from '../user-consent.service.js';
 import { CoreIntelligenceService } from '../core-intelligence.service.js';
 import { handlePrivacyButtonInteraction } from '../../commands/privacy-commands.js';
+import { privacyCommands } from '../../commands/privacy-commands.js';
 
 // Mock prisma
 jest.mock('../../db/prisma.js', () => ({

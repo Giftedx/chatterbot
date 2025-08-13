@@ -287,8 +287,13 @@ export class UltraIntelligentResearchService {
 
             const searchResult = await braveWebSearch(searchParams);
             
-            if (searchResult?.results?.length) {
-                for (const page of searchResult.results) {
+            // Normalize alternate shape into results
+            const normalizedResults = (searchResult?.results && searchResult.results.length > 0)
+                ? searchResult.results.map(r => ({ title: r.title, url: r.url, snippet: r.snippet, rank: r.rank }))
+                : (searchResult?.webPages?.value || []).map((p, idx) => ({ title: p.name, url: p.url, snippet: p.snippet, rank: idx + 1 }));
+            
+            if (normalizedResults.length) {
+                for (const page of normalizedResults) {
                     sources.push({
                         url: page.url,
                         title: page.title,
@@ -353,13 +358,17 @@ export class UltraIntelligentResearchService {
                     count: 5
                 });
 
-                if (searchResult?.results?.length) {
-                    for (const page of searchResult.results) {
+                const results2 = (searchResult?.results && searchResult.results.length > 0)
+                    ? searchResult.results
+                    : (searchResult?.webPages?.value || []).map((p, idx) => ({ title: p.name, url: p.url, snippet: p.snippet, rank: idx + 1 }));
+
+                if (results2?.length) {
+                    for (const page of results2) {
                         sources.push({
                             url: page.url,
-                            title: page.title,
+                            title: (page as any).title || (page as any).name,
                             snippet: page.snippet,
-                            credibility: this.assessCredibility(page.url, page.title),
+                            credibility: this.assessCredibility(page.url, (page as any).title || (page as any).name),
                             relevance: this.assessRelevance(page.snippet, query),
                             recency: 0,
                             type: this.categorizeSource(page.url),
@@ -391,13 +400,17 @@ export class UltraIntelligentResearchService {
                     count: 5
                 });
 
-                if (searchResult?.results?.length) {
-                    for (const page of searchResult.results) {
+                const results3 = (searchResult?.results && searchResult.results.length > 0)
+                    ? searchResult.results
+                    : (searchResult?.webPages?.value || []).map((p, idx) => ({ title: p.name, url: p.url, snippet: p.snippet, rank: idx + 1 }));
+
+                if (results3?.length) {
+                    for (const page of results3) {
                         sources.push({
                             url: page.url,
-                            title: page.title,
+                            title: (page as any).title || (page as any).name,
                             snippet: page.snippet,
-                            credibility: this.assessCredibility(page.url, page.title),
+                            credibility: this.assessCredibility(page.url, (page as any).title || (page as any).name),
                             relevance: this.assessRelevance(page.snippet, query),
                             recency: 0,
                             type: this.categorizeSource(page.url),

@@ -803,8 +803,27 @@ export class HardenedAudioProcessingService extends EventEmitter {
   }
 
   private async downloadAudioFromUrl(url: string): Promise<Buffer> {
-    // Placeholder for URL download with security checks
-    throw new Error('URL download not implemented in this demo');
+    try {
+      const { default: axios } = await import('axios');
+      const resp = await axios.get(url, {
+        responseType: 'arraybuffer',
+        timeout: 20000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; HardenedAudio/1.0)',
+          'Accept': 'audio/*,application/octet-stream;q=0.9,*/*;q=0.8'
+        },
+        maxContentLength: this.config.max_file_size_mb * 1024 * 1024
+      });
+      const contentType = String(resp.headers['content-type'] || 'application/octet-stream');
+      const allowed = (this.config.supported_formats || []).some(fmt => contentType.includes(fmt) || url.toLowerCase().endsWith(fmt));
+      if (!allowed) {
+        // Still return buffer but warn; upstream validation will run
+        console.warn(`Downloaded content-type not in supported formats: ${contentType}`);
+      }
+      return Buffer.from(resp.data);
+    } catch (error) {
+      throw new Error(`Audio URL download failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   private createBasicQualityMetrics(buffer: Buffer): AudioQualityMetrics {

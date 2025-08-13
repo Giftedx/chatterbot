@@ -1,8 +1,11 @@
-import { personaRegistry, Persona } from '../personas';
-import { prisma } from '../db/prisma';
+import { personaRegistry, type Persona } from '../personas/index.js';
+import { prisma } from '../db/prisma.js';
 
-async function loadPersistedPersonas() {
-    try {
+async function loadPersistedPersonas(): Promise<void> {
+  try {
+    if (!prisma || process.env.NODE_ENV === 'test') {
+      return;
+    }
     const dbPersonas = await prisma.persona.findMany();
     dbPersonas.forEach((p: { name: string; systemPrompt: string; styleHints?: string }) => personaRegistry.upsert({ name: p.name, systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.parse(p.styleHints) : undefined }));
   } catch (err) {
@@ -41,9 +44,7 @@ export function setActivePersona(guildId: string, name: string): void {
 
 export function getActivePersona(guildId: string): Persona {
   const name = activePersona.get(guildId) || DEFAULT_PERSONA;
-  const persona = personaRegistry.get(name);
-  // fallback should always exist because DEFAULT_PERSONA is built-in
-  return persona!;
+  return personaRegistry.get(name) || personaRegistry.list()[0];
 }
 
 export function listPersonas(): Persona[] {
@@ -56,4 +57,8 @@ export async function createOrUpdatePersona(name: string, systemPrompt: string, 
 }
 
 // Load persisted personas on startup
-loadPersistedPersonas();
+// Initialize on module load (non-test only)
+if (process.env.NODE_ENV !== 'test') {
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  loadPersistedPersonas();
+}

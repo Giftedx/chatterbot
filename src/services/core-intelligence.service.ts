@@ -850,7 +850,7 @@ export class CoreIntelligenceService {
             channel: interaction.channel, guild: interaction.guild, member: interaction.member,
             createdTimestamp: interaction.createdTimestamp, editedTimestamp: null,
             toString: () => promptText,
-            fetchReference: async () => { logger.warn('[CoreIntelSvc] Mocked fetchReference called.'); throw new Error("Not implemented on mock."); },
+            fetchReference: async () => { logger.warn('[CoreIntelSvc] Mocked fetchReference called. Returning minimal reference.'); return { id: 'ref_mock', content: 'Reference unavailable in mock environment.' }; },
         } as unknown as Message;
     }
 

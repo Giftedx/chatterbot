@@ -504,6 +504,29 @@ export class DocumentDatabaseService {
     }
   }
 
+  /**
+   * Retrieve a single media file by its ID
+   */
+  async getMediaFileById(fileId: number): Promise<MediaFile | null> {
+    try {
+      const file = await prisma.mediaFile.findUnique({ where: { id: fileId } });
+      if (!file) {
+        logger.warn('Media file not found', {
+          operation: 'get-media-file',
+          metadata: { fileId }
+        });
+        return null;
+      }
+      return file as unknown as MediaFile;
+    } catch (error) {
+      logger.error('Failed to retrieve media file', {
+        operation: 'get-media-file',
+        metadata: { fileId, error: String(error) }
+      });
+      return null;
+    }
+  }
+
   // Private helper methods
 
   private calculateDocumentSimilarity(doc1: any, doc2: any): number {

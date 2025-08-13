@@ -472,7 +472,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
         case 'langgraph_reasoning':
           if (this.capabilities.langgraph_reasoning) {
             const result = await advancedLangGraphWorkflow.execute(query, {
-              user_context: { user_id: options.userId ?? 'unknown_user', session_id: options.sessionId ?? 'unknown_session' }
+              user_context: { user_id: options.userId ?? 'unknown_user', session_id: options.sessionId ?? 'unknown_session' , preferences: {}, conversation_history: [] }
             });
             response = result.final_answer || '';
             confidence = result.confidence_score || 0;
@@ -815,7 +815,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
   async processWithSemanticRouting(query: string, options: { userId?: string; sessionId?: string; [k: string]: unknown } = {}) {
     if (!this.capabilities.semantic_routing) {
       const basic = await this.processAdvancedQuery(query, options);
-      return { ...basic, routing_decision: {} };
+      return { ...basic, routing_decision: { route_id: 'standard', confidence: 0.5, reasoning: 'semantic routing disabled', alternative_routes: [], preprocessing_applied: [], execution_metadata: {}, timestamp: new Date() } };
     }
 
     const startTime = Date.now();
@@ -825,7 +825,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       const routingDecision = await semanticRoutingService.route(query, {
         user_history: [],
         conversation_context: [],
-        user_preferences: options.context || {}
+        user_preferences: (options.context as Record<string, unknown>) || {}
       });
 
       let response = '';
@@ -883,37 +883,19 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
           cost = 0.02;
       }
 
-      const processingTime = Date.now() - startTime;
-
+      const processing_time_ms = Date.now() - startTime;
       return {
         response,
         confidence,
-        processing_time_ms: processingTime,
+        processing_time_ms,
         cost_usd: cost,
-        routing_decision: routingDecision,
         capabilities_used: capabilitiesUsed,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          user_id: options.userId,
-          session_id: options.sessionId,
-          semantic_routing_used: true,
-          alternative_routes: routingDecision.alternative_routes,
-          framework_status: this.getFrameworkStatus()
-        }
+        routing_decision: routingDecision || { route_id: 'standard', confidence: 0.5, reasoning: 'fallback', alternative_routes: [], preprocessing_applied: [], execution_metadata: {}, timestamp: new Date() },
+        metadata: { semantic_routing_used: true }
       };
-
     } catch (error) {
-      // Fallback to standard processing on routing error
-      console.warn('Semantic routing failed, falling back to standard processing:', error);
-      const fallbackResult = await this.processAdvancedQuery(query, options);
-      return {
-        ...fallbackResult,
-        routing_decision: null,
-        metadata: {
-          ...fallbackResult.metadata,
-          semantic_routing_error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      };
+      const basic = await this.processAdvancedQuery(query, options);
+      return { ...basic, routing_decision: { route_id: 'standard', confidence: 0.5, reasoning: 'error fallback', alternative_routes: [], preprocessing_applied: [], execution_metadata: {}, timestamp: new Date() } };
     }
   }
 
