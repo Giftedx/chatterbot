@@ -83,6 +83,31 @@ npm run dev
 
 ---
 
+### Production Postgres + pgvector (recommended)
+- Set `DATABASE_URL` to your Postgres connection string and set `FEATURE_PGVECTOR=true`.
+- Ensure pgvector extension is available:
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+- The app will auto-create table/indexes for vector search on first run. To pre-create:
+```sql
+CREATE TABLE IF NOT EXISTS kb_vectors (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  guild_id TEXT,
+  content TEXT NOT NULL,
+  embedding vector(1536),
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS kb_vectors_embedding_idx ON kb_vectors USING ivfflat (embedding vector_l2_ops);
+```
+
+### OpenTelemetry Tracing
+- Export traces to an OTLP endpoint by setting `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318/v1/traces`).
+- Tracing is initialized at startup and shut down gracefully on exit.
+
+---
+
 ### The only command
 - `/chat prompt [attachment]`
   - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
@@ -96,7 +121,7 @@ Note: No other slash commands are exposed by default. Natural-language privacy c
 The bot runs a single, well-defined pipeline for every message:
 1. Privacy and consent checks (opt-in with `/chat` once)
 2. Moderation (text + attachments)
-3. Unified message analysis (intents, domains, complexity, attachments)
+3. Unified message analysis (intents, domains, complexity, attachments) with input sanitization and length limiting
 4. Retrieval (conversation history, memories, knowledge base RAG)
 5. Tool/MCP orchestration as needed (web search, scraping, browser, etc.)
 6. Model routing across providers (OpenAI/Anthropic/Gemini/Groq/Mistral/compatible)
@@ -119,8 +144,8 @@ The bot runs a single, well-defined pipeline for every message:
 ---
 
 ### Knowledge Base RAG
-- Lightweight embeddings path using OpenAI `text-embedding-3-small` stored in `KBChunk.embedding` (bytes).
-- Search prefers vector similarity if chunks exist; else keyword relevance.
+- Vector-first retrieval when `FEATURE_PGVECTOR=true` and OpenAI embeddings are configured; falls back to Prisma chunks or keyword search.
+- Optional Cohere reranking when `FEATURE_RERANK=true` and `COHERE_API_KEY` is set.
 - Ingestion helper: `KnowledgeBaseIngestService.addSource(guildId, title, content, url?)` to add and embed new content.
 - Background ingestion (optional): set `KB_INGEST_CHANNEL_ID` to automatically ingest URLs posted in that channel.
 
@@ -181,9 +206,14 @@ FEATURE_OPENAI_RESPONSES_TOOLS=false
 FEATURE_TOOL_SUMMARY=false
 FEATURE_RERANK=false
 FEATURE_PERSIST_TELEMETRY=false
+FEATURE_PGVECTOR=false
+FEATURE_TEMPORAL=false
 COST_TIER_MAX=medium   # one of: low|medium|high (max spend)
 SPEED_TIER_MIN=medium  # one of: slow|medium|fast (min speed)
 COHERE_API_KEY=...
+
+# OpenTelemetry
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
 
 # Edge AI deployment
 EDGE_MAX_NODES=5
@@ -193,13 +223,6 @@ EDGE_FAILOVER_ENABLED=true
 EDGE_MODEL_REPLICATION=2
 EDGE_UPTIME_SUCCESS_RATE=0.95
 EDGE_MAX_SIMULATED_LOAD_FACTOR=0.9
-
-### Metrics and telemetry
-- Telemetry snapshot: GET `/api/telemetry` (last N provider/model selections with latency)
-- Telemetry (DB): GET `/api/telemetry/db?limit=50&offset=0`
-- Verification metrics: GET `/api/verification-metrics`
-- KB stats: GET `/api/kb-stats`
-- Enable dashboard: `ENABLE_ANALYTICS_DASHBOARD=true` (lightweight endpoints)
 ```
 
 ### Optional streaming (internal)

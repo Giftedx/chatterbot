@@ -24,6 +24,8 @@ Verification:
 - Only `/chat` is exposed by default. All other controls (pause/resume/delete/export/move DM/new topic) are handled via natural language and completed quietly via DM.
 - The bot avoids channel clutter by responding only in user-specific threads or DMs.
 - Moderation runs pre- and post-generation; unsafe content is blocked or safe-completed.
+- Input sanitization removes common prompt-injection patterns and length-limits user inputs before analysis.
+- Per-user rate limiting is applied to inbound interactions to reduce abuse and load spikes.
 - No chain-of-thought is logged or stored. Durable state consists of message logs, intent logs, memories, summaries, and optional embeddings.
 - Deletion requests wipe user memories, summaries, logs, and media for that user. Exports are DM’d as JSON.
 - Respect Discord rate limits. The orchestrator uses backoffs and short cooldowns per user.

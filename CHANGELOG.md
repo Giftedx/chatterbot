@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Development workflow with `tsx` for reliability
 - Extensive documentation and architectural guides
 
+## v0.2.0
+
+- Observability: Added OpenTelemetry initialization (`src/telemetry.ts`) with OTLP exporter; start at boot and shutdown gracefully. Updated README and env example for `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- Retrieval: Enabled pgvector-backed vector search by default when `FEATURE_PGVECTOR=true`. Switched KB service to enhanced pgvector repository (`src/vector/pgvector-enhanced.repository.ts`). Added Postgres envs to `env.example` and README, plus SQL snippets.
+- Reranking: Integrated optional Cohere Rerank in knowledge search when `FEATURE_RERANK=true` and `COHERE_API_KEY` is set.
+- Security: Input sanitization added to unified message analysis to mitigate prompt injection and length overflow.
+- CI: Strengthened CI to run typecheck/lint/tests/build. Added OpenSSF Scorecard and Dependabot. Added prompt-eval workflow stub.
+- Docs: README updated with OTel, pgvector, feature flags, and pipeline notes.
+
 ---
 
 ## Legacy Service Cleanup Summary

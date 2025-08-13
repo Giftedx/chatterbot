@@ -6,7 +6,7 @@
 import { prisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
 import { features } from '../config/feature-flags.js';
-import { pgvectorRepository } from '../vector/pgvector.repository.js';
+import { pgvectorRepository } from '../vector/pgvector-enhanced.repository.js';
 
 function cosineSim(a: Float32Array, b: Float32Array): number {
   let dot = 0, na = 0, nb = 0;
@@ -185,7 +185,7 @@ export class KnowledgeBaseService {
                 channelId: null,
                 authorId: null,
                 tags: null,
-                confidence: Math.max(minConfidence, Math.min(0.99, r.score)),
+                confidence: Math.max(minConfidence, Math.min(0.99, (r as any).similarity ?? (r as any).score ?? 0)),
                 createdAt: new Date(),
                 updatedAt: new Date()
               } as any));

@@ -12,6 +12,8 @@ import { memoryConsolidationScheduler } from './services/schedulers/memory-conso
 import { vectorMaintenanceScheduler } from './services/schedulers/vector-maintenance.scheduler.js';
 import { runWithTrace } from './utils/async-context.js';
 import crypto from 'node:crypto';
+import { sdk as otelSdk } from './telemetry.js';
+import { RateLimiter } from './utils/rate-limiter.js';
 
 
 // console.log("Gemini API Key (first 8 chars):", process.env.GEMINI_API_KEY?.slice(0, 8));
@@ -23,6 +25,9 @@ const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 if (!DISCORD_TOKEN || !DISCORD_CLIENT_ID) {
   throw new Error('Missing DISCORD_TOKEN or DISCORD_CLIENT_ID in environment variables');
 }
+
+// Start OpenTelemetry as early as possible
+await otelSdk.start();
 
 // Determine feature flags from environment variables
 const enableAgenticFeatures = process.env.ENABLE_AGENTIC_INTELLIGENCE !== 'false'; // Default to true
@@ -36,6 +41,10 @@ const enableAdvancedCapabilities = process.env.ENABLE_ADVANCED_CAPABILITIES !== 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
+
+// Per-user rate limiter
+const maxPerMinute = Number(process.env.MAX_REQUESTS_PER_MINUTE || 60);
+const rateLimiter = new RateLimiter({ maxRequests: maxPerMinute, windowMs: 60_000 });
 
 // Configure and initialize CoreIntelligenceService
 const coreIntelConfig: CoreIntelligenceConfig = {
@@ -156,6 +165,18 @@ client.on('interactionCreate', async (interaction: Interaction) => {
   const traceId = crypto.randomUUID();
   await runWithTrace(traceId, async () => {
     try {
+      // Rate limit per user
+      const uid = (interaction as any)?.user?.id || (interaction as any)?.member?.user?.id || 'unknown';
+      try {
+        await rateLimiter.checkLimits(uid);
+      } catch (rlErr) {
+        const anyIx = interaction as any;
+        if (!anyIx.replied && !anyIx.deferred && typeof anyIx.reply === 'function') {
+          await anyIx.reply({ content: 'You are sending requests too quickly. Please wait a moment and try again.', ephemeral: true });
+        }
+        return;
+      }
+
       // Handle privacy modal submissions
       if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('forget_me_confirm') || interaction.customId.startsWith('privacy_')) {
@@ -202,6 +223,14 @@ client.on('messageCreate', async (message: Message) => {
   const traceId = crypto.randomUUID();
   await runWithTrace(traceId, async () => {
     try {
+      // Rate limit per user for free-form messages
+      try {
+        await rateLimiter.checkLimits(message.author.id);
+      } catch {
+        await message.reply('You are sending requests too quickly. Please wait a moment and try again.');
+        return;
+      }
+
       await coreIntelligenceService.handleMessage(message);
     } catch (err) {
       logger.error('Unhandled error in messageCreate', err as Error, { metadata: { traceId } });
@@ -239,6 +268,13 @@ const gracefulShutdown = async (signal: string) => {
     console.log('🤖 Closing Discord connection...');
     client.destroy();
     console.log('✅ Discord connection closed');
+
+    // Shutdown OpenTelemetry
+    try {
+      await otelSdk.shutdown();
+    } catch (e) {
+      console.error('❌ Error shutting down OpenTelemetry:', e);
+    }
     
     // healthCheck.stop(); // Assuming a stop method
     console.log('🎯 Graceful shutdown complete');
