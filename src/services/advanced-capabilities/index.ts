@@ -85,3 +85,39 @@ export function getProviderStatuses(): ProviderStatus[] {
     { name: 'openai_compat', available: !!process.env.OPENAI_COMPAT_API_KEY && !!process.env.OPENAI_COMPAT_BASE_URL }
   ];
 }
+
+export interface ProviderHealth {
+  provider: string;
+  successCount: number;
+  errorCount: number;
+  avgLatencyMs: number;
+  lastUpdated: number;
+}
+
+class ProviderHealthStore {
+  private health: Map<string, ProviderHealth> = new Map();
+
+  update(entry: ModelTelemetry) {
+    const key = `${entry.provider}`;
+    const current = this.health.get(key) || { provider: entry.provider, successCount: 0, errorCount: 0, avgLatencyMs: entry.latencyMs, lastUpdated: Date.now() };
+    const total = current.successCount + current.errorCount + 1;
+    const newAvg = (current.avgLatencyMs * (total - 1) + entry.latencyMs) / total;
+    this.health.set(key, {
+      provider: entry.provider,
+      successCount: current.successCount + (entry.success ? 1 : 0),
+      errorCount: current.errorCount + (entry.success ? 0 : 1),
+      avgLatencyMs: Math.floor(newAvg),
+      lastUpdated: Date.now()
+    });
+  }
+
+  get(provider: string): ProviderHealth | undefined {
+    return this.health.get(provider);
+  }
+
+  snapshot(): ProviderHealth[] {
+    return Array.from(this.health.values());
+  }
+}
+
+export const providerHealthStore = new ProviderHealthStore();

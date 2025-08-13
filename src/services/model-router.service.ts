@@ -8,7 +8,7 @@ import { MistralProvider } from '../providers/mistral.provider.js';
 import { OpenAICompatProvider } from '../providers/openai-compatible.provider.js';
 import { modelRegistry } from './model-registry.service.js';
 import type { ModelCard, ProviderName, RoutingSignal } from '../config/models.js';
-import { modelTelemetryStore } from './advanced-capabilities/index.js';
+import { modelTelemetryStore, providerHealthStore } from './advanced-capabilities/index.js';
 import { getEnvAsBoolean } from '../utils/env.js';
 import { OpenAIResponsesProvider } from '../providers/openai-responses.provider.js';
 import { retry } from '../utils/retry.js';
@@ -72,6 +72,11 @@ export class ModelRouterService {
   }
 
   private async callProvider(card: ModelCard, prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<string> {
+    // short-circuit unhealthy provider if error rate is high
+    const health = providerHealthStore.get(card.provider);
+    if (health && health.errorCount >= 5 && health.errorCount > health.successCount * 2 && Date.now() - health.lastUpdated < 60_000) {
+      throw new Error(`Provider ${card.provider} temporarily unhealthy`);
+    }
     const mapped = history.map(m => ({ role: (m.role === 'model' ? 'assistant' : (m.role as 'user' | 'assistant' | 'system')), content: m.parts.map(p => (p as any).text || '').join(' ') }));
     const start = Date.now();
     const traceId = getTraceId();
@@ -132,6 +137,7 @@ export class ModelRouterService {
 
       const latencyMs = Date.now() - start;
       modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: true });
+      providerHealthStore.update({ provider: card.provider, model: card.model, latencyMs, success: true });
       try {
         const { prisma } = await import('../db/prisma.js');
         if (getEnvAsBoolean('FEATURE_PERSIST_TELEMETRY', false)) {
@@ -142,6 +148,7 @@ export class ModelRouterService {
     } catch (e) {
       const latencyMs = Date.now() - start;
       modelTelemetryStore.record({ provider: card.provider, model: card.model, latencyMs, success: false });
+      providerHealthStore.update({ provider: card.provider, model: card.model, latencyMs, success: false });
       logger.error('Model call failed', e as Error, { metadata: { provider: card.provider, model: card.model, traceId } });
       try {
         const { prisma } = await import('../db/prisma.js');
@@ -155,11 +162,24 @@ export class ModelRouterService {
 
   async generateWithMeta(prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<GenerationMeta> {
     return await withSpan('router.generateWithMeta', async () => {
+      // if circuit breaker tripped for preferred provider, allow fallback
       const preferred = modelRegistry.selectModel(prompt, history);
-      const text = await withSpan('router.callProvider', async () => this.callProvider(preferred, prompt, history, systemPrompt), {
-        provider: preferred.provider,
-        model: preferred.model
-      });
+      let text: string;
+      try {
+        text = await withSpan('router.callProvider', async () => this.callProvider(preferred, prompt, history, systemPrompt), {
+          provider: preferred.provider,
+          model: preferred.model
+        });
+      } catch (err) {
+        // Fallback to next available model
+        const fallback = modelRegistry.listAvailableModels().find(m => m.provider !== preferred.provider) || preferred;
+        text = await withSpan('router.callProvider', async () => this.callProvider(fallback, prompt, history, systemPrompt), {
+          provider: fallback.provider,
+          model: fallback.model,
+          fallback: true
+        });
+        return { text, provider: fallback.provider, model: fallback.model };
+      }
       return { text, provider: preferred.provider, model: preferred.model };
     }, { route: 'auto' });
   }
