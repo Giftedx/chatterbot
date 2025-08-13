@@ -1,230 +1,387 @@
-# Chatterbot — Advanced Discord AI with 34 AI Capabilities
+# Chatterbot — Production‑Ready Discord AI Bot
 
-> A production-ready Discord bot powered by cutting-edge AI frameworks including AutoGen Multi-Agent, DSPy, Semantic Routing, Neural-Symbolic Reasoning, MoE Architecture, RAG 2.0, Constitutional AI, and Quantum-Inspired AI. End users see just one command: `/chat`. Everything else happens automatically behind the scenes.
+[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/Giftedx/chatterbot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Giftedx/chatterbot/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-jest-informational)](jest.config.js)
 
-## 🚀 Advanced AI Framework Integration (2025)
+> A modern Discord bot with agentic intelligence, multi‑provider model routing, long‑term memory, multimodal analysis, safety moderation, analytics, and optional durable orchestration. Users see one command: `/chat`. Everything else is automatic.
 
-**34 Total AI Capabilities** spanning the entire spectrum of modern AI technology:
+### Highlights
+- One visible command: `/chat` (prompt + optional attachment)
+- Automatic provider routing across OpenAI, Anthropic, Gemini, Groq, Mistral, and OpenAI‑compatible endpoints
+- Long‑term memory and personalized responses (opt‑in, revocable)
+- Advanced moderation for text, images, and attachments
+- Health and metrics endpoints; optional analytics dashboard
+- Optional Temporal worker for durable orchestration
+- Vector search with pgvector (optional)
 
-### Core Advanced Frameworks (16)
-- **AutoGen Multi-Agent Framework** - Microsoft's collaborative AI with 5 specialized agents
-- **DSPy Structured Prompting** - Stanford's systematic AI reasoning with optimization pipelines  
-- **Semantic Routing & Intent Classification** - Intelligent query routing with OpenAI embeddings
-- **Neural-Symbolic Reasoning** - Hybrid TensorFlow.js + symbolic logic system
-- **LangGraph Agentic Workflows** - Complex multi-step reasoning workflows
-- **CrewAI Specialists** - Domain-specific collaborative AI teams
-- **Long-term Memory Subsystem** - Persistent episodic and semantic memory
-- **Enhanced Multimodal GPT-4o** - Advanced vision, audio, and document processing
-- **Real-time Streaming Backbone** - Live AI interactions with WebSocket support
-- **Hardened Audio Processing** - Speech-to-text, text-to-speech, and audio analysis
-- **MLOps Lifecycle Management** - Automated model training and deployment
-- **Edge AI Deployment** - Sub-50ms inference with geographic load balancing
-- **Advanced Vector Database** - Multi-modal semantic search with HNSW indexing
-- **Temporal Workflow Orchestration** - Durable, fault-tolerant AI operations
-- **Constitutional AI Safety** - 7-principle ethical framework with real-time filtering
-- **Comprehensive Analytics** - Real-time performance monitoring and optimization
+### Feature matrix
 
-### 2025 Cutting-Edge Frameworks (10)
-- **Mixture of Experts (MoE)** - Dynamic expert routing across 6 specialized domains
-- **RAG 2.0 with Hybrid Search** - Next-generation retrieval with multi-modal embeddings
-- **Compound AI Systems** - Multi-component orchestration with parallel workflows
-- **Federated Learning** - Privacy-preserving distributed ML with 8 simulated clients
-- **Causal AI & Reasoning** - Automated causal discovery with PC, GES, LiNGAM algorithms
-- **LangChain Expression Language (LCEL)** - Advanced prompt engineering framework
-- **Graph Neural Networks** - Knowledge graph processing with GCN, GraphSAGE, GAT, GIN
-- **Meta-Learning Framework** - Few-shot learning with MAML, Reptile, Prototypical Networks
-- **Quantum-Inspired AI** - Quantum annealing and superposition for optimization
-- **Multi-Agent Conversation Systems** - Advanced coordination and collaboration
+| Feature | Status / Flag | Notes |
+|---|---|---|
+| Multi‑provider model routing | On by default | `src/config/models.ts` selects best model per message |
+| Long‑term memory & personalization | ENABLE_ENHANCED_INTELLIGENCE | Prisma `UserMemory`, per‑user opt‑in |
+| Moderation (text/image/attachments) | ENABLE_MODERATION | Per‑guild config in DB |
+| Multimodal (image/audio/docs) | On | `src/multimodal/*` |
+| RAG with pgvector | FEATURE_PGVECTOR | Requires Postgres + `DATABASE_URL` |
+| Cohere rerank | FEATURE_RERANK | `COHERE_API_KEY` required |
+| Temporal orchestration | FEATURE_TEMPORAL | Durable workflows (optional) |
+| MCP tooling (web, scrape, memory) | ENABLE_ENHANCED_INTELLIGENCE + keys | Consent prompts for higher‑risk tools |
+| Analytics dashboard API | ENABLE_ANALYTICS_DASHBOARD | Port `ANALYTICS_DASHBOARD_PORT` |
+| OpenTelemetry tracing | On by default | `OTEL_EXPORTER_OTLP_ENDPOINT` |
 
-### Enhanced Core Features (8)
-- **Intelligent Framework Selection** - Automatic optimal capability routing
-- **Cross-Modal Processing** - Seamless text, image, audio, video, and structured data
-- **Constitutional Safety Layer** - All outputs filtered through comprehensive ethical AI
-- **Real-time Performance Monitoring** - Health checks across all 34 capabilities
-- **Multi-Framework Collaboration** - Complex problems solved using coordinated frameworks
-- **Advanced Memory Systems** - Episodic, semantic, and procedural memory integration
-- **Enterprise-Grade Orchestration** - Production-ready scalability and reliability
-- **Comprehensive Error Handling** - Graceful degradation and automatic recovery
+## Stack
+- Runtime: Node.js 18+ (ESM), TypeScript
+- Discord: `discord.js@14`
+- AI Providers: `openai`, `@google/generative-ai` (Gemini), `@anthropic-ai/sdk`, `groq-sdk`, `@mistralai/mistralai`, OpenAI‑compatible endpoints
+- Orchestration: Optional Temporal (`@temporalio/*`) behind feature flag
+- Data: Prisma (default SQLite), optional Postgres + pgvector
+- Observability: OpenTelemetry (OTLP HTTP exporter)
+- Tests: Jest + ts‑jest
 
-### What users experience
-- Type `/chat` once to opt in. You’ll get a short, friendly consent message.
-- The bot replies only in a personal thread (or DM if you choose “Move to DM?”). No channel clutter.
-- After that, just talk normally in your thread/DM and the bot replies when addressed.
-- Say things like “pause for 30 minutes”, “resume”, “delete my data”, “export my data”, or “what do you know about me?” at any time; the bot handles it quietly via DM.
-
-### Key Highlights
-- **Single visible command**: `/chat` (prompt + optional attachment) powered by 34 AI capabilities
-- **Intelligent AI Framework Selection**: Automatic routing to optimal capabilities based on query analysis
-- **Advanced Multi-Agent Systems**: AutoGen and CrewAI for collaborative problem solving
-- **Next-Generation RAG**: Hybrid search with multi-modal embeddings and constitutional safety
-- **Real-time Edge AI**: Sub-50ms inference with geographic load balancing
-- **Comprehensive Memory**: Long-term episodic, semantic, and procedural memory systems
-- **Production-Ready**: Enterprise-grade reliability, monitoring, and scalability
-- **Constitutional AI Safety**: 7-principle ethical framework protecting all interactions
-
----
-
-### Quick Start
+## Quick start
 ```bash
-# 1) Install dependencies
+# 1) Install deps
 npm install
 
 # 2) Configure environment
 cp env.example .env
-# Set: DISCORD_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
-# Optional: STABILITY_API_KEY (images), TENOR_API_KEY (GIFs), ELEVENLABS_API_KEY (TTS)
+# Required at minimum:
+# DISCORD_TOKEN=...
+# DISCORD_CLIENT_ID=...
+# GEMINI_API_KEY=...    # default provider; see Providers below
 
-# 3) Initialize database (SQLite by default)
+# 3) Initialize Prisma (SQLite default)
 npx prisma migrate dev --name init
 
-# 4) Run in dev
+# 4) Run in dev (tsx)
 npm run dev
 ```
 
----
+Minimal .env
+```env
+DISCORD_TOKEN=your_discord_bot_token
+DISCORD_CLIENT_ID=your_discord_client_id
+GEMINI_API_KEY=your_gemini_api_key
+NODE_ENV=development
+HEALTH_CHECK_PORT=3000
+ENABLE_MODERATION=true
+ENABLE_ENHANCED_INTELLIGENCE=false
+```
 
-### Production Postgres + pgvector (recommended)
-- Set `DATABASE_URL` to your Postgres connection string and set `FEATURE_PGVECTOR=true`.
-- Ensure pgvector extension is available:
+What to expect
+- On first `/chat`, the bot posts a brief consent notice and creates a personal thread (or offers “Move to DM?”).
+- Continue talking in your thread/DM; the bot replies when addressed.
+- Natural‑language privacy controls work anytime: “delete my data”, “export my data”, “pause for 30 minutes”, “resume”.
+
+## Getting the bot into a server
+1) Create an application at the Discord Developer Portal and add a Bot. Copy the Bot Token to `.env` as `DISCORD_TOKEN`.
+2) Enable intents: in Bot settings, toggle “Message Content Intent”.
+3) Generate an invite URL (replace CLIENT_ID and adjust permissions as needed):
+   - `https://discord.com/api/oauth2/authorize?client_id=CLIENT_ID&scope=bot%20applications.commands&permissions=274877975552`
+   - Use the [Discord Permissions Calculator](https://discordapi.com/permissions.html) and see [OAuth2 scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to tailor permissions.
+4) Invite the bot to your server using that URL.
+5) Run the bot (`npm run dev`) and use `/chat` in your server.
+
+## Commands
+- `/chat prompt [attachment]`
+  - Only command registered by default. Registration happens at startup via application commands (global). Propagation can take minutes.
+
+### Faster dev registration (guild‑scoped)
+For faster propagation during development, register commands to a single guild. Set `DISCORD_GUILD_ID` and use this route in your registration step:
+```ts
+await rest.put(
+  Routes.applicationGuildCommands(DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID!),
+  { body: allCommands }
+);
+```
+Revert to global registration for production:
+```ts
+await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), { body: allCommands });
+```
+
+## Health, metrics, analytics
+- Health server: `GET /health` (JSON) on `HEALTH_CHECK_PORT` (default 3000)
+- Prometheus metrics: `GET /metrics`
+- Optional analytics dashboard API: set `ENABLE_ANALYTICS_DASHBOARD=true` (port `ANALYTICS_DASHBOARD_PORT`, default 3001)
+
+Relevant files
+- `src/health.ts`
+- `src/services/analytics-dashboard.ts`
+
+## Providers and model routing
+Provider and model selection is automatic based on task signals (coding, long context, multimodal, safety, latency). Supported providers are defined in `src/config/models.ts`.
+
+Environment (see `env.example` for all keys)
+```env
+# Default provider (used when routing ties)
+DEFAULT_PROVIDER=gemini
+
+# OpenAI
+OPENAI_API_KEY=...
+OPENAI_MODEL=gpt-4o-mini
+
+# Anthropic
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL=claude-3-5-sonnet-latest
+
+# Gemini
+GEMINI_API_KEY=...
+
+# Groq (Llama 3.x)
+GROQ_API_KEY=...
+GROQ_MODEL=llama-3.1-70b-versatile
+
+# Mistral
+MISTRAL_API_KEY=...
+MISTRAL_MODEL=mistral-large-latest
+
+# OpenAI-compatible (e.g., OpenRouter, vLLM)
+OPENAI_COMPAT_API_KEY=...
+OPENAI_COMPAT_BASE_URL=https://your-endpoint/v1
+OPENAI_COMPAT_MODEL=qwen2.5-32b-instruct
+```
+
+### Provider compatibility
+
+| Provider | Example model | Modalities | Function calling | Notes |
+|---|---|---|---|---|
+| OpenAI | gpt-4o-mini | text, image, tools | yes | fast, low cost |
+| Anthropic | claude-3-5-sonnet-latest | text, tools | no | long context, high safety |
+| Gemini | gemini-1.5-pro | text, image, tools | no | multimodal, very long context |
+| Groq | llama-3.1-70b-versatile | text | no | very low latency |
+| Mistral | mistral-large-latest | text, tools | yes | coding/tools |
+| OpenAI‑compatible | qwen2.5-32b-instruct | text, tools | yes | custom endpoints |
+
+Notes reflect defaults from `src/config/models.ts`; behavior can change with provider updates.
+
+## Memory and personalization
+- Long‑term memory is stored via Prisma models (see `prisma/schema.prisma` → `UserMemory`, conversations, topics, media).
+- Personalized responses are enabled when `ENABLE_ENHANCED_INTELLIGENCE=true`.
+- Background consolidation and maintenance run on intervals (`MEMORY_CONSOLIDATION_INTERVAL`, `VECTOR_MAINTENANCE_INTERVAL`).
+
+Key files
+- `src/memory/user-memory.service.ts`
+- `src/services/advanced-memory/*`
+- `src/services/schedulers/*`
+
+## Moderation and safety
+- Text and image moderation with configurable strictness, incident logging, and optional auto‑delete.
+- Attachment safety checks and type validation.
+
+Key files
+- `src/moderation/moderation-service.ts`
+- `src/moderation/advanced-text-moderation.ts`
+- `src/moderation/advanced-image-moderation.ts`
+- `prisma/schema.prisma` (incidents, configs)
+
+Env (examples)
+```env
+ENABLE_MODERATION=true
+# Per‑guild config is stored in DB; defaults can be adjusted via code
+```
+
+## Multimodal analysis
+Process images, audio, and documents; integrate results into conversation, RAG, and verification flows.
+
+Key files
+- `src/multimodal/` (image, audio, document, integration)
+- `src/audio/hardened-processing.service.ts`
+
+## RAG and vector search (optional)
+- Use Postgres + pgvector to enable semantic search across knowledge base entries.
+- Enable with `FEATURE_PGVECTOR=true` and set `DATABASE_URL` or `POSTGRES_*` envs.
+- Optional Cohere rerank: `FEATURE_RERANK=true` + `COHERE_API_KEY`.
+
+Minimal setup
 ```sql
+-- on your Postgres db
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
-- The app will auto-create table/indexes for vector search on first run. To pre-create:
-```sql
-CREATE TABLE IF NOT EXISTS kb_vectors (
-  id TEXT PRIMARY KEY,
-  user_id TEXT,
-  guild_id TEXT,
-  content TEXT NOT NULL,
-  embedding vector(1536),
-  metadata JSONB DEFAULT '{}'::jsonb
-);
-CREATE INDEX IF NOT EXISTS kb_vectors_embedding_idx ON kb_vectors USING ivfflat (embedding vector_l2_ops);
+
+Railway (pgvector)
+```bash
+# Connect to your Railway Postgres and enable pgvector
+# Option A: open a psql shell then run the SQL above
+railway connect
+
+# Option B: run psql non‑interactively if psql is available and DATABASE_URL is set
+psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-### OpenTelemetry Tracing
-- Export traces to an OTLP endpoint by setting `OTEL_EXPORTER_OTLP_ENDPOINT` (default `http://localhost:4318/v1/traces`).
-- Tracing is initialized at startup and shut down gracefully on exit.
+Docker Postgres (pgvector)
+```yaml
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=chatterbot
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg-initdb:/docker-entrypoint-initdb.d
 
----
+# ./pg-initdb/01-pgvector.sql
+# CREATE EXTENSION IF NOT EXISTS vector;
+```
 
-### The only command
-- `/chat prompt [attachment]`
-  - On first use: you’ll see a short ephemeral consent and the bot will create a personal thread and offer “Move to DM?”.
-  - After that: just talk in your thread or DM. Ask to “switch to DMs” or “talk here” to move.
-  
-Note: No other slash commands are exposed by default. Natural-language privacy controls work any time (delete/export/pause/resume/new topic).
+Key files
+- Basic: `src/vector/pgvector.repository.ts`
+- Enhanced: `src/vector/pgvector-enhanced.repository.ts`
+- Docs: `docs/pgvector-setup.md`
 
----
+## Orchestration (optional)
+- Temporal worker for durable, multi‑step AI workflows; feature‑flagged to avoid runtime deps unless enabled.
+- Enable with `FEATURE_TEMPORAL=true`. Configure `TEMPORAL_*` envs.
 
-### Processing pipeline (robust, autonomous)
-The bot runs a single, well-defined pipeline for every message:
-1. Privacy and consent checks (opt-in with `/chat` once)
-2. Moderation (text + attachments)
-3. Unified message analysis (intents, domains, complexity, attachments) with input sanitization and length limiting
-4. Retrieval (conversation history, memories, knowledge base RAG)
-5. Tool/MCP orchestration as needed (web search, scraping, browser, etc.)
-6. Model routing across providers (OpenAI/Anthropic/Gemini/Groq/Mistral/compatible)
-7. Answer verification (self-critique, cross-model comparison, optional auto-rerun)
-8. Personalization and memory update (durable memory and summaries)
-9. Response delivery with enhanced UI (threads/DMs, attachments)
+Key files
+- `src/orchestration/temporal/loader.ts` (flag‑gated)
+- `src/orchestration/temporal/runtime.ts` (worker)
+- `src/orchestration/temporal/workflows/*`, `activities/*`
+- `src/orchestration/temporal/README.md`
 
----
+Run locally (example)
+```bash
+FEATURE_TEMPORAL=true npm run dev
+```
 
-### Observability & Ops
-- Health: GET `/health`
-- Metrics: GET `/metrics`
-- Optional dashboard: set `ENABLE_ANALYTICS_DASHBOARD=true` and visit `http://localhost:3001`
-- DM-only admin diagnose (no commands):
-  - DM the bot with phrases like “diagnose”, “status”, “health”, “providers”, “telemetry”, or “kb”.
-  - Only users recognized as admins (via RBAC) will receive a DM summary of provider availability, recent model usage, and knowledge base stats.
-  - Configure keywords via `DIAGNOSE_KEYWORDS` env (comma-separated).
-- Verification metrics (for tuning): exported via code (`getVerificationMetrics`) and can be logged periodically to observe low-agreement rates and reruns.
+## MCP integration (tools)
+- Real MCP clients via `@modelcontextprotocol/sdk` for web search, content extraction, and memory tools.
+- Consent prompts are shown for higher‑risk tools (web search, scraping, DB), handled via Discord buttons.
 
----
+Key files
+- `src/services/mcp-manager.service.ts`
+- `src/services/mcp-integration.service.ts`
+- `src/config/mcp-servers.config.ts`
+- Examples: `examples/mcp-integration-examples.ts`, `examples/personalization-mcp-examples.ts`
 
-### Knowledge Base RAG
-- Vector-first retrieval when `FEATURE_PGVECTOR=true` and OpenAI embeddings are configured; falls back to Prisma chunks or keyword search.
-- Optional Cohere reranking when `FEATURE_RERANK=true` and `COHERE_API_KEY` is set.
-- Ingestion helper: `KnowledgeBaseIngestService.addSource(guildId, title, content, url?)` to add and embed new content.
-- Background ingestion (optional): set `KB_INGEST_CHANNEL_ID` to automatically ingest URLs posted in that channel.
+Related env (examples)
+```env
+# MCP servers (examples)
+BRAVE_API_KEY=...
+FIRECRAWL_API_KEY=...
+ENABLE_ENHANCED_INTELLIGENCE=true
+```
 
----
+## Observability
+- OpenTelemetry tracing is enabled at startup; shutdown is handled gracefully.
+- Configure exporter:
+```env
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
+```
 
-### Development
-- Build: `npm run build`
-- Lint: `npm run lint`
-- Typecheck: `npm run typecheck`
-- Test: `npm test`
-- Docs: `npm run docs`
+Key file
+- `src/telemetry.ts`
 
-### Docker
+## Rate limiting
+Per‑user rate limiting for interactions and free‑form messages.
+```env
+MAX_REQUESTS_PER_MINUTE=60
+```
+
+## Project structure (selected)
+- `src/index.ts`: Entry point, command registration, event handlers, schedulers, analytics, health server
+- `src/services/core-intelligence.service.ts`: Core pipeline for `/chat`
+- `src/services/*`: Advanced capabilities, memory, routing, ingestion, verification, etc.
+- `src/agents/*`: AutoGen/CrewAI/LangGraph/DSPy scaffolding and workflows
+- `src/multimodal/*`: Image, audio, and document processing
+- `src/conversation/*`: Context windows, summarization, topic detection
+- `src/providers/*`: Provider adapters (OpenAI, OpenAI‑compatible, etc.)
+- `src/db/*`, `prisma/*`: Prisma setup
+
+## Environment reference
+- A comprehensive reference is in `env.example` (over 150 keys across features).
+- Common, safe defaults are provided; advanced features are opt‑in via `FEATURE_*` and `ENABLE_*` flags.
+
+## Local development
+Scripts (`package.json`)
+```bash
+# Dev
+npm run dev            # tsx watch src/index.ts
+npm run dev:health     # health server only
+
+# Quality
+npm run typecheck
+npm run lint
+
+# Tests
+npm test
+npm run test:watch
+npm run test:coverage
+npm run test:ci
+
+# Build and run
+npm run build
+npm start
+
+# Prisma
+npm run db:migrate     # npx prisma migrate deploy
+npm run db:studio      # npx prisma studio
+
+# Docs
+npm run docs           # typedoc
+```
+
+Husky pre‑commit
+- `./.husky/pre-commit` runs `lint` and `typecheck`.
+
+Makefile conveniences
+```bash
+make verify-env
+make agent-setup
+make test
+make clean
+```
+
+## Docker
 ```bash
 docker build -t chatterbot .
 docker run --rm -it \
   -e DISCORD_TOKEN=... \
   -e DISCORD_CLIENT_ID=... \
   -e GEMINI_API_KEY=... \
+  -p 3000:3000 -p 3001:3001 \
   chatterbot
 ```
+- Image exposes 3000 (/health, /metrics) and 3001 (analytics API if enabled).
+- Uses `dumb-init` and a non‑root user.
 
+## Deployment
+- See `DEPLOYMENT.md` for Railway‑based deployment and CI examples.
+- GitHub Actions: `CI` (typecheck/lint/test/build) and `CI-CD` (Docker build + optional GHCR push).
+
+## Permissions and intents
+- Enable “Message Content Intent” for your application in the Discord Developer Portal.
+- The bot requests `Guilds`, `GuildMessages`, and `MessageContent` intents.
+
+## Data and privacy
+- Users opt in once via `/chat`. Consent buttons are used where required by tools.
+- Users can request deletion via a modal (“DELETE ALL MY DATA” confirmation).
+- See `src/ui/privacy-consent.handlers.ts` and `src/ui/privacy-consent.ts`.
+
+## Further reading
+- Architecture: `docs/ARCHITECTURE.md`
+- Advanced capabilities: `docs/ADVANCED_CAPABILITIES.md`
+- Feature flags: `docs/FEATURE_FLAGS.md`
+- Security guidelines: `docs/SECURITY_GUIDELINES.md`
+- pgvector setup: `docs/pgvector-setup.md`
+- Temporal orchestration: `src/orchestration/temporal/README.md`
+
+## Troubleshooting
+- Global command registration can take time to propagate. Prefer guild‑scoped during development if needed.
+- Prisma client missing: run `npx prisma generate` (Dockerfile already does this in build stage).
+- Missing envs: run `node scripts/verify-env.mjs` or `make verify-env`.
+- Temporal worker requires `FEATURE_TEMPORAL=true` and `@temporalio/*` runtime; see `src/orchestration/temporal/README.md`.
+
+## Contributing
+- See `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md`.
+
+## Security
+- See `SECURITY.md` and `docs/SECURITY_GUIDELINES.md`.
+
+## License
 MIT © 2025
-
-## Multi-Provider Model Routing and Verification
-
-- Model registry with model cards in `src/config/models.ts` supports: OpenAI, Anthropic, Gemini, Groq (Llama 3.x), Mistral, and OpenAI-compatible endpoints (e.g., OpenRouter/vLLM).
-- Automatic routing selects the best model based on signals (coding, long context, safety, latency). Users do not choose providers; the AI selects automatically per message.
-- Optional internal enhancements (flag-controlled):
-  - LangGraph-driven intent conditioning (`FEATURE_LANGGRAPH=true`) to improve tone/precision.
-  - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations.
-  - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop. Optionally append tool summaries in the final answer with `FEATURE_TOOL_SUMMARY=true`.
-  - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
-  - Edge AI deployment (`EDGE_*` envs) for low-latency responses with health-checked nodes.
-
-Environment flags (see `env.example`):
-
-```
-DEFAULT_PROVIDER=gemini
-# Providers
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-GROQ_API_KEY=...
-MISTRAL_API_KEY=...
-OPENAI_COMPAT_API_KEY=...
-OPENAI_COMPAT_BASE_URL=...
-
-# Verification
-ENABLE_ANSWER_VERIFICATION=true
-CROSS_MODEL_VERIFICATION=true
-MAX_RERUNS=1
-
-# Optional advanced SDK integrations
-FEATURE_VERCEL_AI=false
-FEATURE_LANGGRAPH=false
-FEATURE_OPENAI_RESPONSES=false
-FEATURE_OPENAI_RESPONSES_TOOLS=false
-FEATURE_TOOL_SUMMARY=false
-FEATURE_RERANK=false
-FEATURE_PERSIST_TELEMETRY=false
-FEATURE_PGVECTOR=false
-FEATURE_TEMPORAL=false
-COST_TIER_MAX=medium   # one of: low|medium|high (max spend)
-SPEED_TIER_MIN=medium  # one of: slow|medium|fast (min speed)
-COHERE_API_KEY=...
-
-# OpenTelemetry
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318/v1/traces
-
-# Edge AI deployment
-EDGE_MAX_NODES=5
-EDGE_LOAD_THRESHOLD=0.8
-EDGE_SYNC_INTERVAL_MS=30000
-EDGE_FAILOVER_ENABLED=true
-EDGE_MODEL_REPLICATION=2
-EDGE_UPTIME_SUCCESS_RATE=0.95
-EDGE_MAX_SIMULATED_LOAD_FACTOR=0.9
-```
-
-### Optional streaming (internal)
-- When `FEATURE_VERCEL_AI=true`, slash interactions may stream responses using the internal streaming path for supported providers.
-- This is automatic and does not expose new user options.
