@@ -170,15 +170,35 @@ export class RealTimeStreamingService extends EventEmitter {
 
   private async authenticateConnection(req: any, callback: (err: string | null | undefined, success: boolean) => void): Promise<void> {
     try {
-      // Basic authentication check (in production, use proper JWT validation)
-      const token = req.handshake?.auth?.token || req.handshake?.query?.token;
-      
+      // Socket.IO allowRequest receives a raw IncomingMessage. Extract token from query/header.
+      let token: string | undefined;
+
+      // 1) Try handshake-style (in case of different invocation context)
+      token = req.handshake?.auth?.token || req.handshake?.query?.token;
+
+      // 2) Parse from URL query string of the raw request
+      if (!token && typeof req.url === 'string') {
+        try {
+          const url = new URL(req.url, 'http://localhost');
+          const q = url.searchParams.get('token');
+          if (q) token = q;
+        } catch {}
+      }
+
+      // 3) Check common auth headers
+      if (!token && req.headers) {
+        const auth = req.headers['authorization'] || req.headers['Authorization'];
+        if (typeof auth === 'string' && auth.startsWith('Bearer ')) {
+          token = auth.slice('Bearer '.length).trim();
+        }
+      }
+
       if (!token) {
         callback('Authentication required', false);
         return;
       }
 
-      // For now, accept any token that starts with 'user_'
+      // Placeholder validation (replace with proper JWT validation in production)
       if (typeof token === 'string' && token.startsWith('user_')) {
         callback(null, true);
       } else {
@@ -478,6 +498,7 @@ export class RealTimeStreamingService extends EventEmitter {
           type: channelType,
           participants: [],
           created_at: new Date(),
+          message_retention: this.MESSAGE_BUFFER_SIZE,
           max_participants: channelType === 'direct' ? 2 : undefined
         };
 
@@ -710,7 +731,10 @@ export class RealTimeStreamingService extends EventEmitter {
   }
 
   private extractUserIdFromSocket(socket: Socket): string | null {
-    const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    let token = socket.handshake.auth?.token || socket.handshake.query?.token as string | undefined;
+    if (!token && typeof socket.handshake.headers?.authorization === 'string' && socket.handshake.headers.authorization.startsWith('Bearer ')) {
+      token = socket.handshake.headers.authorization.slice('Bearer '.length).trim();
+    }
     if (typeof token === 'string' && token.startsWith('user_')) {
       return token.substring(5); // Remove 'user_' prefix
     }
@@ -730,7 +754,8 @@ export class RealTimeStreamingService extends EventEmitter {
         name: channelConfig.name,
         type: channelConfig.type,
         participants: [],
-        created_at: new Date()
+        created_at: new Date(),
+        message_retention: this.MESSAGE_BUFFER_SIZE
       };
 
       this.channels.set(channel.id, channel);

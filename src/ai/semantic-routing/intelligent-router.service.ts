@@ -109,6 +109,9 @@ interface ContextualFactors {
   };
 }
 
+// Embedding dimensions
+const DEFAULT_EMBEDDING_DIMENSION = 1536; // Override via env if needed
+
 class SemanticRoutingService extends EventEmitter {
   private isInitialized = false;
   private routes: Map<string, SemanticRoute> = new Map();
@@ -663,7 +666,7 @@ Provide response in JSON format:
       return embedding;
     } catch (error) {
       console.warn('Failed to generate embedding, using fallback:', error);
-      return Array.from({ length: 1536 }, () => Math.random() - 0.5);
+      return Array.from({ length: DEFAULT_EMBEDDING_DIMENSION }, () => Math.random() - 0.5);
     }
   }
 

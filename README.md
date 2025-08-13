@@ -108,6 +108,7 @@ MIT © 2025
   - OpenAI Responses API path (`FEATURE_OPENAI_RESPONSES=true`) for higher-quality generations.
   - OpenAI Responses Tools (`FEATURE_OPENAI_RESPONSES_TOOLS=true`) to allow the model to call internal MCP-like tools (memory/web/content extraction/browser/sequential thinking) via a function-calling loop. Optionally append tool summaries in the final answer with `FEATURE_TOOL_SUMMARY=true`.
   - Cohere Rerank (`FEATURE_RERANK=true` + `COHERE_API_KEY`) to improve RAG snippet ordering and reduce noise.
+  - Edge AI deployment (`EDGE_*` envs) for low-latency responses with health-checked nodes.
 
 Environment flags (see `env.example`):
 
@@ -137,6 +138,15 @@ FEATURE_PERSIST_TELEMETRY=false
 COST_TIER_MAX=medium   # one of: low|medium|high (max spend)
 SPEED_TIER_MIN=medium  # one of: slow|medium|fast (min speed)
 COHERE_API_KEY=...
+
+# Edge AI deployment
+EDGE_MAX_NODES=5
+EDGE_LOAD_THRESHOLD=0.8
+EDGE_SYNC_INTERVAL_MS=30000
+EDGE_FAILOVER_ENABLED=true
+EDGE_MODEL_REPLICATION=2
+EDGE_UPTIME_SUCCESS_RATE=0.95
+EDGE_MAX_SIMULATED_LOAD_FACTOR=0.9
 
 ### Metrics and telemetry
 - Telemetry snapshot: GET `/api/telemetry` (last N provider/model selections with latency)

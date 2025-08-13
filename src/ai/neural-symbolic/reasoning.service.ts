@@ -178,7 +178,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 1.0,
       evidence_weight: 1.0,
       domains: ['logic', 'reasoning'],
-      metadata: { type: 'deductive', classical: true }
+      metadata: { type: 'deductive', classical: true },
+      created_at: new Date()
     });
 
     // Causal reasoning rules
@@ -190,7 +191,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 0.8,
       evidence_weight: 0.9,
       domains: ['causality', 'prediction'],
-      metadata: { type: 'inductive', temporal: true }
+      metadata: { type: 'inductive', temporal: true },
+      created_at: new Date()
     });
 
     // Classification rules
@@ -202,7 +204,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 0.9,
       evidence_weight: 0.85,
       domains: ['classification', 'taxonomy'],
-      metadata: { type: 'deductive', hierarchical: true }
+      metadata: { type: 'deductive', hierarchical: true },
+      created_at: new Date()
     });
 
     // Analogy rules
@@ -214,7 +217,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 0.7,
       evidence_weight: 0.6,
       domains: ['analogy', 'similarity'],
-      metadata: { type: 'abductive', similarity_based: true }
+      metadata: { type: 'abductive', similarity_based: true },
+      created_at: new Date()
     });
 
     // Temporal reasoning
@@ -226,7 +230,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 0.85,
       evidence_weight: 0.8,
       domains: ['temporal', 'sequence'],
-      metadata: { type: 'deductive', temporal: true }
+      metadata: { type: 'deductive', temporal: true },
+      created_at: new Date()
     });
 
     // Uncertainty propagation
@@ -238,7 +243,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       confidence: 1.0,
       evidence_weight: 1.0,
       domains: ['uncertainty', 'probability'],
-      metadata: { type: 'meta_rule', mathematical: true }
+      metadata: { type: 'meta_rule', mathematical: true },
+      created_at: new Date()
     });
   }
 
@@ -262,7 +268,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
         label: concept.label,
         properties: { domain: 'ai', importance: 0.9 },
         certainty: 0.95,
-        domains: ['artificial_intelligence']
+        domains: ['artificial_intelligence'],
+        created_at: new Date()
       });
     });
 
@@ -284,7 +291,9 @@ class NeuralSymbolicReasoningService extends EventEmitter {
         target_id: rel.target,
         relation_type: rel.relation,
         weight: 0.8,
-        certainty: 0.9
+        certainty: 0.9,
+        properties: {},
+        created_at: new Date()
       });
     });
 
@@ -969,7 +978,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       properties: nodeConfig.properties || {},
       embeddings: nodeConfig.embeddings,
       certainty: nodeConfig.certainty || 0.8,
-      domains: nodeConfig.domains || ['general']
+      domains: nodeConfig.domains || ['general'],
+      created_at: new Date()
     });
 
     this.knowledgeGraph.nodes.set(nodeId, node);
@@ -998,7 +1008,8 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       relation_type: edgeConfig.relation_type || 'related_to',
       weight: edgeConfig.weight || 0.8,
       properties: edgeConfig.properties || {},
-      certainty: edgeConfig.certainty || 0.8
+      certainty: edgeConfig.certainty || 0.8,
+      created_at: new Date()
     });
 
     this.knowledgeGraph.edges.set(edgeId, edge);

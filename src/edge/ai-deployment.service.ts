@@ -5,6 +5,10 @@
 import { EventEmitter } from 'events';
 import { getEnvAsString, getEnvAsNumber, getEnvAsBoolean } from '../utils/env.js';
 
+// Simulation constants (use env to override as needed)
+const DEFAULT_UPTIME_SUCCESS_RATE = getEnvAsNumber('EDGE_UPTIME_SUCCESS_RATE', 0.95); // 95% uptime
+const MAX_SIMULATED_LOAD_FACTOR = getEnvAsNumber('EDGE_MAX_SIMULATED_LOAD_FACTOR', 0.9); // Max 90% load
+
 interface EdgeNode {
   id: string;
   location: string;
@@ -174,7 +178,7 @@ export class EdgeAIDeploymentService extends EventEmitter {
       }
 
       // Update heartbeat (simulate edge node reporting)
-      if (Math.random() > 0.05) { // 95% uptime simulation
+      if (Math.random() < DEFAULT_UPTIME_SUCCESS_RATE) { // uptime simulation
         node.last_heartbeat = now;
         node.load_factor = Math.random() * MAX_SIMULATED_LOAD_FACTOR; // Random load simulation
       }

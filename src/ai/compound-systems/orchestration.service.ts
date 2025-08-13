@@ -3,7 +3,7 @@
 // Based on 2025 research in distributed AI system architecture
 
 import { EventEmitter } from 'events';
-import { getEnvAsString, getEnvAsBoolean } from '../../utils/env.js';
+import { getEnvAsString, getEnvAsBoolean, getEnvAsNumber } from '../../utils/env.js';
 
 interface AIComponent {
   id: string;
@@ -892,8 +892,8 @@ export class CompoundAISystemsService extends EventEmitter {
       const component = this.components.get(componentId);
       if (!component) return false;
 
-      // Simulate health check
-      const isHealthy = Math.random() > 0.05; // 95% uptime simulation
+      const COMPONENT_UPTIME_SUCCESS_RATE = getEnvAsNumber('COMPONENT_UPTIME_SUCCESS_RATE', 0.95);
+      const isHealthy = Math.random() < COMPONENT_UPTIME_SUCCESS_RATE; // uptime simulation
       
       component.status = isHealthy ? 'healthy' : 'degraded';
       component.last_health_check = new Date();
@@ -927,9 +927,9 @@ export class CompoundAISystemsService extends EventEmitter {
 
   private validateComponent(component: AIComponent): boolean {
     return (
-      component.id &&
-      component.name &&
-      component.type &&
+      Boolean(component.id) &&
+      Boolean(component.name) &&
+      Boolean(component.type) &&
       component.capabilities.length > 0 &&
       component.input_types.length > 0 &&
       component.output_types.length > 0 &&

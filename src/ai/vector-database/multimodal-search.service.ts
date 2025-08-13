@@ -139,6 +139,11 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     sparse: 'bm25' // Placeholder for sparse embeddings
   };
 
+  // Embedding dimension constants
+  static readonly TEXT_EMBEDDING_DIM = 1536;
+  static readonly IMAGE_EMBEDDING_DIM = 1024;
+  static readonly AUDIO_EMBEDDING_DIM = 768;
+
   constructor() {
     super();
     this.initializeDefaultIndices();
@@ -149,7 +154,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     this.indices.set('text_index', {
       id: 'text_index',
       name: 'Primary Text Index',
-      embedding_dimension: 3072, // text-embedding-3-large dimension
+      embedding_dimension: AdvancedVectorDatabaseService.TEXT_EMBEDDING_DIM, // text-embedding-3-large dimension
       distance_metric: 'cosine',
       index_type: 'hnsw',
       parameters: {
@@ -166,7 +171,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     this.indices.set('multimodal_index', {
       id: 'multimodal_index',
       name: 'Cross-Modal Index',
-      embedding_dimension: 1024, // Hypothetical multimodal dimension
+      embedding_dimension: AdvancedVectorDatabaseService.IMAGE_EMBEDDING_DIM, // Hypothetical multimodal dimension
       distance_metric: 'cosine',
       index_type: 'hnsw',
       parameters: {
@@ -390,7 +395,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
 
     } catch (error) {
       console.warn('⚠️ Failed to generate text embedding, using mock:', error);
-      const mockEmbedding = Array.from({ length: MultimodalSearchService.TEXT_EMBEDDING_DIM }, () => Math.random() - 0.5);
+      const mockEmbedding = Array.from({ length: AdvancedVectorDatabaseService.TEXT_EMBEDDING_DIM }, () => Math.random() - 0.5);
       this.cacheEmbedding(cacheKey, mockEmbedding);
       return mockEmbedding;
     }
@@ -404,7 +409,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     }
 
     // Mock image embedding
-    const embedding = Array.from({ length: 1024 }, () => Math.random() - 0.5);
+    const embedding = Array.from({ length: AdvancedVectorDatabaseService.IMAGE_EMBEDDING_DIM }, () => Math.random() - 0.5);
     this.cacheEmbedding(cacheKey, embedding);
     return embedding;
   }
@@ -417,7 +422,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     }
 
     // Mock audio embedding
-    const embedding = Array.from({ length: 768 }, () => Math.random() - 0.5);
+    const embedding = Array.from({ length: AdvancedVectorDatabaseService.AUDIO_EMBEDDING_DIM }, () => Math.random() - 0.5);
     this.cacheEmbedding(cacheKey, embedding);
     return embedding;
   }

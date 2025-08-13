@@ -287,9 +287,9 @@ export class PgvectorRepository {
         query = `
           SELECT *, 
             (${vectorWeight} * (1 - (embedding <=> $1)) + 
-             ${textWeight} * ts_rank_cd(to_tsvector('english', content), to_tsquery('english', $${paramIndex}))) as combined_score
+             ${textWeight} * ts_rank_cd(to_tsvector('english', content), plainto_tsquery('english', $${paramIndex}))) as combined_score
           FROM (${query}) subq
-          WHERE to_tsvector('english', content) @@ to_tsquery('english', $${paramIndex})
+          WHERE to_tsvector('english', content) @@ plainto_tsquery('english', $${paramIndex})
           ORDER BY combined_score DESC
         `;
         queryParams.push(params.hybridSearch.textQuery);
@@ -607,15 +607,25 @@ export class PgvectorRepository {
   }
 
   // Helper methods
-
-  private parseVector(vectorString: string): number[] {
-    try {
-      // Parse vector string format "[1,2,3]" to array
-      return JSON.parse(vectorString.replace(/[\[\]]/g, '').split(',').map(s => s.trim()).join(','));
-    } catch {
-      return [];
-    }
-  }
+ 
+   private parseVector(vectorString: string): number[] {
+     try {
+       if (!vectorString) return [];
+       const trimmed = String(vectorString).trim();
+       // If already JSON array
+       if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+         return JSON.parse(trimmed);
+       }
+       // Postgres vector literal like "1,2,3" or "{1,2,3}" or "(1,2,3)"
+       const normalized = trimmed
+         .replace(/^\{|^\(|^\[|^<|^vector\(/i, '')
+         .replace(/\}$|\)$|\]$|>$/i, '');
+       if (!normalized) return [];
+       return normalized.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+     } catch {
+       return [];
+     }
+   }
 }
 
 // Export singleton instance

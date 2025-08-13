@@ -156,14 +156,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     causal_ai_reasoning: false,
     meta_learning: false,
     graph_neural_networks: false,
-    quantum_inspired_ai: false,
-    
-    // 2025 Next-Generation AI Frameworks
-    edge_ai_deployment: false,
-    langchain_expression_language: false,
-    advanced_prompt_engineering: false,
-    multi_modal_orchestration: false,
-    real_time_adaptation: false
+    quantum_inspired_ai: false
   };
 
   private metrics: AIFrameworkMetrics = {
@@ -479,7 +472,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
         case 'langgraph_reasoning':
           if (this.capabilities.langgraph_reasoning) {
             const result = await advancedLangGraphWorkflow.execute(query, {
-              user_context: { user_id: options.userId, session_id: options.sessionId }
+              user_context: { user_id: options.userId ?? 'unknown_user', session_id: options.sessionId ?? 'unknown_session' }
             });
             response = result.final_answer || '';
             confidence = result.confidence_score || 0;
@@ -516,7 +509,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
                 pipelines[0].id,
                 { query: query }
               );
-              response = result.outputs.answer || result.outputs.final_answer || 'DSPy processing completed';
+              response = (result.outputs as any).answer || (result.outputs as any).final_answer || 'DSPy processing completed';
               confidence = result.success ? 0.82 : 0.6;
               cost = 0.04;
             }
@@ -593,14 +586,14 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     
     // Edge AI deployment patterns
     if (/(edge|local|fast|latency|real.*time|instant|mobile|iot|distributed)/.test(queryLower)) {
-      if (this.capabilities.edge_ai_deployment) {
-        return 'edge_ai_deployment';
+      if (this.capabilities.edge_deployment) {
+        return 'edge_deployment';
       }
     }
     
     // LangChain Expression Language patterns
     if (/(chain|pipeline|workflow|expression|compose|orchestrate|sequence)/.test(queryLower)) {
-      if (this.capabilities.langchain_expression_language) {
+      if ((this.capabilities as any).langchain_expression_language) {
         return 'langchain_expression_language';
       }
     }
@@ -819,25 +812,10 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
   }
 
   // Advanced processing with semantic routing integration
-  async processWithSemanticRouting(
-    query: string,
-    options: {
-      userId?: string;
-      sessionId?: string;
-      context?: Record<string, unknown>;
-    } = {}
-  ): Promise<{
-    response: string;
-    confidence: number;
-    processing_time_ms: number;
-    cost_usd: number;
-    routing_decision: any;
-    capabilities_used: string[];
-    metadata: Record<string, unknown>;
-  }> {
+  async processWithSemanticRouting(query: string, options: { userId?: string; sessionId?: string; [k: string]: unknown } = {}) {
     if (!this.capabilities.semantic_routing) {
-      // Fallback to standard processing
-      return this.processAdvancedQuery(query, options);
+      const basic = await this.processAdvancedQuery(query, options);
+      return { ...basic, routing_decision: {} };
     }
 
     const startTime = Date.now();
@@ -869,7 +847,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
             const pipelines = dspyFrameworkService.getPipelines();
             if (pipelines.length > 0) {
               const result = await dspyFrameworkService.executePipeline(pipelines[0].id, { query });
-              response = result.outputs.code || result.outputs.answer || 'Code generation completed';
+              response = (result.outputs as any).code || (result.outputs as any).answer || 'Code generation completed';
               confidence = result.success ? 0.85 : 0.6;
               cost = 0.04;
             }
@@ -1066,7 +1044,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     try {
       console.log('🌐 Initializing Edge AI Deployment Service...');
       const success = await edgeAIDeploymentService.init();
-      this.capabilities.edge_ai_deployment = success;
+      this.capabilities.edge_deployment = success;
       
       if (success) {
         console.log('✅ Edge AI Deployment initialized successfully');
@@ -1074,7 +1052,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       return success;
     } catch (error) {
       console.warn('⚠️ Edge AI Deployment initialization failed:', error);
-      this.capabilities.edge_ai_deployment = false;
+      this.capabilities.edge_deployment = false;
       return false;
     }
   }
@@ -1083,7 +1061,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     try {
       console.log('🔗 Initializing LangChain Expression Language (LCEL)...');
       const success = await langChainExpressionLanguageService.init();
-      this.capabilities.langchain_expression_language = success;
+      (this.capabilities as any).langchain_expression_language = success;
       
       if (success) {
         console.log('✅ LangChain Expression Language initialized successfully');
@@ -1091,7 +1069,7 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       return success;
     } catch (error) {
       console.warn('⚠️ LangChain Expression Language initialization failed:', error);
-      this.capabilities.langchain_expression_language = false;
+      (this.capabilities as any).langchain_expression_language = false;
       return false;
     }
   }

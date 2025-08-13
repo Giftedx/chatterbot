@@ -140,14 +140,19 @@ export async function multimodalProcessingWorkflow(
       });
 
       // Step 2: Enhanced content processing (if requested)
-      let enhancedContent: any = undefined;
+      let enhancedContent: { type: string; content: string | Buffer; contentUrl?: string } | undefined = undefined;
       if (request.processingOptions.enhanceContent && item.type === 'image') {
-        enhancedContent = await multimodal.enhanceMultimodal({
+        const enhancement = await multimodal.enhanceMultimodal({
           contentType: `${item.type}/original`,
           content: item.content,
           enhancementType: 'upscale',
           options: { quality: 'high' }
         });
+        enhancedContent = {
+          type: `${item.type}/enhanced`,
+          content: enhancement.enhancedContent,
+          contentUrl: enhancement.enhancedContentUrl
+        };
       }
 
       // Step 3: Generate AI description (if requested)
@@ -187,8 +192,9 @@ export async function multimodalProcessingWorkflow(
       }
 
       // Calculate overall confidence for this item
-      const avgConfidence = analysisResults.reduce((sum, result) => 
-        sum + result.confidence, 0) / analysisResults.length;
+      const avgConfidence = analysisResults.length > 0
+        ? analysisResults.reduce((sum, result) => sum + (result.confidence || 0), 0) / analysisResults.length
+        : 0;
 
       const processedItem = {
         id: item.id,
@@ -201,7 +207,7 @@ export async function multimodalProcessingWorkflow(
         description,
         insights,
         confidence: avgConfidence,
-        processingTime: Date.now() - itemStartTime
+        processingTime: Math.max(0, Date.now() - itemStartTime)
       };
 
       processedItems.push(processedItem);
@@ -225,7 +231,7 @@ export async function multimodalProcessingWorkflow(
               workflowId: workflowInfo().workflowId,
               analysisTypes: request.processingOptions.analysisTypes,
               confidence: avgConfidence,
-              timestamp: new Date().toISOString()
+              timestamp: Date.now()
             }
           });
 
@@ -238,7 +244,7 @@ export async function multimodalProcessingWorkflow(
       }
 
       // Add processing delay for rate limiting
-      await sleep('100ms');
+      await sleep(100);
 
     } catch (error) {
       console.error(`Failed to process item ${item.id}:`, error);
@@ -249,7 +255,7 @@ export async function multimodalProcessingWorkflow(
         type: item.type,
         analysisResults: { error: `Processing failed: ${error}` },
         confidence: 0,
-        processingTime: Date.now() - itemStartTime
+        processingTime: Math.max(0, Date.now() - itemStartTime)
       });
     }
   }
@@ -267,7 +273,7 @@ export async function multimodalProcessingWorkflow(
     overallInsights,
     memoryUpdates,
     metadata: {
-      totalProcessingTime: Date.now() - startTime,
+      totalProcessingTime: Math.max(0, Date.now() - startTime),
       workflowId: workflowInfo().workflowId,
       itemsProcessed: processedItems.length,
       itemsRequested: request.contentItems.length,
