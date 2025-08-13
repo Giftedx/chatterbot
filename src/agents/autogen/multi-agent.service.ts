@@ -140,6 +140,7 @@ class AutoGenMultiAgentService extends EventEmitter {
       },
       human_input_mode: 'NEVER',
       max_consecutive_auto_reply: 10,
+      memory: { type: 'short_term', max_messages: 100 },
       capabilities: ['general_assistance', 'problem_solving', 'coordination']
     });
 
@@ -170,6 +171,8 @@ class AutoGenMultiAgentService extends EventEmitter {
         ]
       },
       human_input_mode: 'NEVER',
+      max_consecutive_auto_reply: 10,
+      memory: { type: 'short_term', max_messages: 100 },
       code_execution_config: {
         work_dir: '/tmp/autogen_code',
         use_docker: false,
@@ -192,6 +195,8 @@ class AutoGenMultiAgentService extends EventEmitter {
         max_tokens: 2000
       },
       human_input_mode: 'NEVER',
+      max_consecutive_auto_reply: 10,
+      memory: { type: 'short_term', max_messages: 100 },
       capabilities: ['quality_assurance', 'code_review', 'solution_validation']
     });
 
@@ -208,6 +213,8 @@ class AutoGenMultiAgentService extends EventEmitter {
         max_tokens: 2000
       },
       human_input_mode: 'NEVER',
+      max_consecutive_auto_reply: 10,
+      memory: { type: 'short_term', max_messages: 100 },
       capabilities: ['research', 'data_analysis', 'information_synthesis']
     });
 
@@ -224,6 +231,8 @@ class AutoGenMultiAgentService extends EventEmitter {
         max_tokens: 2000
       },
       human_input_mode: 'NEVER',
+      max_consecutive_auto_reply: 10,
+      memory: { type: 'short_term', max_messages: 100 },
       capabilities: ['strategic_planning', 'task_decomposition', 'workflow_optimization']
     });
   }

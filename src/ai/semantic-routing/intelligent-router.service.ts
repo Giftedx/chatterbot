@@ -231,6 +231,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { capability: 'qa_reasoning' }
       },
       preprocessing: ['normalize_text', 'extract_entities'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'What is machine learning?', expected_route: true },
         { input: 'How does blockchain work?', expected_route: true },
@@ -259,6 +261,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { pipeline_id: 'code_generation_pipeline' }
       },
       preprocessing: ['extract_language', 'parse_requirements'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'Write a Python function to sort a list', expected_route: true },
         { input: 'Generate JavaScript code for API calls', expected_route: true },
@@ -287,6 +291,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { domain: 'content_creation' }
       },
       preprocessing: ['identify_creative_type', 'extract_themes'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'Write a short story about time travel', expected_route: true },
         { input: 'Create a haiku about nature', expected_route: true },
@@ -316,6 +322,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { workflow_type: 'research_analysis' }
       },
       preprocessing: ['identify_research_type', 'extract_comparison_entities'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'Analyze the impact of AI on healthcare', expected_route: true },
         { input: 'Compare React and Vue.js frameworks', expected_route: true },
@@ -344,6 +352,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { required_capabilities: ['general'] }
       },
       preprocessing: ['identify_complexity', 'extract_required_expertise'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'I need a comprehensive business plan for a tech startup', expected_route: true },
         { input: 'Help me solve this complex optimization problem', expected_route: true },
@@ -372,6 +382,8 @@ class SemanticRoutingService extends EventEmitter {
         parameters: { stream_type: 'interactive' }
       },
       preprocessing: ['identify_stream_type', 'setup_realtime_context'],
+      postprocessing: [],
+      metadata: {},
       examples: [
         { input: 'Stream AI responses as you generate them', expected_route: true },
         { input: 'I want live updates on my request', expected_route: true },
@@ -527,7 +539,7 @@ class SemanticRoutingService extends EventEmitter {
       try {
         const enhanced = await this.enhanceIntentClassification(query, context);
         classification.intent = enhanced.intent || classification.intent;
-        classification.confidence = Math.max(classification.confidence, enhanced.confidence);
+        classification.confidence = Math.max(classification.confidence, typeof enhanced.confidence === 'number' ? enhanced.confidence : 0);
         classification.entities = enhanced.entities || [];
         classification.emotional_tone = enhanced.emotional_tone;
       } catch (error) {

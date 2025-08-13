@@ -202,7 +202,7 @@ export class UltraIntelligentResearchService {
                 relatedTopics: synthesis.relatedTopics,
                 actionableInsights: insights,
                 timestamp: new Date(),
-                processingTime: Date.now() - startTime
+                processingTime: Math.max(1, Date.now() - startTime)
             };
 
             // Step 7: Learn from research process

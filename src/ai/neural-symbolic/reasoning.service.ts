@@ -268,8 +268,7 @@ class NeuralSymbolicReasoningService extends EventEmitter {
         label: concept.label,
         properties: { domain: 'ai', importance: 0.9 },
         certainty: 0.95,
-        domains: ['artificial_intelligence'],
-        created_at: new Date()
+        domains: ['artificial_intelligence']
       });
     });
 
@@ -292,8 +291,7 @@ class NeuralSymbolicReasoningService extends EventEmitter {
         relation_type: rel.relation,
         weight: 0.8,
         certainty: 0.9,
-        properties: {},
-        created_at: new Date()
+        properties: {}
       });
     });
 
@@ -978,8 +976,7 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       properties: nodeConfig.properties || {},
       embeddings: nodeConfig.embeddings,
       certainty: nodeConfig.certainty || 0.8,
-      domains: nodeConfig.domains || ['general'],
-      created_at: new Date()
+      domains: nodeConfig.domains || ['general']
     });
 
     this.knowledgeGraph.nodes.set(nodeId, node);
@@ -1008,8 +1005,7 @@ class NeuralSymbolicReasoningService extends EventEmitter {
       relation_type: edgeConfig.relation_type || 'related_to',
       weight: edgeConfig.weight || 0.8,
       properties: edgeConfig.properties || {},
-      certainty: edgeConfig.certainty || 0.8,
-      created_at: new Date()
+      certainty: edgeConfig.certainty || 0.8
     });
 
     this.knowledgeGraph.edges.set(edgeId, edge);

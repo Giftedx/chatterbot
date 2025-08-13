@@ -188,15 +188,13 @@ export class MixtureOfExpertsService extends EventEmitter {
   }
 
   private validateExpert(expert: Expert): boolean {
-    return (
-      expert.id &&
-      expert.name &&
-      expert.specialization &&
-      expert.model_provider &&
-      expert.confidence_threshold >= 0 &&
-      expert.confidence_threshold <= 1 &&
-      expert.capabilities.length > 0
-    );
+    const hasId = typeof expert.id === 'string' && expert.id.length > 0;
+    const hasName = typeof expert.name === 'string' && expert.name.length > 0;
+    const hasSpec = typeof expert.specialization === 'string' && expert.specialization.length > 0;
+    const hasProvider = typeof expert.model_provider === 'string' && expert.model_provider.length > 0;
+    const confOk = typeof expert.confidence_threshold === 'number' && expert.confidence_threshold >= 0 && expert.confidence_threshold <= 1;
+    const capsOk = Array.isArray(expert.capabilities) && expert.capabilities.length > 0;
+    return Boolean(hasId && hasName && hasSpec && hasProvider && confOk && capsOk);
   }
 
   async routeToExperts(

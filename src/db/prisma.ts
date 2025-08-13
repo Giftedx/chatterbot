@@ -35,16 +35,21 @@ async function initializePrisma() {
 
 // Initialize synchronously for non-test environments, mock for tests
 if (process.env.NODE_ENV === 'test') {
-  // For tests, always use mock if real client fails - don't block startup
-  import('./prisma-mock.js').then(({ mockPrisma }) => {
-    prisma = mockPrisma;
-  }).catch(async () => {
-    try {
-      prisma = await createRealClient();
-    } catch {
-      prisma = {};
+  try {
+    // Prefer jest manual mock if provided
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const jestMock = require('@prisma/client');
+    const MockCtor = jestMock?.PrismaClient;
+    if (MockCtor) {
+      prisma = new MockCtor();
     }
-  });
+  } catch {
+    // Fall back to our local mock
+  }
+  if (!prisma) {
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    import('./prisma-mock.js').then(({ mockPrisma }) => { prisma = mockPrisma; });
+  }
 } else {
   // Best-effort initialize real client synchronously
   // Note: top-level await not available here, so keep uninitialized until first get

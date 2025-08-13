@@ -281,12 +281,15 @@ export class CoreIntelligenceService {
          } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle interaction:', { interactionId: interaction.id, error });
             console.error('Failed to send reply', error);
+            console.error('Error handling interaction', error);
             if (interaction && typeof interaction.isRepliable === 'function' && interaction.isRepliable()) {
                 const errorMessage = 'An error occurred while processing your request.';
                                  if ((interaction as any).editReply && typeof (interaction as any).editReply === 'function') {
                      await (interaction as any).editReply({ content: errorMessage, ephemeral: true }).catch((e: unknown) => logger.error('[CoreIntelSvc] Failed to send error editReply', e as any));
                  } else if (interaction.deferred || interaction.replied) {
-                     await interaction.followUp({ content: errorMessage, ephemeral: true }).catch(e => logger.error('[CoreIntelSvc] Failed to send error followUp', e));
+                     if (typeof (interaction as any).followUp === 'function') {
+                         await (interaction as any).followUp({ content: errorMessage, ephemeral: true }).catch((e: unknown) => logger.error('[CoreIntelSvc] Failed to send error followUp', e as any));
+                     }
                  } else {
                      await interaction.reply({ content: errorMessage, ephemeral: true }).catch(e => logger.error('[CoreIntelSvc] Failed to send error reply', e));
                  }
@@ -591,7 +594,12 @@ export class CoreIntelligenceService {
 
             // Full processing pipeline; uiContext = message
             const responseOptions = await this._processPromptAndGenerateResponse(message.content, message.author.id, message.channel.id, message.guildId, commonAttachments, message);
-            await message.reply(responseOptions);
+            try {
+                await message.reply(responseOptions);
+            } catch (err) {
+                console.error('Failed to send reply', err as any);
+                throw err;
+            }
 
             // Log assistant reply
             try { await prisma.messageLog.create({ data: { userId, guildId: message.guildId || undefined, channelId: message.channelId, threadId: message.channelId, msgId: `${message.id}:reply`, role: 'assistant', content: typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]' } }); } catch (err) { logger.error('[CoreIntelSvc] Failed to log assistant reply:', { messageId: message.id, error: err }); }

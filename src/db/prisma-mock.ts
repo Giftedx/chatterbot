@@ -91,6 +91,11 @@ export class MockPrismaClient {
     },
     count: async () => {
       return this.analyticsEvents.size;
+    },
+    deleteMany: async () => {
+      const count = this.analyticsEvents.size;
+      this.analyticsEvents.clear();
+      return { count };
     }
   };
 
@@ -268,6 +273,22 @@ export class MockPrismaClient {
     findUnique: async (query: any) => {
       const whereId = query.where?.id || query.where?.username;
       return this.users.get(whereId) || null;
+    },
+    update: async (query: any) => {
+      const whereId = query.where?.id;
+      const existing = this.users.get(whereId) || {};
+      const updated = { ...existing, ...query.data };
+      this.users.set(whereId, updated);
+      return updated;
+    },
+    findMany: async (query?: any) => {
+      return Array.from(this.users.values());
+    },
+    delete: async (query: any) => {
+      const whereId = query.where?.id;
+      const existing = this.users.get(whereId) || null;
+      this.users.delete(whereId);
+      return existing;
     }
   };
 
@@ -279,6 +300,12 @@ export class MockPrismaClient {
       const count = this.conversationMessages.size;
       this.conversationMessages.clear();
       return { count };
+    },
+    create: async (data: any) => {
+      const id = this.counters.conversationMessages++;
+      const msg = { id, ...data.data };
+      this.conversationMessages.set(id, msg);
+      return msg;
     }
   };
 
@@ -328,7 +355,18 @@ export class MockPrismaClient {
   }
   
   async $transaction(fn: any) {
-    return Promise.resolve(fn(this));
+    if (typeof fn === 'function') {
+      return await fn(this);
+    }
+    if (Array.isArray(fn)) {
+      // Execute sequentially and return results
+      const results = [] as any[];
+      for (const op of fn) {
+        results.push(await op);
+      }
+      return results;
+    }
+    return [];
   }
 
   // Clear all data (useful for test cleanup)
