@@ -176,7 +176,7 @@ export class EdgeAIDeploymentService extends EventEmitter {
       // Update heartbeat (simulate edge node reporting)
       if (Math.random() > 0.05) { // 95% uptime simulation
         node.last_heartbeat = now;
-        node.load_factor = Math.random() * 0.9; // Random load simulation
+        node.load_factor = Math.random() * MAX_SIMULATED_LOAD_FACTOR; // Random load simulation
       }
     }
 
