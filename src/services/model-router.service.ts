@@ -30,7 +30,7 @@ export class ModelRouterService {
   private gemini: GeminiService;
   private openai?: OpenAIProvider;
   private openaiResponses?: OpenAIResponsesProvider;
-  private openaiResponsesTools?: (await import('../providers/openai-responses-tools.provider.js')).OpenAIResponsesToolsProvider | undefined;
+  private openaiResponsesTools?: any;
   private anthropic?: AnthropicProvider;
   private groq?: GroqProvider;
   private mistral?: MistralProvider;

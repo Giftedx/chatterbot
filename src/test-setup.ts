@@ -3,6 +3,9 @@
  * Configures logging and other test-specific behaviors
  */
 
+// Setup global mocks before other imports
+jest.mock('@prisma/client', () => require('./__mocks__/@prisma/client.js'));
+
 // Suppress console output during tests except for errors
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
   // Override console methods to be silent except for errors and warnings
@@ -24,18 +27,54 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
     console.debug = originalDebug;
   };
   
-  // Ensure Prisma connections are closed after all tests to avoid open handles
-  import('./db/prisma.js')
-    .then(({ prisma }) => {
-      afterAll(async () => {
-        try {
-          await prisma.$disconnect();
-        } catch (_) {
-          // ignore
+  // Setup mocked Prisma for tests
+  let mockPrismaInstance: any;
+  
+  beforeAll(async () => {
+    try {
+      // Use the mocked prisma client
+      const { mockPrismaClient } = await import('./__mocks__/@prisma/client.js');
+      mockPrismaInstance = mockPrismaClient;
+      
+      // Setup test database if real prisma is available  
+      try {
+        const { prisma } = await import('./db/prisma.js');
+        // If real prisma is available, we can still use it for integration tests
+        if (process.env.TEST_WITH_REAL_DB !== 'true') {
+          // Override with mock for unit tests
+          (global as any).mockPrisma = mockPrismaInstance;
         }
-      });
-    })
-    .catch(() => {/* prisma not available */});
+      } catch (_) {
+        // Real prisma not available, use mock
+        (global as any).mockPrisma = mockPrismaInstance;
+      }
+    } catch (error) {
+      console.warn('Failed to setup test database:', error);
+    }
+  });
+  
+  afterAll(async () => {
+    if (mockPrismaInstance?._reset) {
+      mockPrismaInstance._reset();
+    }
+    
+    // Cleanup real prisma connections if used
+    try {
+      const { prisma } = await import('./db/prisma.js');
+      if (prisma && typeof prisma.$disconnect === 'function') {
+        await prisma.$disconnect();
+      }
+    } catch (_) {
+      // ignore cleanup errors
+    }
+  });
+
+  // Reset mocks between tests
+  beforeEach(() => {
+    if (mockPrismaInstance?._reset) {
+      mockPrismaInstance._reset();
+    }
+  });
 
   // --- Global timer tracking to clean up handles that keep Node alive ---
   type TimerHandle = NodeJS.Timeout;

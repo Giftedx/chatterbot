@@ -78,19 +78,25 @@ client.once('ready', async () => {
     if (orchestration.started) {
       console.log('🧩 Orchestration worker started.');
     }
-  } catch {}
+  } catch (error) {
+    console.error('❌ Failed to start orchestration worker:', error);
+  }
 
   // Start memory consolidation scheduler
   try {
     memoryConsolidationScheduler.start();
     console.log('🧠 Memory consolidation scheduler started.');
-  } catch {}
+  } catch (error) {
+    console.error('❌ Failed to start memory consolidation scheduler:', error);
+  }
 
   // Start vector maintenance scheduler
   try {
     vectorMaintenanceScheduler.start();
     console.log('🧹 Vector maintenance scheduler started.');
-  } catch {}
+  } catch (error) {
+    console.error('❌ Failed to start vector maintenance scheduler:', error);
+  }
 
   // Initialize Enhanced Intelligence if enabled
   if (process.env.ENABLE_ENHANCED_INTELLIGENCE === 'true') {
@@ -214,7 +220,11 @@ const gracefulShutdown = async (signal: string) => {
       await mcpManagerInstance.shutdown();
       console.log('✅ MCP Manager shutdown complete');
     }
-    try { stopAnalyticsDashboard(); } catch {}
+    try { 
+      stopAnalyticsDashboard(); 
+    } catch (error) {
+      console.error('❌ Failed to stop analytics dashboard:', error);
+    }
 
     console.log('🤖 Closing Discord connection...');
     client.destroy();

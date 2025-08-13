@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { features } from '../config/feature-flags.js';
 
 export interface VectorRecord {
@@ -16,9 +15,15 @@ export interface VectorSearchParams {
   filter?: { userId?: string; guildId?: string };
 }
 
+interface PgClient {
+  connect(): Promise<void>;
+  query(text: string, params?: unknown[]): Promise<{ rows: unknown[] } | any>;
+  end(): Promise<void>;
+}
+
 export class PgvectorRepository {
   private initialized = false;
-  private client: any;
+  private client: PgClient | null = null;
 
   async init(): Promise<boolean> {
     if (this.initialized) return true;
@@ -27,9 +32,11 @@ export class PgvectorRepository {
       const pg = await import('pg');
       const Client = (pg as any).Client || (pg as any).default?.Client;
       this.client = new Client({ connectionString: process.env.DATABASE_URL });
-      await this.client.connect();
-      await this.client.query('CREATE EXTENSION IF NOT EXISTS vector');
-      await this.client.query(`CREATE TABLE IF NOT EXISTS kb_vectors (
+      if (this.client && typeof (this.client as any).connect === 'function') {
+        await this.client.connect();
+      }
+      await this.client!.query('CREATE EXTENSION IF NOT EXISTS vector');
+      await this.client!.query(`CREATE TABLE IF NOT EXISTS kb_vectors (
         id TEXT PRIMARY KEY,
         user_id TEXT,
         guild_id TEXT,
@@ -37,7 +44,7 @@ export class PgvectorRepository {
         embedding vector(1536),
         metadata JSONB
       )`);
-      await this.client.query(`CREATE INDEX IF NOT EXISTS kb_vectors_embedding_idx ON kb_vectors USING ivfflat (embedding vector_l2_ops)`);
+      await this.client!.query(`CREATE INDEX IF NOT EXISTS kb_vectors_embedding_idx ON kb_vectors USING ivfflat (embedding vector_l2_ops)`);
       this.initialized = true;
       return true;
     } catch (err) {
@@ -47,7 +54,7 @@ export class PgvectorRepository {
 
   async upsert(record: VectorRecord): Promise<void> {
     if (!(await this.init())) return;
-    await this.client.query(
+    await this.client!.query(
       `INSERT INTO kb_vectors (id, user_id, guild_id, content, embedding, metadata)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (id) DO UPDATE SET
@@ -68,7 +75,7 @@ export class PgvectorRepository {
     if (filter?.userId) { where.push(`user_id = $${args.length + 1}`); args.push(filter.userId); }
     if (filter?.guildId) { where.push(`guild_id = $${args.length + 1}`); args.push(filter.guildId); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const res = await this.client.query(
+    const res = await this.client!.query(
       `SELECT id, content, 1 - (embedding <=> $1) AS score
        FROM kb_vectors
        ${whereSql}
@@ -76,7 +83,7 @@ export class PgvectorRepository {
        LIMIT ${topK}`,
       args
     );
-    return res.rows.map((r: any) => ({ id: r.id, content: r.content, score: Number(r.score) }));
+    return (res.rows as any[]).map((r: any) => ({ id: r.id, content: r.content, score: Number(r.score) }));
   }
 }
 

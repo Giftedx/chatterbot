@@ -41,6 +41,14 @@ export function getEnvAsNumber(key: string, defaultValue: number = 0): number {
 }
 
 /**
+ * Get an environment variable as a string with optional default
+ */
+export function getEnvAsString(key: string, defaultValue?: string): string | undefined {
+  const value = process.env[key];
+  return value || defaultValue;
+}
+
+/**
  * Check if environment variable is set (not empty)
  */
 export function isEnvSet(key: string): boolean {

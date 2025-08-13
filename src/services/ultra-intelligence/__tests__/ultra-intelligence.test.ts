@@ -19,11 +19,14 @@ jest.mock('../../../utils/logger.js', () => ({
   }
 }));
 
-// Mock MCP functions
-const mockBraveWebSearch = jest.fn();
+// Mock MCP functions first
 jest.mock('../../../mcp/index.js', () => ({
-  braveWebSearch: mockBraveWebSearch
+  braveWebSearch: jest.fn()
 }));
+
+// Import the mock after setting it up
+import { braveWebSearch } from '../../../mcp/index.js';
+const mockBraveWebSearch = braveWebSearch as jest.MockedFunction<typeof braveWebSearch>;
 
 describe('Ultra-Intelligence System', () => {
   let orchestrator: UltraIntelligenceOrchestrator;

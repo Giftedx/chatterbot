@@ -63,7 +63,9 @@ export class AnswerVerificationService {
                 current = alt2.text;
               }
             }
-          } catch {}
+          } catch (error) {
+            console.warn('Failed to parse verification response:', error);
+          }
 
           if (agreement < 0.6 && this.options.maxReruns > 0) {
             const rerun = await modelRouterService.generateWithMeta(`Re-answer clearly and accurately. Consider both alternatives above. Avoid hallucinations and cite uncertainties.\n\nUser: ${userPrompt}`, history);

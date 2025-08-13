@@ -2,6 +2,10 @@ export default {
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(.*)\\.js$': '$1',
+    // Discord.js ESM mapping
+    '^discord\\.js$': '<rootDir>/src/__mocks__/discord.js',
+    // Prisma client mapping
+    '^@prisma/client$': '<rootDir>/src/__mocks__/@prisma/client.js',
   },
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
@@ -27,8 +31,8 @@ export default {
     }],
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$))'
+    'node_modules/(?!(.*\\.mjs$|discord\\.js|@discordjs))'
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testTimeout: 30000,
+  testTimeout: 30000
 };
