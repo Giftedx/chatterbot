@@ -69,7 +69,7 @@
     "@opentelemetry/api": "^1.8.0",
     "@opentelemetry/sdk-node": "^0.55.0",
     "@opentelemetry/auto-instrumentations-node": "^0.55.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.55.0"
+    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
