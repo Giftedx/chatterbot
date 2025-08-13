@@ -1,5 +1,10 @@
 # Chatterbot — Production‑Ready Discord AI Bot
 
+[![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/your-org/your-repo/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-jest-informational)](jest.config.js)
+
 > A modern Discord bot with agentic intelligence, multi‑provider model routing, long‑term memory, multimodal analysis, safety moderation, analytics, and optional durable orchestration. Users see one command: `/chat`. Everything else is automatic.
 
 ### Highlights
@@ -10,6 +15,21 @@
 - Health and metrics endpoints; optional analytics dashboard
 - Optional Temporal worker for durable orchestration
 - Vector search with pgvector (optional)
+
+### Feature matrix
+
+| Feature | Status / Flag | Notes |
+|---|---|---|
+| Multi‑provider model routing | On by default | `src/config/models.ts` selects best model per message |
+| Long‑term memory & personalization | ENABLE_ENHANCED_INTELLIGENCE | Prisma `UserMemory`, per‑user opt‑in |
+| Moderation (text/image/attachments) | ENABLE_MODERATION | Per‑guild config in DB |
+| Multimodal (image/audio/docs) | On | `src/multimodal/*` |
+| RAG with pgvector | FEATURE_PGVECTOR | Requires Postgres + `DATABASE_URL` |
+| Cohere rerank | FEATURE_RERANK | `COHERE_API_KEY` required |
+| Temporal orchestration | FEATURE_TEMPORAL | Durable workflows (optional) |
+| MCP tooling (web, scrape, memory) | ENABLE_ENHANCED_INTELLIGENCE + keys | Consent prompts for higher‑risk tools |
+| Analytics dashboard API | ENABLE_ANALYTICS_DASHBOARD | Port `ANALYTICS_DASHBOARD_PORT` |
+| OpenTelemetry tracing | On by default | `OTEL_EXPORTER_OTLP_ENDPOINT` |
 
 ## Stack
 - Runtime: Node.js 18+ (ESM), TypeScript
@@ -43,6 +63,14 @@ What to expect
 - On first `/chat`, the bot posts a brief consent notice and creates a personal thread (or offers “Move to DM?”).
 - Continue talking in your thread/DM; the bot replies when addressed.
 - Natural‑language privacy controls work anytime: “delete my data”, “export my data”, “pause for 30 minutes”, “resume”.
+
+## Getting the bot into a server
+1) Create an application at the Discord Developer Portal and add a Bot. Copy the Bot Token to `.env` as `DISCORD_TOKEN`.
+2) Enable intents: in Bot settings, toggle “Message Content Intent”.
+3) Generate an invite URL (replace CLIENT_ID and adjust permissions as needed):
+   - `https://discord.com/api/oauth2/authorize?client_id=CLIENT_ID&scope=bot%20applications.commands&permissions=274877975552`
+4) Invite the bot to your server using that URL.
+5) Run the bot (`npm run dev`) and use `/chat` in your server.
 
 ## Commands
 - `/chat prompt [attachment]`
