@@ -679,6 +679,9 @@ export class QuantumInspiredAIService extends EventEmitter {
     const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
     const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
     
+    if (Math.abs(mean) < 1e-12) {
+      return 0; // Avoid division by zero; define normalized stddev as 0 if mean is zero
+    }
     return Math.sqrt(variance) / Math.abs(mean); // Normalized standard deviation
   }
 
