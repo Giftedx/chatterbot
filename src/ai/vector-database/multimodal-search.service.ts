@@ -390,7 +390,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
 
     } catch (error) {
       console.warn('⚠️ Failed to generate text embedding, using mock:', error);
-      const mockEmbedding = Array.from({ length: 3072 }, () => Math.random() - 0.5);
+      const mockEmbedding = Array.from({ length: MultimodalSearchService.TEXT_EMBEDDING_DIM }, () => Math.random() - 0.5);
       this.cacheEmbedding(cacheKey, mockEmbedding);
       return mockEmbedding;
     }
