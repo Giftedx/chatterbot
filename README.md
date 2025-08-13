@@ -59,6 +59,17 @@ npx prisma migrate dev --name init
 npm run dev
 ```
 
+Minimal .env
+```env
+DISCORD_TOKEN=your_discord_bot_token
+DISCORD_CLIENT_ID=your_discord_client_id
+GEMINI_API_KEY=your_gemini_api_key
+NODE_ENV=development
+HEALTH_CHECK_PORT=3000
+ENABLE_MODERATION=true
+ENABLE_ENHANCED_INTELLIGENCE=false
+```
+
 What to expect
 - On first `/chat`, the bot posts a brief consent notice and creates a personal thread (or offers “Move to DM?”).
 - Continue talking in your thread/DM; the bot replies when addressed.
@@ -69,6 +80,7 @@ What to expect
 2) Enable intents: in Bot settings, toggle “Message Content Intent”.
 3) Generate an invite URL (replace CLIENT_ID and adjust permissions as needed):
    - `https://discord.com/api/oauth2/authorize?client_id=CLIENT_ID&scope=bot%20applications.commands&permissions=274877975552`
+   - Use the [Discord Permissions Calculator](https://discordapi.com/permissions.html) and see [OAuth2 scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to tailor permissions.
 4) Invite the bot to your server using that URL.
 5) Run the bot (`npm run dev`) and use `/chat` in your server.
 
@@ -186,6 +198,35 @@ Minimal setup
 ```sql
 -- on your Postgres db
 CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+Railway (pgvector)
+```bash
+# Connect to your Railway Postgres and enable pgvector
+# Option A: open a psql shell then run the SQL above
+railway connect
+
+# Option B: run psql non‑interactively if psql is available and DATABASE_URL is set
+psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+```
+
+Docker Postgres (pgvector)
+```yaml
+# docker-compose.yml
+services:
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=chatterbot
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg-initdb:/docker-entrypoint-initdb.d
+
+# ./pg-initdb/01-pgvector.sql
+# CREATE EXTENSION IF NOT EXISTS vector;
 ```
 
 Key files
