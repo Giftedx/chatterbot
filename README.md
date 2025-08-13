@@ -391,7 +391,7 @@ docker compose pull && docker compose up -d
 ```
 
 ### Data persistence
-- SQLite DB lives in a Docker volume (`bot-data`).
+- SQLite DB lives in a Docker volume (`bot-data`). Compose sets `DATABASE_URL=file:/data/dev.db` inside the container.
 - Logs: `./logs` on your host.
 - Knowledge base files: `./kb` on your host.
 

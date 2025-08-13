@@ -3,7 +3,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Faster builds
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl python3 make g++
+
+# Set a default DATABASE_URL during build so prisma generate does not complain
+ENV DATABASE_URL=file:./prisma/dev.db
 
 # Install deps
 COPY package*.json ./
@@ -25,8 +28,8 @@ RUN npm prune --omit=dev
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Install wget for healthchecks inside container
-RUN apk add --no-cache wget
+# Install wget for healthchecks inside container and tini for proper signal handling
+RUN apk add --no-cache wget tini
 
 # Create non-root user and data dir
 RUN addgroup -S app && adduser -S app -G app && \
@@ -53,4 +56,8 @@ USER app
 # Expose health and optional analytics ports
 EXPOSE 3000 3001
 
-ENTRYPOINT ["/entrypoint.sh"]
+# Image-level healthcheck (works without compose)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://localhost:3000/health || exit 1
+
+# Use tini as PID 1 for signal handling
+ENTRYPOINT ["/sbin/tini", "-g", "--", "/entrypoint.sh"]

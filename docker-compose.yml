@@ -10,7 +10,6 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Force SQLite location to persisted volume regardless of .env
       - DATABASE_URL=file:/data/dev.db
       - HEALTH_CHECK_PORT=3000
     volumes:

@@ -13,8 +13,4 @@ fi
 
 # Start the app
 echo "Starting chatterbot..."
-if npm run | grep -q "^  start$"; then
-  exec npm start
-else
-  exec node dist/index.js
-fi
+exec npm start
