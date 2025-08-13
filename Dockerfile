@@ -1,59 +1,56 @@
-# Build stage
-FROM node:18-alpine as builder
-
+# ---- Base build stage ----
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files
+# Faster builds
+RUN apk add --no-cache libc6-compat openssl
+
+# Install deps
 COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+
+# Copy source
 COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY src ./src
 
-# Install dependencies (include dev deps for TypeScript build)
-RUN npm ci
-
-# Copy source code
-COPY src/ ./src/
-COPY prisma/ ./prisma/
-
-# Generate Prisma client
+# Generate Prisma client & build
 RUN npx prisma generate
-
-# Build TypeScript
 RUN npm run build
 
-# Production stage
-FROM node:18-alpine as production
+# Prune dev deps for smaller runtime, but keep @prisma/client in deps
+RUN npm prune --omit=dev
 
+# ---- Runtime stage ----
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init curl
+# Install wget for healthchecks inside container
+RUN apk add --no-cache wget
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S botuser -u 1001
+# Create non-root user and data dir
+RUN addgroup -S app && adduser -S app -G app && \
+    mkdir -p /data && chown -R app:app /data
 
-# Copy built application
-COPY --from=builder --chown=botuser:nodejs /app/dist ./dist
-COPY --from=builder --chown=botuser:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=botuser:nodejs /app/package*.json ./
-COPY --from=builder --chown=botuser:nodejs /app/prisma ./prisma
+# Default envs
+ENV NODE_ENV=production \
+    HEALTH_CHECK_PORT=3000 \
+    DATABASE_URL=file:/data/dev.db
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data && chown botuser:nodejs /app/data
+# Copy built app and runtime deps
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/package*.json ./
 
-# Switch to non-root user
-USER botuser
+# Add entrypoint
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# Expose analytics dashboard port (optional) and health port
-EXPOSE 3001
-EXPOSE 3000
+# Drop privileges
+USER app
 
-# Health check against the health endpoint
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -sf http://localhost:3000/health > /dev/null || exit 1
+# Expose health and optional analytics ports
+EXPOSE 3000 3001
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
-
-# Start the application
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["/entrypoint.sh"]

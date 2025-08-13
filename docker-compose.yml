@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/giftedx/chatterbot:local
+    container_name: chatterbot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Force SQLite location to persisted volume regardless of .env
+      - DATABASE_URL=file:/data/dev.db
+      - HEALTH_CHECK_PORT=3000
+    volumes:
+      - bot-data:/data
+      - ./logs:/app/logs
+      - ./kb:/app/kb
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    depends_on: []
+    stop_grace_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: chatterbot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chatterbot
+      POSTGRES_PASSWORD: chatterbot
+      POSTGRES_DB: chatterbot
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    profiles: ["postgres"]
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: chatterbot-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    ports:
+      - "6333:6333"
+    profiles: ["qdrant"]
+
+volumes:
+  bot-data:
+  pg-data:
+  qdrant-data:

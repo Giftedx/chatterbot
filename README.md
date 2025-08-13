@@ -348,7 +348,52 @@ docker run --rm -it \
   chatterbot
 ```
 - Image exposes 3000 (/health, /metrics) and 3001 (analytics API if enabled).
-- Uses `dumb-init` and a non‑root user.
+- Uses a non‑root user.
+
+## One-Command Docker Deployment
+
+1. Install Docker Desktop (Win/Mac) or Docker Engine (Linux).
+2. Clone this repo and create `.env`:
+   ```bash
+   cp env.example .env
+   # Fill in DISCORD_TOKEN, DISCORD_CLIENT_ID, and one provider key (e.g., GEMINI_API_KEY)
+   ```
+3. Start the bot (SQLite persisted by default):
+   ```bash
+   docker compose up -d --build
+   ```
+4. Observability:
+   - Health: http://localhost:3000/health
+   - Metrics: http://localhost:3000/metrics
+   - Optional dashboard: set `ENABLE_ANALYTICS_DASHBOARD=true` → http://localhost:3001
+
+### Postgres (optional)
+
+If you want to use Postgres for vector search features (pgvector), enable the profile:
+```bash
+# Ensure FEATURE_PGVECTOR=true in .env
+docker compose --profile postgres up -d --build
+```
+Set Postgres connection info (for pgvector code paths):
+```env
+POSTGRES_URL=postgresql://chatterbot:chatterbot@postgres:5432/chatterbot
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=chatterbot
+POSTGRES_USER=chatterbot
+POSTGRES_PASSWORD=chatterbot
+```
+Note: Prisma remains SQLite by default for app data. Do not change `DATABASE_URL` to Postgres unless you intend to migrate Prisma.
+
+### Updating
+```bash
+docker compose pull && docker compose up -d
+```
+
+### Data persistence
+- SQLite DB lives in a Docker volume (`bot-data`).
+- Logs: `./logs` on your host.
+- Knowledge base files: `./kb` on your host.
 
 ## Deployment
 - See `DEPLOYMENT.md` for Railway‑based deployment and CI examples.
