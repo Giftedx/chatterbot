@@ -1,7 +1,7 @@
 // TASK-032: Harden speech/audio processing stack
 
 import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../utils/env.js';
-import { ElevenLabsApi } from '@elevenlabs/elevenlabs-js';
+import { ElevenLabs } from '@elevenlabs/elevenlabs-js';
 import { z } from 'zod';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -165,7 +165,7 @@ interface AudioProcessingMetrics {
 }
 
 export class HardenedAudioProcessingService extends EventEmitter {
-  private elevenLabsClient: ElevenLabsApi | null = null;
+  private elevenLabsClient: ElevenLabs | null = null;
   private isInitialized = false;
   private config: AudioProcessingConfig;
   private processingQueue: Map<string, { status: string; progress: number }> = new Map();
@@ -233,7 +233,7 @@ export class HardenedAudioProcessingService extends EventEmitter {
       // Initialize ElevenLabs client if API key is available
       const elevenLabsApiKey = getEnvAsString('ELEVENLABS_API_KEY');
       if (elevenLabsApiKey) {
-        this.elevenLabsClient = new ElevenLabsApi({
+        this.elevenLabsClient = new ElevenLabs({
           apiKey: elevenLabsApiKey,
           timeout: 60000
         });
@@ -281,7 +281,9 @@ export class HardenedAudioProcessingService extends EventEmitter {
       } else if (validatedInput.source instanceof Buffer) {
         audioBuffer = validatedInput.source;
       } else {
-        audioBuffer = Buffer.from(validatedInput.source);
+        // ArrayBuffer case
+        const ab = validatedInput.source as ArrayBuffer;
+        audioBuffer = Buffer.from(new Uint8Array(ab));
       }
 
       this.processingQueue.set(processingId, { status: 'validating', progress: 20 });
@@ -848,7 +850,7 @@ export class HardenedAudioProcessingService extends EventEmitter {
   private async validateAudioProcessingCapabilities(): Promise<void> {
     // Test basic audio processing capabilities
     const testBuffer = Buffer.alloc(1024);
-    await this.analyzeAudioQuality(testBuffer, { source: testBuffer, channels: 1 });
+    await this.analyzeAudioQuality(testBuffer, { source: testBuffer, channels: 1, duration_limit_seconds: 60, noise_reduction: true, normalize_volume: true, quality_threshold: 0.5 });
     console.log('✅ Audio processing capabilities validated');
   }
 

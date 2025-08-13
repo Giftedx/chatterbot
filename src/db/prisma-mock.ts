@@ -19,6 +19,7 @@ export class MockPrismaClient {
   private knowledgeEntries = new Map();
   private escalationTickets = new Map();
   private interactionLogs = new Map();
+  private users = new Map();
 
   // Auto-increment counters
   private counters = {
@@ -236,6 +237,37 @@ export class MockPrismaClient {
     }
   };
 
+  user = {
+    upsert: async (query: any) => {
+      const whereId = query.where?.id || query.where?.username || 'unknown';
+      const existing = this.users.get(whereId);
+      if (existing) {
+        const updated = { ...existing, ...query.update };
+        this.users.set(whereId, updated);
+        return updated;
+      } else {
+        const created = { id: whereId, ...query.create };
+        this.users.set(whereId, created);
+        return created;
+      }
+    },
+    findUnique: async (query: any) => {
+      const whereId = query.where?.id || query.where?.username;
+      return this.users.get(whereId) || null;
+    }
+  };
+
+  conversationMessage = {
+    findMany: async (query: any) => {
+      return Array.from(this.conversationMessages.values());
+    },
+    deleteMany: async (query: any) => {
+      const count = this.conversationMessages.size;
+      this.conversationMessages.clear();
+      return { count };
+    }
+  };
+
   knowledgeEntry = {
     create: async (data: any) => {
       const id = `knowledge_${this.counters.knowledgeEntries++}`;
@@ -297,6 +329,7 @@ export class MockPrismaClient {
     this.knowledgeEntries.clear();
     this.escalationTickets.clear();
     this.interactionLogs.clear();
+    this.users.clear();
     
     // Reset counters
     Object.keys(this.counters).forEach(key => {
