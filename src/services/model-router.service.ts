@@ -14,6 +14,7 @@ import { OpenAIResponsesProvider } from '../providers/openai-responses.provider.
 import { retry } from '../utils/retry.js';
 import { getTraceId } from '../utils/async-context.js';
 import { logger } from '../utils/logger.js';
+import { withSpan } from '../utils/tracing.js';
 
 export interface RouterOptions {
   defaultProvider?: ProviderName;
@@ -153,9 +154,14 @@ export class ModelRouterService {
   }
 
   async generateWithMeta(prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<GenerationMeta> {
-    const preferred = modelRegistry.selectModel(prompt, history);
-    const text = await this.callProvider(preferred, prompt, history, systemPrompt);
-    return { text, provider: preferred.provider, model: preferred.model };
+    return await withSpan('router.generateWithMeta', async () => {
+      const preferred = modelRegistry.selectModel(prompt, history);
+      const text = await withSpan('router.callProvider', async () => this.callProvider(preferred, prompt, history, systemPrompt), {
+        provider: preferred.provider,
+        model: preferred.model
+      });
+      return { text, provider: preferred.provider, model: preferred.model };
+    }, { route: 'auto' });
   }
 
   async generate(prompt: string, history: ChatMessage[], _userId?: string, _guildId?: string, systemPrompt?: string): Promise<string> {
