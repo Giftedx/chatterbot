@@ -1,6 +1,31 @@
 # Contributing
 
-Thanks for helping improve this project!
+Thanks for contributing to Chatterbot!
+
+## Dev setup
+```bash
+npm install
+# Configure env
+yarn setup # or: npm run setup
+# or
+cp env.example .env
+npx prisma migrate dev --name init
+
+# Run
+yarn dev # or: npm run dev
+```
+
+## Tests
+```bash
+npm test
+```
+
+## Docker
+```bash
+docker compose up -d --build
+```
+
+Before creating a PR, please ensure typecheck/lint/tests pass.
 
 ## Ground rules
 - Keep existing features working; prefer incremental, well-scoped changes
