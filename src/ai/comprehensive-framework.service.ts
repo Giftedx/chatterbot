@@ -24,6 +24,12 @@ import { compoundAISystemsService } from './compound-systems/orchestration.servi
 import { advancedVectorDatabaseService } from './vector-database/multimodal-search.service.js';
 import { federatedLearningService } from './federated-learning/distributed-training.service.js';
 import { causalAIReasoningService } from './causal-ai/reasoning-framework.service.js';
+// 2025 Next-Generation AI Framework Services
+import { edgeAIDeploymentService } from '../edge/ai-deployment.service.js';
+import { langChainExpressionLanguageService } from './lcel/expression-language.service.js';
+import { graphNeuralNetworksService } from './graph-neural-networks/gnn-framework.service.js';
+import { metaLearningFrameworkService } from './meta-learning/framework.service.js';
+import { quantumInspiredAIService } from './quantum-inspired/quantum-ai.service.js';
 // Note: Import temporal and other services as they become available
 
 interface AIFrameworkCapabilities {
@@ -150,7 +156,14 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     causal_ai_reasoning: false,
     meta_learning: false,
     graph_neural_networks: false,
-    quantum_inspired_ai: false
+    quantum_inspired_ai: false,
+    
+    // 2025 Next-Generation AI Frameworks
+    edge_ai_deployment: false,
+    langchain_expression_language: false,
+    advanced_prompt_engineering: false,
+    multi_modal_orchestration: false,
+    real_time_adaptation: false
   };
 
   private metrics: AIFrameworkMetrics = {
@@ -208,7 +221,14 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
         this.initCompoundAISystems(),
         this.initAdvancedVectorDatabase(),
         this.initFederatedLearning(),
-        this.initCausalAIReasoning()
+        this.initCausalAIReasoning(),
+        
+        // 2025 Next-Generation AI Frameworks
+        this.initEdgeAIDeployment(),
+        this.initLangChainExpressionLanguage(),
+        this.initGraphNeuralNetworks(),
+        this.initMetaLearning(),
+        this.initQuantumInspiredAI()
       ]);
 
       // Analyze initialization results
@@ -568,6 +588,96 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
 
     // Analyze query to determine best capability
     const queryLower = query.toLowerCase();
+    
+    // 2025 Next-Generation Framework Patterns
+    
+    // Edge AI deployment patterns
+    if (/(edge|local|fast|latency|real.*time|instant|mobile|iot|distributed)/.test(queryLower)) {
+      if (this.capabilities.edge_ai_deployment) {
+        return 'edge_ai_deployment';
+      }
+    }
+    
+    // LangChain Expression Language patterns
+    if (/(chain|pipeline|workflow|expression|compose|orchestrate|sequence)/.test(queryLower)) {
+      if (this.capabilities.langchain_expression_language) {
+        return 'langchain_expression_language';
+      }
+    }
+    
+    // Graph Neural Networks patterns
+    if (/(graph|network|relationship|connection|node|edge|social|knowledge.*graph|entity)/.test(queryLower)) {
+      if (this.capabilities.graph_neural_networks) {
+        return 'graph_neural_networks';
+      }
+    }
+    
+    // Meta-learning patterns
+    if (/(few.*shot|adapt|learn.*quickly|meta.*learning|transfer.*learning|generalize)/.test(queryLower)) {
+      if (this.capabilities.meta_learning) {
+        return 'meta_learning';
+      }
+    }
+    
+    // Quantum-inspired patterns
+    if (/(quantum|superposition|optimization|annealing|complex.*optimization|global.*minimum)/.test(queryLower)) {
+      if (this.capabilities.quantum_inspired_ai) {
+        return 'quantum_inspired_ai';
+      }
+    }
+    
+    // 2025 Advanced Framework Patterns
+    
+    // Mixture of Experts patterns
+    if (/(expert|specialist|route|domain.*specific|mix|ensemble|capability)/.test(queryLower)) {
+      if (this.capabilities.mixture_of_experts) {
+        return 'mixture_of_experts';
+      }
+    }
+    
+    // RAG 2.0 patterns
+    if (/(search|retrieve|document|knowledge|context|reference|source|citation)/.test(queryLower)) {
+      if (this.capabilities.rag_2_0_hybrid_search) {
+        return 'rag_2_0_hybrid_search';
+      }
+    }
+    
+    // Constitutional AI patterns
+    if (/(safe|ethical|harm|bias|appropriate|constitutional|guidelines|policy)/.test(queryLower)) {
+      if (this.capabilities.constitutional_ai_safety) {
+        return 'constitutional_ai_safety';
+      }
+    }
+    
+    // Compound AI Systems patterns
+    if (/(compound|complex.*system|multi.*component|orchestrate|coordinate|workflow)/.test(queryLower)) {
+      if (this.capabilities.compound_ai_systems) {
+        return 'compound_ai_systems';
+      }
+    }
+    
+    // Advanced Vector Database patterns
+    if (/(vector|embedding|similarity|semantic.*search|multimodal.*search|cross.*modal)/.test(queryLower)) {
+      if (this.capabilities.advanced_vector_database) {
+        return 'advanced_vector_database';
+      }
+    }
+    
+    // Federated Learning patterns
+    if (/(federated|distributed|privacy|collaborative.*learning|decentralized|edge.*learning)/.test(queryLower)) {
+      if (this.capabilities.federated_learning) {
+        return 'federated_learning';
+      }
+    }
+    
+    // Causal AI patterns
+    if (/(causal|cause|effect|intervention|counterfactual|why.*happened|root.*cause)/.test(queryLower)) {
+      if (this.capabilities.causal_ai_reasoning) {
+        return 'causal_ai_reasoning';
+      }
+    }
+    
+    // Original Advanced Framework Patterns
     
     // Multi-agent collaboration patterns
     if (/(collaborate|team|multiple|complex.*problem|comprehensive.*solution|experts?)/.test(queryLower)) {
@@ -946,6 +1056,93 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     } catch (error) {
       console.warn('⚠️ Causal AI and Reasoning initialization failed:', error);
       this.capabilities.causal_ai_reasoning = false;
+      return false;
+    }
+  }
+
+  // 2025 Next-Generation AI Framework Initialization Methods
+
+  private async initEdgeAIDeployment(): Promise<boolean> {
+    try {
+      console.log('🌐 Initializing Edge AI Deployment Service...');
+      const success = await edgeAIDeploymentService.init();
+      this.capabilities.edge_ai_deployment = success;
+      
+      if (success) {
+        console.log('✅ Edge AI Deployment initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Edge AI Deployment initialization failed:', error);
+      this.capabilities.edge_ai_deployment = false;
+      return false;
+    }
+  }
+
+  private async initLangChainExpressionLanguage(): Promise<boolean> {
+    try {
+      console.log('🔗 Initializing LangChain Expression Language (LCEL)...');
+      const success = await langChainExpressionLanguageService.init();
+      this.capabilities.langchain_expression_language = success;
+      
+      if (success) {
+        console.log('✅ LangChain Expression Language initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ LangChain Expression Language initialization failed:', error);
+      this.capabilities.langchain_expression_language = false;
+      return false;
+    }
+  }
+
+  private async initGraphNeuralNetworks(): Promise<boolean> {
+    try {
+      console.log('🕸️ Initializing Graph Neural Networks Framework...');
+      const success = await graphNeuralNetworksService.init();
+      this.capabilities.graph_neural_networks = success;
+      
+      if (success) {
+        console.log('✅ Graph Neural Networks initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Graph Neural Networks initialization failed:', error);
+      this.capabilities.graph_neural_networks = false;
+      return false;
+    }
+  }
+
+  private async initMetaLearning(): Promise<boolean> {
+    try {
+      console.log('🧠 Initializing Meta-Learning Framework...');
+      const success = await metaLearningFrameworkService.init();
+      this.capabilities.meta_learning = success;
+      
+      if (success) {
+        console.log('✅ Meta-Learning Framework initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Meta-Learning Framework initialization failed:', error);
+      this.capabilities.meta_learning = false;
+      return false;
+    }
+  }
+
+  private async initQuantumInspiredAI(): Promise<boolean> {
+    try {
+      console.log('⚛️ Initializing Quantum-Inspired AI Framework...');
+      const success = await quantumInspiredAIService.init();
+      this.capabilities.quantum_inspired_ai = success;
+      
+      if (success) {
+        console.log('✅ Quantum-Inspired AI Framework initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Quantum-Inspired AI Framework initialization failed:', error);
+      this.capabilities.quantum_inspired_ai = false;
       return false;
     }
   }
