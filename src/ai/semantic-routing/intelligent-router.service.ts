@@ -641,7 +641,7 @@ Provide response in JSON format:
 
     if (!this.openaiClient) {
       // Return mock embedding for testing
-      return Array.from({ length: 1536 }, () => Math.random() - 0.5);
+      return Array.from({ length: DEFAULT_EMBEDDING_DIMENSION }, () => Math.random() - 0.5);
     }
 
     try {
