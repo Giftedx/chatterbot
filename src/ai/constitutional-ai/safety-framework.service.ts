@@ -250,17 +250,21 @@ export class ConstitutionalAIService extends EventEmitter {
   }
 
   private validatePrinciple(principle: ConstitutionalPrinciple): boolean {
-    return (
-      principle.id &&
-      principle.name &&
-      principle.description &&
-      principle.rule &&
-      principle.examples.positive.length > 0 &&
-      principle.examples.negative.length > 0 &&
-      ['critical', 'high', 'medium', 'low'].includes(principle.priority) &&
-      ['safety', 'ethics', 'accuracy', 'helpfulness', 'privacy'].includes(principle.category) &&
-      ['block', 'modify', 'warn', 'log'].includes(principle.violation_consequence)
-    );
+    const hasRequiredStrings =
+      typeof principle.id === 'string' && principle.id.length > 0 &&
+      typeof principle.name === 'string' && principle.name.length > 0 &&
+      typeof principle.description === 'string' && principle.description.length > 0 &&
+      typeof principle.rule === 'string' && principle.rule.length > 0;
+
+    const hasExamples =
+      Array.isArray(principle.examples?.positive) && principle.examples.positive.length > 0 &&
+      Array.isArray(principle.examples?.negative) && principle.examples.negative.length > 0;
+
+    const validPriority = ['critical', 'high', 'medium', 'low'].includes(principle.priority);
+    const validCategory = ['safety', 'ethics', 'accuracy', 'helpfulness', 'privacy'].includes(principle.category);
+    const validConsequence = ['block', 'modify', 'warn', 'log'].includes(principle.violation_consequence);
+
+    return Boolean(hasRequiredStrings && hasExamples && validPriority && validCategory && validConsequence);
   }
 
   async assessSafety(content: string, context: Record<string, unknown> = {}): Promise<SafetyAssessment> {
@@ -750,7 +754,7 @@ export class ConstitutionalAIService extends EventEmitter {
   getMetrics(): {
     total_principles: number;
     violation_history_count: number;
-    safety_thresholds: typeof this.safetyThresholds;
+    safety_thresholds: { toxicity_max: number; bias_max: number; misinformation_max: number; privacy_risk_max: number; overall_safety_min: number };
     violation_distribution: Record<string, number>;
     recent_violations: number;
   } {

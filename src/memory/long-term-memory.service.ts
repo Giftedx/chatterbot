@@ -294,6 +294,18 @@ export class LongTermMemoryService {
     }
   }
 
+  async queryMemories(params: { userId: string; query: string; limit?: number; semantic_search?: boolean }): Promise<{ memories: Memory[]; insights: string[] }> {
+    const memories = await this.retrieveMemories({
+      userId: params.userId,
+      query: params.query,
+      limit: params.limit ?? 10,
+      semantic_search: params.semantic_search ?? true,
+      include_associations: true
+    });
+    const insights: string[] = memories.slice(0, 3).map(m => `Related: ${m.content.substring(0, 100)}...`);
+    return { memories, insights };
+  }
+
   async deleteMemory(memoryId: string, userId: string): Promise<boolean> {
     await this.init();
 

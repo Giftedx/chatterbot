@@ -198,7 +198,7 @@ export class AdvancedCapabilitiesManager {
         attachments: [],
         metadata: {
           capabilitiesUsed: ['fallback'],
-          totalExecutionTime: Date.now() - startTime,
+          totalExecutionTime: Math.max(1, Date.now() - startTime),
           confidenceScore: 0.1
         }
       };
@@ -498,7 +498,7 @@ export class AdvancedCapabilitiesManager {
       webSearchResults,
       metadata: {
         capabilitiesUsed,
-        totalExecutionTime: Date.now() - startTime,
+        totalExecutionTime: Math.max(1, Date.now() - startTime),
         confidenceScore
       }
     };
