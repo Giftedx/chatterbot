@@ -11,6 +11,11 @@ import { longTermMemoryService } from '../memory/long-term-memory.service.js';
 import { hardenedAudioProcessingService } from '../audio/hardened-processing.service.js';
 import { realTimeStreamingService } from '../streaming/real-time.service.js';
 import { gpt4oEnhancedMultimodalService } from '../multimodal/gpt4o-enhanced.service.js';
+// Advanced AI Framework Services
+import { autoGenMultiAgentService } from '../agents/autogen/multi-agent.service.js';
+import { dspyFrameworkService } from '../agents/dspy/framework.service.js';
+import { semanticRoutingService } from './semantic-routing/intelligent-router.service.js';
+import { neuralSymbolicReasoningService } from './neural-symbolic/reasoning.service.js';
 // Note: Import temporal and other services as they become available
 
 interface AIFrameworkCapabilities {
@@ -40,6 +45,16 @@ interface AIFrameworkCapabilities {
   edge_deployment: boolean;
   performance_monitoring: boolean;
   cost_optimization: boolean;
+
+  // Advanced AI Frameworks (New)
+  autogen_multi_agent: boolean;
+  dspy_structured_prompting: boolean;
+  semantic_routing: boolean;
+  neural_symbolic_reasoning: boolean;
+  advanced_orchestration: boolean;
+  intelligent_routing: boolean;
+  hybrid_reasoning: boolean;
+  collaborative_agents: boolean;
 }
 
 interface AIFrameworkMetrics {
@@ -93,7 +108,17 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     mlops_lifecycle: false,
     edge_deployment: false,
     performance_monitoring: false,
-    cost_optimization: false
+    cost_optimization: false,
+
+    // Advanced AI Frameworks (New)
+    autogen_multi_agent: false,
+    dspy_structured_prompting: false,
+    semantic_routing: false,
+    neural_symbolic_reasoning: false,
+    advanced_orchestration: false,
+    intelligent_routing: false,
+    hybrid_reasoning: false,
+    collaborative_agents: false
   };
 
   private metrics: AIFrameworkMetrics = {
@@ -136,7 +161,13 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
         
         // Production Features
         this.initMLOpsLifecycle(),
-        this.initEdgeDeployment()
+        this.initEdgeDeployment(),
+
+        // Advanced AI Frameworks (New)
+        this.initAutoGenMultiAgent(),
+        this.initDSPyFramework(),
+        this.initSemanticRouting(),
+        this.initNeuralSymbolicReasoning()
       ]);
 
       // Analyze initialization results
@@ -286,6 +317,59 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     }
   }
 
+  // Advanced AI Framework Initialization Methods
+
+  private async initAutoGenMultiAgent(): Promise<void> {
+    try {
+      const initialized = await autoGenMultiAgentService.init();
+      this.capabilities.autogen_multi_agent = initialized;
+      this.capabilities.collaborative_agents = initialized;
+      if (initialized) {
+        console.log('🤖 AutoGen Multi-Agent Framework: READY');
+      }
+    } catch (error) {
+      console.warn('⚠️ AutoGen Multi-Agent initialization failed:', error);
+    }
+  }
+
+  private async initDSPyFramework(): Promise<void> {
+    try {
+      const initialized = await dspyFrameworkService.init();
+      this.capabilities.dspy_structured_prompting = initialized;
+      if (initialized) {
+        console.log('🧠 DSPy Structured Prompting Framework: READY');
+      }
+    } catch (error) {
+      console.warn('⚠️ DSPy Framework initialization failed:', error);
+    }
+  }
+
+  private async initSemanticRouting(): Promise<void> {
+    try {
+      const initialized = await semanticRoutingService.init();
+      this.capabilities.semantic_routing = initialized;
+      this.capabilities.intelligent_routing = initialized;
+      if (initialized) {
+        console.log('🧭 Semantic Routing & Intelligence: READY');
+      }
+    } catch (error) {
+      console.warn('⚠️ Semantic Routing initialization failed:', error);
+    }
+  }
+
+  private async initNeuralSymbolicReasoning(): Promise<void> {
+    try {
+      const initialized = await neuralSymbolicReasoningService.init();
+      this.capabilities.neural_symbolic_reasoning = initialized;
+      this.capabilities.hybrid_reasoning = initialized;
+      if (initialized) {
+        console.log('🧠🔗 Neural-Symbolic Reasoning: READY');
+      }
+    } catch (error) {
+      console.warn('⚠️ Neural-Symbolic Reasoning initialization failed:', error);
+    }
+  }
+
   private updateCapabilityScores(): void {
     const enabledCapabilities = Object.values(this.capabilities).filter(Boolean).length;
     const totalCapabilities = Object.keys(this.capabilities).length;
@@ -352,6 +436,45 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
           }
           break;
 
+        case 'autogen_multi_agent':
+          if (this.capabilities.autogen_multi_agent) {
+            const result = await autoGenMultiAgentService.executeCollaborativeTask(query);
+            response = result.result;
+            confidence = result.success ? 0.88 : 0.6;
+            cost = 0.08;
+            capabilitiesUsed.push(result.conversation_id);
+          }
+          break;
+
+        case 'dspy_structured_prompting':
+          if (this.capabilities.dspy_structured_prompting) {
+            // Use a default pipeline for general queries
+            const pipelines = dspyFrameworkService.getPipelines();
+            if (pipelines.length > 0) {
+              const result = await dspyFrameworkService.executePipeline(
+                pipelines[0].id,
+                { query: query }
+              );
+              response = result.outputs.answer || result.outputs.final_answer || 'DSPy processing completed';
+              confidence = result.success ? 0.82 : 0.6;
+              cost = 0.04;
+            }
+          }
+          break;
+
+        case 'neural_symbolic_reasoning':
+          if (this.capabilities.neural_symbolic_reasoning) {
+            const result = await neuralSymbolicReasoningService.reason(query, {}, {
+              prefer_method: 'hybrid',
+              confidence_threshold: 0.7
+            });
+            response = result.conclusion;
+            confidence = result.confidence;
+            cost = 0.06;
+            capabilitiesUsed.push(`Neural: ${result.neural_contribution}`, `Symbolic: ${result.symbolic_contribution}`);
+          }
+          break;
+
         default:
           // Fallback to basic processing
           response = `Processed query: ${query}`;
@@ -396,24 +519,63 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       return preferredCapability;
     }
 
+    // Use semantic routing for intelligent query routing
+    if (this.capabilities.semantic_routing) {
+      // This would integrate with semantic routing service
+      // For now, we'll use the enhanced logic below
+    }
+
     // Analyze query to determine best capability
     const queryLower = query.toLowerCase();
     
+    // Multi-agent collaboration patterns
+    if (/(collaborate|team|multiple|complex.*problem|comprehensive.*solution|experts?)/.test(queryLower)) {
+      if (this.capabilities.autogen_multi_agent) {
+        return 'autogen_multi_agent';
+      } else if (this.capabilities.crewai_specialists) {
+        return 'crewai_specialists';
+      }
+    }
+
+    // Neural-symbolic reasoning patterns
+    if (/(logic|reasoning|symbolic|hybrid.*reasoning|combine.*approaches)/.test(queryLower)) {
+      if (this.capabilities.neural_symbolic_reasoning) {
+        return 'neural_symbolic_reasoning';
+      }
+    }
+
+    // Structured prompting patterns
+    if (/(structured|format|template|systematic|step.*by.*step|pipeline)/.test(queryLower)) {
+      if (this.capabilities.dspy_structured_prompting) {
+        return 'dspy_structured_prompting';
+      }
+    }
+    
+    // Research and analysis patterns
     if (/(research|analyze|investigate|complex|reasoning)/.test(queryLower) && this.capabilities.langgraph_reasoning) {
       return 'langgraph_reasoning';
     }
     
+    // Team collaboration patterns
     if (/(team|collaborate|specialist|expert|multi-step)/.test(queryLower) && this.capabilities.crewai_specialists) {
       return 'crewai_specialists';
     }
     
+    // Multimodal patterns
     if (/(image|audio|video|document|multimodal)/.test(queryLower) && this.capabilities.gpt4o_multimodal) {
       return 'gpt4o_multimodal';
     }
     
-    // Default to LangGraph if available, otherwise CrewAI
-    if (this.capabilities.langgraph_reasoning) {
+    // Priority order for default selection
+    if (this.capabilities.neural_symbolic_reasoning && /(why|how|explain|reason)/.test(queryLower)) {
+      return 'neural_symbolic_reasoning';
+    } else if (this.capabilities.autogen_multi_agent && queryLower.length > 100) {
+      // Use multi-agent for complex, longer queries
+      return 'autogen_multi_agent';
+    } else if (this.capabilities.langgraph_reasoning) {
       return 'langgraph_reasoning';
+    } else if (this.capabilities.crewai_specialists) {
+      return 'crewai_specialists';
     } else if (this.capabilities.crewai_specialists) {
       return 'crewai_specialists';
     }
@@ -502,6 +664,127 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       
     } catch (error) {
       console.error('❌ Error during AI Framework shutdown:', error);
+    }
+  }
+
+  // Advanced processing with semantic routing integration
+  async processWithSemanticRouting(
+    query: string,
+    options: {
+      userId?: string;
+      sessionId?: string;
+      context?: Record<string, unknown>;
+    } = {}
+  ): Promise<{
+    response: string;
+    confidence: number;
+    processing_time_ms: number;
+    cost_usd: number;
+    routing_decision: any;
+    capabilities_used: string[];
+    metadata: Record<string, unknown>;
+  }> {
+    if (!this.capabilities.semantic_routing) {
+      // Fallback to standard processing
+      return this.processAdvancedQuery(query, options);
+    }
+
+    const startTime = Date.now();
+
+    try {
+      // Use semantic routing for intelligent query routing
+      const routingDecision = await semanticRoutingService.route(query, {
+        user_history: [],
+        conversation_context: [],
+        user_preferences: options.context || {}
+      });
+
+      let response = '';
+      let confidence = 0;
+      let cost = 0;
+      const capabilitiesUsed = [routingDecision.route_id];
+
+      // Execute based on routing decision
+      switch (routingDecision.route_id) {
+        case 'qa_route':
+          const qaResult = await this.processAdvancedQuery(query, { ...options, prefer_capability: 'langgraph_reasoning' });
+          response = qaResult.response;
+          confidence = routingDecision.confidence;
+          cost = 0.03;
+          break;
+
+        case 'code_gen_route':
+          if (this.capabilities.dspy_structured_prompting) {
+            const pipelines = dspyFrameworkService.getPipelines();
+            if (pipelines.length > 0) {
+              const result = await dspyFrameworkService.executePipeline(pipelines[0].id, { query });
+              response = result.outputs.code || result.outputs.answer || 'Code generation completed';
+              confidence = result.success ? 0.85 : 0.6;
+              cost = 0.04;
+            }
+          }
+          break;
+
+        case 'analysis_route':
+          const analysisResult = await this.processAdvancedQuery(query, { ...options, prefer_capability: 'neural_symbolic_reasoning' });
+          response = analysisResult.response;
+          confidence = routingDecision.confidence;
+          cost = 0.06;
+          break;
+
+        case 'collaboration_route':
+          const collabResult = await this.processAdvancedQuery(query, { ...options, prefer_capability: 'autogen_multi_agent' });
+          response = collabResult.response;
+          confidence = routingDecision.confidence;
+          cost = 0.08;
+          break;
+
+        case 'creative_route':
+          const creativeResult = await this.processAdvancedQuery(query, { ...options, prefer_capability: 'crewai_specialists' });
+          response = creativeResult.response;
+          confidence = routingDecision.confidence;
+          cost = 0.05;
+          break;
+
+        default:
+          // Fallback processing
+          const fallbackResult = await this.processAdvancedQuery(query, options);
+          response = fallbackResult.response;
+          confidence = routingDecision.confidence * 0.8; // Slight penalty for fallback
+          cost = 0.02;
+      }
+
+      const processingTime = Date.now() - startTime;
+
+      return {
+        response,
+        confidence,
+        processing_time_ms: processingTime,
+        cost_usd: cost,
+        routing_decision: routingDecision,
+        capabilities_used: capabilitiesUsed,
+        metadata: {
+          timestamp: new Date().toISOString(),
+          user_id: options.userId,
+          session_id: options.sessionId,
+          semantic_routing_used: true,
+          alternative_routes: routingDecision.alternative_routes,
+          framework_status: this.getFrameworkStatus()
+        }
+      };
+
+    } catch (error) {
+      // Fallback to standard processing on routing error
+      console.warn('Semantic routing failed, falling back to standard processing:', error);
+      const fallbackResult = await this.processAdvancedQuery(query, options);
+      return {
+        ...fallbackResult,
+        routing_decision: null,
+        metadata: {
+          ...fallbackResult.metadata,
+          semantic_routing_error: error instanceof Error ? error.message : 'Unknown error'
+        }
+      };
     }
   }
 }
