@@ -2,7 +2,7 @@
 
 [![Node >= 18](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/your-org/your-repo/actions/workflows/ci.yml/badge.svg)](.github/workflows/ci.yml)
+[![CI](https://github.com/Giftedx/chatterbot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Giftedx/chatterbot/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-jest-informational)](jest.config.js)
 
 > A modern Discord bot with agentic intelligence, multi‑provider model routing, long‑term memory, multimodal analysis, safety moderation, analytics, and optional durable orchestration. Users see one command: `/chat`. Everything else is automatic.
@@ -76,6 +76,19 @@ What to expect
 - `/chat prompt [attachment]`
   - Only command registered by default. Registration happens at startup via application commands (global). Propagation can take minutes.
 
+### Faster dev registration (guild‑scoped)
+For faster propagation during development, register commands to a single guild. Set `DISCORD_GUILD_ID` and use this route in your registration step:
+```ts
+await rest.put(
+  Routes.applicationGuildCommands(DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID!),
+  { body: allCommands }
+);
+```
+Revert to global registration for production:
+```ts
+await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), { body: allCommands });
+```
+
 ## Health, metrics, analytics
 - Health server: `GET /health` (JSON) on `HEALTH_CHECK_PORT` (default 3000)
 - Prometheus metrics: `GET /metrics`
@@ -117,6 +130,19 @@ OPENAI_COMPAT_API_KEY=...
 OPENAI_COMPAT_BASE_URL=https://your-endpoint/v1
 OPENAI_COMPAT_MODEL=qwen2.5-32b-instruct
 ```
+
+### Provider compatibility
+
+| Provider | Example model | Modalities | Function calling | Notes |
+|---|---|---|---|---|
+| OpenAI | gpt-4o-mini | text, image, tools | yes | fast, low cost |
+| Anthropic | claude-3-5-sonnet-latest | text, tools | no | long context, high safety |
+| Gemini | gemini-1.5-pro | text, image, tools | no | multimodal, very long context |
+| Groq | llama-3.1-70b-versatile | text | no | very low latency |
+| Mistral | mistral-large-latest | text, tools | yes | coding/tools |
+| OpenAI‑compatible | qwen2.5-32b-instruct | text, tools | yes | custom endpoints |
+
+Notes reflect defaults from `src/config/models.ts`; behavior can change with provider updates.
 
 ## Memory and personalization
 - Long‑term memory is stored via Prisma models (see `prisma/schema.prisma` → `UserMemory`, conversations, topics, media).
@@ -295,6 +321,14 @@ docker run --rm -it \
 - Users opt in once via `/chat`. Consent buttons are used where required by tools.
 - Users can request deletion via a modal (“DELETE ALL MY DATA” confirmation).
 - See `src/ui/privacy-consent.handlers.ts` and `src/ui/privacy-consent.ts`.
+
+## Further reading
+- Architecture: `docs/ARCHITECTURE.md`
+- Advanced capabilities: `docs/ADVANCED_CAPABILITIES.md`
+- Feature flags: `docs/FEATURE_FLAGS.md`
+- Security guidelines: `docs/SECURITY_GUIDELINES.md`
+- pgvector setup: `docs/pgvector-setup.md`
+- Temporal orchestration: `src/orchestration/temporal/README.md`
 
 ## Troubleshooting
 - Global command registration can take time to propagate. Prefer guild‑scoped during development if needed.
