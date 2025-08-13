@@ -62,6 +62,20 @@ export class MockPrismaClient {
       const deleted = this.personas.get(query.where.id);
       this.personas.delete(query.where.id);
       return deleted;
+    },
+    upsert: async (query: any) => {
+      const where = query.where || { id: this.counters.personas };
+      const existing = this.personas.get(where.id);
+      if (existing) {
+        const updated = { ...existing, ...query.update, updatedAt: new Date() };
+        this.personas.set(where.id, updated);
+        return updated;
+      } else {
+        const id = where.id || this.counters.personas++;
+        const created = { id, ...query.create, createdAt: new Date(), updatedAt: new Date() };
+        this.personas.set(id, created);
+        return created;
+      }
     }
   };
 

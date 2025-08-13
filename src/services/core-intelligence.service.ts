@@ -280,7 +280,7 @@ export class CoreIntelligenceService {
              }
          } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle interaction:', { interactionId: interaction.id, error });
-            console.error('Error handling interaction', error);
+            console.error('Failed to send reply', error);
             if (interaction && typeof interaction.isRepliable === 'function' && interaction.isRepliable()) {
                 const errorMessage = 'An error occurred while processing your request.';
                                  if ((interaction as any).editReply && typeof (interaction as any).editReply === 'function') {

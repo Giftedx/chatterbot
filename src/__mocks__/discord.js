@@ -59,6 +59,23 @@ class ChatInputCommandInteraction {
   }
 }
 
+class ModalBuilder {
+  constructor() { this._data = { components: [] }; }
+  setCustomId(id) { this._data.custom_id = id; return this; }
+  setTitle(title) { this._data.title = title; return this; }
+  addComponents(...rows) { this._data.components.push(...rows); return this; }
+}
+class TextInputBuilder {
+  constructor() { this._data = {}; }
+  setCustomId(id) { this._data.custom_id = id; return this; }
+  setLabel(l) { this._data.label = l; return this; }
+  setStyle(s) { this._data.style = s; return this; }
+  setRequired(r) { this._data.required = r; return this; }
+  setMaxLength(m) { this._data.max_length = m; return this; }
+  setPlaceholder(p) { this._data.placeholder = p; return this; }
+}
+const TextInputStyle = { Short: 1, Paragraph: 2 };
+
 class ButtonBuilder {
   constructor() {
     this._data = { custom_id: '', label: '', style: 1 };
@@ -67,6 +84,7 @@ class ButtonBuilder {
   setLabel(label) { this._data.label = label; return this; }
   setStyle(style) { this._data.style = style; return this; }
   setEmoji(e) { this._data.emoji = e; return this; }
+  setURL(u) { this._data.url = u; return this; }
   toJSON() { return this._data; }
 }
 
@@ -94,4 +112,7 @@ module.exports = {
   Collection,
   EmbedBuilder,
   Attachment,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 };
