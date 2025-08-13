@@ -16,6 +16,14 @@ import { autoGenMultiAgentService } from '../agents/autogen/multi-agent.service.
 import { dspyFrameworkService } from '../agents/dspy/framework.service.js';
 import { semanticRoutingService } from './semantic-routing/intelligent-router.service.js';
 import { neuralSymbolicReasoningService } from './neural-symbolic/reasoning.service.js';
+// 2025 Advanced AI Framework Services  
+import { mixtureOfExpertsService } from './mixture-of-experts/moe-architecture.service.js';
+import { advancedRAG2Service } from './rag-2.0/hybrid-search.service.js';
+import { constitutionalAIService } from './constitutional-ai/safety-framework.service.js';
+import { compoundAISystemsService } from './compound-systems/orchestration.service.js';
+import { advancedVectorDatabaseService } from './vector-database/multimodal-search.service.js';
+import { federatedLearningService } from './federated-learning/distributed-training.service.js';
+import { causalAIReasoningService } from './causal-ai/reasoning-framework.service.js';
 // Note: Import temporal and other services as they become available
 
 interface AIFrameworkCapabilities {
@@ -55,6 +63,18 @@ interface AIFrameworkCapabilities {
   intelligent_routing: boolean;
   hybrid_reasoning: boolean;
   collaborative_agents: boolean;
+
+  // 2025 Advanced AI Frameworks (Latest)
+  mixture_of_experts: boolean;
+  rag_2_0_hybrid_search: boolean;
+  constitutional_ai_safety: boolean;
+  compound_ai_systems: boolean;
+  advanced_vector_database: boolean;
+  federated_learning: boolean;
+  causal_ai_reasoning: boolean;
+  meta_learning: boolean;
+  graph_neural_networks: boolean;
+  quantum_inspired_ai: boolean;
 }
 
 interface AIFrameworkMetrics {
@@ -118,7 +138,19 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
     advanced_orchestration: false,
     intelligent_routing: false,
     hybrid_reasoning: false,
-    collaborative_agents: false
+    collaborative_agents: false,
+
+    // 2025 Advanced AI Frameworks (Latest)
+    mixture_of_experts: false,
+    rag_2_0_hybrid_search: false,
+    constitutional_ai_safety: false,
+    compound_ai_systems: false,
+    advanced_vector_database: false,
+    federated_learning: false,
+    causal_ai_reasoning: false,
+    meta_learning: false,
+    graph_neural_networks: false,
+    quantum_inspired_ai: false
   };
 
   private metrics: AIFrameworkMetrics = {
@@ -167,7 +199,16 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
         this.initAutoGenMultiAgent(),
         this.initDSPyFramework(),
         this.initSemanticRouting(),
-        this.initNeuralSymbolicReasoning()
+        this.initNeuralSymbolicReasoning(),
+
+        // 2025 Advanced AI Frameworks (Latest)
+        this.initMixtureOfExperts(),
+        this.initRAG2HybridSearch(),
+        this.initConstitutionalAISafety(),
+        this.initCompoundAISystems(),
+        this.initAdvancedVectorDatabase(),
+        this.initFederatedLearning(),
+        this.initCausalAIReasoning()
       ]);
 
       // Analyze initialization results
@@ -785,6 +826,127 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
           semantic_routing_error: error instanceof Error ? error.message : 'Unknown error'
         }
       };
+    }
+  }
+
+  // 2025 Advanced AI Framework Initialization Methods
+
+  private async initMixtureOfExperts(): Promise<boolean> {
+    try {
+      console.log('🧠 Initializing Mixture of Experts Architecture...');
+      const success = await mixtureOfExpertsService.init();
+      this.capabilities.mixture_of_experts = success;
+      
+      if (success) {
+        console.log('✅ Mixture of Experts initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Mixture of Experts initialization failed:', error);
+      this.capabilities.mixture_of_experts = false;
+      return false;
+    }
+  }
+
+  private async initRAG2HybridSearch(): Promise<boolean> {
+    try {
+      console.log('🔍 Initializing RAG 2.0 with Hybrid Search...');
+      const success = await advancedRAG2Service.init();
+      this.capabilities.rag_2_0_hybrid_search = success;
+      
+      if (success) {
+        console.log('✅ RAG 2.0 Hybrid Search initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ RAG 2.0 Hybrid Search initialization failed:', error);
+      this.capabilities.rag_2_0_hybrid_search = false;
+      return false;
+    }
+  }
+
+  private async initConstitutionalAISafety(): Promise<boolean> {
+    try {
+      console.log('🛡️ Initializing Constitutional AI Safety Framework...');
+      const success = await constitutionalAIService.init();
+      this.capabilities.constitutional_ai_safety = success;
+      
+      if (success) {
+        console.log('✅ Constitutional AI Safety initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Constitutional AI Safety initialization failed:', error);
+      this.capabilities.constitutional_ai_safety = false;
+      return false;
+    }
+  }
+
+  private async initCompoundAISystems(): Promise<boolean> {
+    try {
+      console.log('🔗 Initializing Compound AI Systems Architecture...');
+      const success = await compoundAISystemsService.init();
+      this.capabilities.compound_ai_systems = success;
+      
+      if (success) {
+        console.log('✅ Compound AI Systems initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Compound AI Systems initialization failed:', error);
+      this.capabilities.compound_ai_systems = false;
+      return false;
+    }
+  }
+
+  private async initAdvancedVectorDatabase(): Promise<boolean> {
+    try {
+      console.log('🗃️ Initializing Advanced Vector Database...');
+      const success = await advancedVectorDatabaseService.init();
+      this.capabilities.advanced_vector_database = success;
+      
+      if (success) {
+        console.log('✅ Advanced Vector Database initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Advanced Vector Database initialization failed:', error);
+      this.capabilities.advanced_vector_database = false;
+      return false;
+    }
+  }
+
+  private async initFederatedLearning(): Promise<boolean> {
+    try {
+      console.log('🌐 Initializing Federated Learning Framework...');
+      const success = await federatedLearningService.init();
+      this.capabilities.federated_learning = success;
+      
+      if (success) {
+        console.log('✅ Federated Learning initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Federated Learning initialization failed:', error);
+      this.capabilities.federated_learning = false;
+      return false;
+    }
+  }
+
+  private async initCausalAIReasoning(): Promise<boolean> {
+    try {
+      console.log('🧬 Initializing Causal AI and Reasoning Framework...');
+      const success = await causalAIReasoningService.init();
+      this.capabilities.causal_ai_reasoning = success;
+      
+      if (success) {
+        console.log('✅ Causal AI and Reasoning initialized successfully');
+      }
+      return success;
+    } catch (error) {
+      console.warn('⚠️ Causal AI and Reasoning initialization failed:', error);
+      this.capabilities.causal_ai_reasoning = false;
+      return false;
     }
   }
 }
