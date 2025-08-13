@@ -28,7 +28,8 @@
     "db:migrate": "npx prisma migrate deploy",
     "db:studio": "npx prisma studio",
     "docs": "typedoc",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "setup": "node scripts/setup-wizard.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.2",
