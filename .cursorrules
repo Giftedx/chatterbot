@@ -1,0 +1,245 @@
+# Chatterbot Cursor Rules
+# Advanced Discord AI bot powered by Google Gemini
+
+## Project Overview
+This is a sophisticated Discord AI bot with the following key features:
+- Discord.js v14 integration with Google Gemini AI
+- Service-oriented architecture with dependency injection
+- Prisma ORM with SQLite/PostgreSQL support
+- Comprehensive testing with Jest
+- Docker containerization and deployment
+- Security-first approach with audit logging
+- MCP (Model Context Protocol) integration
+
+## Architecture Guidelines
+
+### Service Layer
+- All services should follow dependency injection patterns
+- Use interfaces for service contracts
+- Implement proper error handling with AppError classes
+- Services should be composable, not inherited
+- Support optional dependency injection for testing
+
+### TypeScript Standards
+- Use strict TypeScript configuration
+- Prefer interfaces over types for object shapes
+- Use ES2022 modules with .js extensions for imports
+- Implement proper type guards and validation
+- Avoid `any` types - use proper typing
+
+### Error Handling
+- Use structured AppError classes
+- Distinguish between operational and non-operational errors
+- Include user-friendly messages separate from internal logging
+- Implement circuit breaker patterns for API protection
+- Use retry logic with exponential backoff
+
+### Security Practices
+- Implement role-based access control
+- Use content moderation for text and images
+- Log security events with tamper-proof hash chains
+- Validate environment variables early
+- Use sandboxing for MCP tool execution
+
+## Code Quality Standards
+
+### Testing
+- Maintain 100% test coverage
+- Use Jest with TypeScript support
+- Implement comprehensive mock implementations
+- Test security patterns and performance monitoring
+- Use dependency injection for testable code
+
+### Documentation
+- All services must have JSDoc documentation
+- Include usage examples and parameter descriptions
+- Document error conditions and edge cases
+- Keep README.md updated with setup instructions
+
+### Code Organization
+- Follow clear directory structure
+- Use modular exports
+- Group related functionality together
+- Keep files focused and single-purpose
+
+## Development Workflow
+
+### Git Practices
+- Use conventional commit messages
+- Implement pre-commit hooks for quality checks
+- Use feature branches for development
+- Maintain clean git history
+
+### Dependencies
+- Keep dependencies up to date
+- Use exact versions for critical dependencies
+- Monitor for security vulnerabilities
+- Document dependency decisions
+
+### Environment Management
+- Use environment variables for configuration
+- Provide clear setup instructions
+- Support both development and production environments
+- Use Docker for consistent deployment
+
+## AI Integration Guidelines
+
+### Model Management
+- Support multiple AI providers (Google Gemini, OpenAI, Anthropic)
+- Implement intelligent model routing
+- Use streaming responses for better UX
+- Implement rate limiting and circuit breakers
+
+### Context Management
+- Maintain conversation history appropriately
+- Implement token counting for memory management
+- Use context-aware responses
+- Support multi-modal processing
+
+### MCP Integration
+- Follow MCP protocol standards
+- Implement proper tool schemas
+- Use secure tool execution patterns
+- Support streaming and async operations
+
+## Performance Considerations
+
+### Database
+- Use proper indexing for performance
+- Implement connection pooling
+- Use migrations for schema changes
+- Monitor query performance
+
+### Caching
+- Implement appropriate caching strategies
+- Use Redis for distributed caching
+- Cache expensive AI operations
+- Implement cache invalidation
+
+### Monitoring
+- Use structured logging with JSON format
+- Implement health check endpoints
+- Monitor API response times
+- Track error rates and performance metrics
+
+## Security Requirements
+
+### Authentication & Authorization
+- Implement Discord permission integration
+- Use role-based access control
+- Validate user permissions before operations
+- Log authentication events
+
+### Data Protection
+- Encrypt sensitive data at rest
+- Use secure communication protocols
+- Implement data retention policies
+- Follow GDPR/privacy best practices
+
+### Input Validation
+- Validate all user inputs
+- Use content moderation for user-generated content
+- Implement rate limiting
+- Sanitize data before processing
+
+## Deployment Guidelines
+
+### Docker
+- Use multi-stage builds for optimization
+- Implement health checks
+- Use environment-specific configurations
+- Optimize image size
+
+### CI/CD
+- Implement automated testing
+- Use security scanning in pipeline
+- Deploy to staging before production
+- Monitor deployment health
+
+### Production
+- Use proper logging and monitoring
+- Implement graceful shutdown
+- Use load balancing for scalability
+- Monitor resource usage
+
+## File-Specific Guidelines
+
+### Configuration Files
+- Use environment variables for secrets
+- Provide clear documentation
+- Use validation for configuration
+- Support multiple environments
+
+### Database Files
+- Use migrations for schema changes
+- Document schema decisions
+- Implement proper backup strategies
+- Use connection pooling
+
+### Test Files
+- Maintain high test coverage
+- Use descriptive test names
+- Test both success and failure cases
+- Mock external dependencies
+
+## Common Patterns
+
+### Service Pattern
+```typescript
+interface IService {
+  // Define service contract
+}
+
+class Service implements IService {
+  constructor(
+    private readonly dependencies: Dependencies
+  ) {}
+  
+  // Implement service methods
+}
+```
+
+### Error Handling Pattern
+```typescript
+class AppError extends Error {
+  constructor(
+    message: string,
+    public readonly isOperational: boolean = true,
+    public readonly code?: string
+  ) {
+    super(message);
+  }
+}
+```
+
+### Testing Pattern
+```typescript
+describe('Service', () => {
+  let service: Service;
+  let mockDependencies: jest.Mocked<Dependencies>;
+  
+  beforeEach(() => {
+    mockDependencies = createMockDependencies();
+    service = new Service(mockDependencies);
+  });
+  
+  it('should handle success case', async () => {
+    // Test implementation
+  });
+});
+```
+
+## Best Practices Summary
+
+1. **Security First**: Always consider security implications
+2. **Test Everything**: Maintain comprehensive test coverage
+3. **Document Clearly**: Keep documentation up to date
+4. **Follow Patterns**: Use established architectural patterns
+5. **Monitor Performance**: Track and optimize performance
+6. **Error Handling**: Implement robust error handling
+7. **Type Safety**: Use TypeScript effectively
+8. **Clean Code**: Write readable and maintainable code
+9. **Dependency Management**: Keep dependencies secure and up to date
+10. **Deployment Safety**: Use proper deployment practices
+
+Remember: This is a production Discord bot handling real user interactions. Always prioritize security, reliability, and user experience.

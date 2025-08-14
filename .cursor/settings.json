@@ -1,0 +1,46 @@
+{
+  "projectName": "chatterbot",
+  "description": "Advanced Discord AI bot powered by Google Gemini",
+  "rules": {
+    "typescript": {
+      "strict": true,
+      "preferInterfaces": true,
+      "noAny": true,
+      "es2022": true
+    },
+    "architecture": {
+      "serviceOriented": true,
+      "dependencyInjection": true,
+      "errorHandling": "structured",
+      "testing": "comprehensive"
+    },
+    "security": {
+      "first": true,
+      "auditLogging": true,
+      "inputValidation": true,
+      "contentModeration": true
+    },
+    "performance": {
+      "monitoring": true,
+      "caching": true,
+      "optimization": true
+    },
+    "documentation": {
+      "jsdoc": true,
+      "readme": true,
+      "examples": true
+    }
+  },
+  "filePatterns": {
+    "services": "src/services/*.ts",
+    "tests": "src/**/*.test.ts",
+    "config": "*.config.*",
+    "docs": "*.md"
+  },
+  "conventions": {
+    "naming": "camelCase",
+    "files": "kebab-case",
+    "commits": "conventional",
+    "branches": "feature-based"
+  }
+}
