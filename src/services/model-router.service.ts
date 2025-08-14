@@ -57,6 +57,26 @@ export class ModelRouterService {
     if (process.env.OPENAI_COMPAT_API_KEY && process.env.OPENAI_COMPAT_BASE_URL) this.openaiCompat = new OpenAICompatProvider();
   }
 
+  private getSelectionConstraints(): import('./model-registry.service.js').SelectionConstraints {
+    const disallow: import('../config/models.js').ProviderName[] = [];
+    // If Gemini key is missing, avoid selecting Gemini to reduce failed attempts
+    if (!process.env.GEMINI_API_KEY) disallow.push('gemini');
+    // Allow user override via CSV list: DISALLOW_PROVIDERS=anthropic,openai
+    const csv = (process.env.DISALLOW_PROVIDERS || '').trim();
+    if (csv) {
+      for (const raw of csv.split(',')) {
+        const p = raw.trim() as import('../config/models.js').ProviderName;
+        if (p && ['gemini','openai','anthropic','groq','mistral','openai_compat'].includes(p) && !disallow.includes(p)) {
+          disallow.push(p);
+        }
+      }
+    }
+    return {
+      preferProvider: this.defaultProvider,
+      disallowProviders: disallow.length ? disallow : undefined,
+    };
+  }
+
   private buildRoutingSignal(prompt: string, history: ChatMessage[], overrideLatency?: RoutingSignal['latencyPreference']): RoutingSignal {
     const text = [
       ...history.map(h => h.parts.map(p => (p as any).text || '').join(' ')),
@@ -162,8 +182,11 @@ export class ModelRouterService {
 
   async generateWithMeta(prompt: string, history: ChatMessage[], systemPrompt?: string): Promise<GenerationMeta> {
     return await withSpan('router.generateWithMeta', async () => {
-      // if circuit breaker tripped for preferred provider, allow fallback
-      const preferred = modelRegistry.selectModel(prompt, history);
+      // Prefer env/default provider and avoid disallowed providers (missing API keys, user overrides)
+      const constraints = this.getSelectionConstraints();
+      const preferred = modelRegistry.selectBestModel(this.buildRoutingSignal(prompt, history), constraints as any) ||
+        modelRegistry.listAvailableModels().find(m => !constraints.disallowProviders?.includes(m.provider)) ||
+        modelRegistry.listAvailableModels()[0];
       let text: string;
       try {
         text = await withSpan('router.callProvider', async () => this.callProvider(preferred, prompt, history, systemPrompt), {
@@ -171,8 +194,33 @@ export class ModelRouterService {
           model: preferred.model
         });
       } catch (err) {
-        // Fallback to next available model
-        const fallback = modelRegistry.listAvailableModels().find(m => m.provider !== preferred.provider) || preferred;
+        // Fallback to next available model with explicit preference order and health-aware penalty
+        const preferredOrder: ProviderName[] = ['gemini', 'openai', 'groq', 'mistral', 'openai_compat', 'anthropic'];
+        const constraints = this.getSelectionConstraints();
+        const available = modelRegistry
+          .listAvailableModels()
+          .filter(m => m.provider !== preferred.provider)
+          .filter(m => !constraints.disallowProviders?.includes(m.provider));
+
+        const healthPenalty = (provider: ProviderName) => {
+          try {
+            const h = providerHealthStore.get(provider);
+            if (!h) return 0;
+            const recent = Date.now() - h.lastUpdated < 60_000;
+            const ratio = (h.errorCount + 1) / (h.successCount + 1);
+            return recent && ratio > 1.5 ? 10 : 0; // push unhealthy providers (e.g., Anthropic credit errors) to the end
+          } catch {
+            return 0;
+          }
+        };
+
+        const score = (card: import('../config/models.js').ModelCard) => {
+          const orderIdx = preferredOrder.indexOf(card.provider);
+          return (orderIdx === -1 ? 999 : orderIdx) + healthPenalty(card.provider);
+        };
+
+        const sorted = available.sort((a, b) => score(a) - score(b));
+        const fallback = sorted[0] || preferred;
         text = await withSpan('router.callProvider', async () => this.callProvider(fallback, prompt, history, systemPrompt), {
           provider: fallback.provider,
           model: fallback.model,

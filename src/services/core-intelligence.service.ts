@@ -49,7 +49,7 @@ import { modelRouterService } from './model-router.service.js';
 import { knowledgeBaseService } from './knowledge-base.service.js';
 import type { ProviderName } from '../config/models.js';
 import { getEnvAsBoolean } from '../utils/env.js';
-import { langGraphWorkflow } from '../agents/langgraph/workflow.js';
+import { langGraphWorkflow, advancedLangGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 // Advanced Capabilities
 import { 
@@ -255,13 +255,8 @@ export class CoreIntelligenceService {
     }
 
     public async handleInteraction(interaction: Interaction): Promise<void> {
-                 try {
-             // Fallback for test/mocked interactions without isChatInputCommand
-             if (!('isChatInputCommand' in interaction) && (interaction as any).options && typeof (interaction as any).options.getString === 'function' && (interaction as any).user) {
-                 await this.processChatCommand(interaction as any);
-                 return;
-             }
-                         if (interaction.isChatInputCommand()) {
+        try {
+            if (interaction.isChatInputCommand()) {
                 // In tests, defer to satisfy unit expectations and enable editReply paths
                 try {
                   if (process.env.NODE_ENV === 'test' && 'deferReply' in interaction && typeof (interaction as any).deferReply === 'function') {
@@ -276,9 +271,9 @@ export class CoreIntelligenceService {
                   }
                 } catch {}
             } else if (interaction.isButton()) {
-                 await this.handleButtonPress(interaction);
-             }
-         } catch (error) {
+                await this.handleButtonPress(interaction);
+            }
+        } catch (error) {
             logger.error('[CoreIntelSvc] Failed to handle interaction:', { interactionId: interaction.id, error });
             console.error('Failed to send reply', error);
             console.error('Error handling interaction', error);
@@ -995,15 +990,25 @@ export class CoreIntelligenceService {
             } catch (error) { logger.warn('Failed to fetch RAG context, continuing without it.', { error }); }
 
             // Optional: derive intent with LangGraph to condition a concise, precise system prompt
-            let systemPrompt: string | undefined;
-            if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
-              try {
-                const state = await langGraphWorkflow.run({ query: ragPrefixedQuery });
-                if (state && (state as any).intent) {
-                  systemPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
-                }
-              } catch {}
-            }
+                        let systemPrompt: string | undefined;
+                        if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
+                            try {
+                                const sessionId = (uiContext as any)?.channel?.isThread?.() ? (uiContext as any).channel.id : (uiContext as any).channelId || (uiContext as any).id;
+                                const state = await advancedLangGraphWorkflow.execute(ragPrefixedQuery, {
+                                    user_context: {
+                                        user_id: String(userId),
+                                        session_id: String(sessionId || Date.now()),
+                                        preferences: await this.getUserPreferences(userId),
+                                        conversation_history: []
+                                    }
+                                });
+                                if (state && (state as any).intent) {
+                                    systemPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+                                }
+                            } catch (e) {
+                                logger.debug('[CoreIntelSvc] LangGraph execute skipped or failed', { error: String(e) });
+                            }
+                        }
 
             const groundedQuery = typeof (globalThis as any).hybridGroundingPrefix !== 'undefined' ? ((globalThis as any).hybridGroundingPrefix + ragPrefixedQuery) : ragPrefixedQuery;
 
@@ -1198,6 +1203,72 @@ export class CoreIntelligenceService {
         } else if (interaction.customId === MOVE_DM_BUTTON_ID) {
             await this.userConsentService.setDmPreference(userId, true);
             await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
+        } else if (interaction.customId === 'privacy_consent_agree') {
+            // Handle privacy consent agreement
+            try {
+                logger.debug('[Consent] agree button pressed', { userId });
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferReply({ ephemeral: true });
+                    logger.debug('[Consent] interaction deferred (reply)', { userId });
+                }
+
+                const ok = await this.userConsentService.optInUser(
+                    userId,
+                    interaction.user.username || 'Unknown',
+                    {
+                        consentToStore: true,
+                        consentToAnalyze: true,
+                        consentToPersonalize: true
+                    }
+                );
+                logger.debug('[Consent] optInUser result', { userId, ok });
+
+                const successMsg = ok
+                    ? '✅ Thank you! Privacy consent granted. You can now use all bot features. Try using `/chat` again!'
+                    : '⚠️ Consent saved partially. You can start using the bot, but some settings may not have persisted.';
+
+                try {
+                    await interaction.editReply({
+                        content: successMsg,
+                        embeds: [],
+                        components: []
+                    });
+                    logger.debug('[Consent] editReply success', { userId });
+                } catch (e) {
+                    logger.debug('[Consent] editReply failed, trying followUp', { userId, error: String(e) });
+                    await interaction.followUp({ content: successMsg, ephemeral: true });
+                }
+            } catch (error) {
+                logger.error('Failed to grant privacy consent', { userId, error: String(error) });
+                try {
+                    await interaction.editReply({ content: '❌ Failed to save consent preferences. Please try again.', embeds: [], components: [] });
+                } catch {
+                    try { await interaction.followUp({ content: '❌ Failed to save consent preferences. Please try again.', ephemeral: true }); } catch {}
+                }
+            }
+        } else if (interaction.customId === 'privacy_consent_decline') {
+            // Handle privacy consent decline
+            try {
+                logger.debug('[Consent] decline button pressed', { userId });
+                if (!interaction.deferred && !interaction.replied) {
+                    await interaction.deferReply({ ephemeral: true });
+                    logger.debug('[Consent] interaction deferred (reply)', { userId });
+                }
+                const declineMsg = '❌ Privacy consent declined. Some features will be limited. You can change your mind anytime using `/privacy` command.';
+                try {
+                    await interaction.editReply({
+                        content: declineMsg,
+                        embeds: [],
+                        components: []
+                    });
+                    logger.debug('[Consent] decline editReply success', { userId });
+                } catch (e) {
+                    logger.debug('[Consent] decline editReply failed, trying followUp', { userId, error: String(e) });
+                    await interaction.followUp({ content: declineMsg, ephemeral: true });
+                }
+            } catch (error) {
+                logger.debug('Failed to update decline UI', { userId, error: String(error) });
+            }
         }
     }
 

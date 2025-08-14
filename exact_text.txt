@@ -1,0 +1,4 @@
+        } else if (interaction.customId === MOVE_DM_BUTTON_ID) {
+            await this.userConsentService.setDmPreference(userId, true);
+            await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
+        }

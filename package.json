@@ -31,6 +31,14 @@
     "prepare": "husky install",
     "setup": "node scripts/setup-wizard.mjs"
   },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,cts,mts,cjs,mjs}": [
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml,css,scss,ts,tsx,js,jsx,cts,mts,cjs,mjs}": [
+      "prettier --write"
+    ]
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.2",
     "@ai-sdk/google": "^2.0.5",
@@ -73,7 +81,12 @@
     "@opentelemetry/api": "^1.8.0",
     "@opentelemetry/sdk-node": "^0.55.0",
     "@opentelemetry/auto-instrumentations-node": "^0.55.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0"
+    "@opentelemetry/exporter-trace-otlp-http": "^0.55.0"
+  },
+  "overrides": {
+    "@browserbasehq/stagehand": {
+      "openai": "^4.62.1"
+    }
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -91,7 +104,11 @@
     "tsx": "^4.6.0",
     "typedoc": "^0.28.0",
     "typescript": "^5.9.2",
-    "husky": "^9.1.6"
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.3.3",
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0"
   },
   "engines": {
     "node": ">=18.0.0"

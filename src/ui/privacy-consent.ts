@@ -93,10 +93,9 @@ export function createPrivacyConsentButtons(): ActionRowBuilder<ButtonBuilder> {
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('❌'),
       new ButtonBuilder()
-        .setCustomId('privacy_full_policy')
         .setLabel('Full Privacy Policy')
         .setStyle(ButtonStyle.Link)
-        .setURL('https://example.com/privacy') // Replace with actual privacy policy URL
+        .setURL('https://github.com/Giftedx/chatterbot/blob/main/PRIVACY.md')
     );
 }
 

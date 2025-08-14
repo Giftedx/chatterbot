@@ -188,8 +188,14 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       // Handle privacy button interactions
       if (interaction.isButton()) {
         if (interaction.customId.startsWith('privacy_') || interaction.customId.startsWith('data_') || interaction.customId.startsWith('delete_')) {
-          await handlePrivacyButtonInteraction(interaction);
-          return;
+          // Let core service own privacy buttons (consent agree/decline) to unify logic
+          // Previously this returned early which prevented CoreIntelligenceService from seeing the button
+          try {
+            await handlePrivacyButtonInteraction(interaction);
+          } catch (e) {
+            logger.debug('Non-fatal privacy button handler error (will continue to core handler)', { error: String(e) });
+          }
+          // Do NOT return here so the core service can handle consent buttons
         }
       }
 

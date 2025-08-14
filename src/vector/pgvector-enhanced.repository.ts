@@ -80,6 +80,13 @@ export class PgvectorRepository {
       return false;
     }
 
+    // Require Postgres connection information; Prisma uses SQLite by default
+    const hasPgConn = Boolean(process.env.DATABASE_URL?.startsWith('postgres') || process.env.POSTGRES_URL || process.env.POSTGRES_HOST);
+    if (!hasPgConn) {
+      logger.info('pgvector disabled: no Postgres connection configured (DATABASE_URL/POSTGRES_URL)');
+      return false;
+    }
+
     try {
       // Dynamic import to avoid loading pg unless needed
       const pg = await import('pg');

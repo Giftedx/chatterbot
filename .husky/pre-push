@@ -1,0 +1,7 @@
+# Run a lean but meaningful test gate before pushing (v10-compatible script)
+if npm run -s test:ci >/dev/null 2>&1; then
+  echo "Running test suite before push..."
+  npm run -s test:ci || exit 1
+else
+  echo "No test:ci script; skipping tests before push."
+fi

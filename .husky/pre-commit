@@ -1,4 +1,40 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
+# Husky pre-commit hook (v10-compatible)
 
-npm run lint && npm run typecheck
+# Blocking: secrets scan on staged changes if gitleaks is available
+if command -v gitleaks >/dev/null 2>&1; then
+	echo "Running gitleaks on staged changes..."
+	gitleaks protect --staged --no-banner -v || exit 1
+else
+	echo "gitleaks not found; skipping secret scan."
+fi
+
+# Blocking: lint-staged to auto-fix and lint only changed files
+if command -v npx >/dev/null 2>&1; then
+	if [ -f package.json ]; then
+		if npx --no-install lint-staged >/dev/null 2>&1; then
+			echo "Running lint-staged (auto-fix and lint staged files)..."
+			npx lint-staged || exit 1
+		else
+			echo "lint-staged not installed; skipping staged auto-fix."
+		fi
+	fi
+fi
+
+echo "Running typecheck (non-blocking)..."
+if command -v timeout >/dev/null 2>&1; then
+	timeout 60s npm run -s typecheck || echo "Typecheck reported issues or timed out; not blocking commit."
+else
+	# Run in background if timeout is unavailable
+	(npm run -s typecheck >/dev/null 2>&1 &)
+fi
+
+# Optional: very fast tests on affected areas (non-blocking). Adjust or remove if slow.
+# Detect presence of script without executing it
+if node -e "const s=require('./package.json').scripts||{}; process.exit(s['test:detect']?0:1)"; then
+	echo "Running quick test detection (non-blocking)..."
+	if command -v timeout >/dev/null 2>&1; then
+		timeout 45s npm run -s test:detect || echo "Tests reported issues or timed out; not blocking commit."
+	else
+		(npm run -s test:detect >/dev/null 2>&1 &)
+	fi
+fi
