@@ -35,6 +35,10 @@ yarn-cache/
 
 # Prisma artifacts
 prisma/dev.db
+prisma/**/dev.db
+
+# Copilot processing scratch file (not for commit)
+Copilot-Processing.md
 
 # Agent-specific directories and files
 .agent-metrics/
