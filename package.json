@@ -29,7 +29,11 @@
     "db:studio": "npx prisma studio",
     "docs": "typedoc",
     "prepare": "husky install",
-    "setup": "node scripts/setup-wizard.mjs"
+    "setup": "node scripts/setup-wizard.mjs",
+    "security:check": "NODE_OPTIONS=\"\" npm audit",
+    "security:fix": "NODE_OPTIONS=\"\" npm audit fix --legacy-peer-deps",
+    "security:report": "./scripts/security-fix.sh",
+    "env:fix": "./scripts/fix-node-env.sh"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,cts,mts,cjs,mjs}": [

@@ -1,0 +1,182 @@
+Security vulnerabilities found:
+🚀 Running: npm audit --json
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "axios": {
+      "name": "axios",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1097679,
+          "name": "axios",
+          "dependency": "axios",
+          "title": "Axios Cross-Site Request Forgery Vulnerability",
+          "url": "https://github.com/advisories/GHSA-wf5p-g6vw-rhxx",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-352"
+          ],
+          "cvss": {
+            "score": 6.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N"
+          },
+          "range": ">=0.8.1 <0.28.0"
+        },
+        {
+          "source": 1103617,
+          "name": "axios",
+          "dependency": "axios",
+          "title": "axios Requests Vulnerable To Possible SSRF and Credential Leakage via Absolute URL",
+          "url": "https://github.com/advisories/GHSA-jr5f-v2jv-69x6",
+          "severity": "high",
+          "cwe": [
+            "CWE-918"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<0.30.0"
+        }
+      ],
+      "effects": [
+        "openai"
+      ],
+      "range": "<=0.29.0",
+      "nodes": [
+        "node_modules/embedchain/node_modules/langchain/node_modules/axios"
+      ],
+      "fixAvailable": false
+    },
+    "crewai": {
+      "name": "crewai",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "embedchain"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/crewai"
+      ],
+      "fixAvailable": false
+    },
+    "embedchain": {
+      "name": "embedchain",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "langchain",
+        "pdfjs-dist"
+      ],
+      "effects": [
+        "crewai"
+      ],
+      "range": ">=0.0.2",
+      "nodes": [
+        "node_modules/embedchain"
+      ],
+      "fixAvailable": false
+    },
+    "langchain": {
+      "name": "langchain",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1100325,
+          "name": "langchain",
+          "dependency": "langchain",
+          "title": "Langchain Path Traversal vulnerability",
+          "url": "https://github.com/advisories/GHSA-hc5w-c9f8-9cc4",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-22",
+            "CWE-29"
+          ],
+          "cvss": {
+            "score": 6.5,
+            "vectorString": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N"
+          },
+          "range": "<0.2.19"
+        },
+        "openai"
+      ],
+      "effects": [
+        "embedchain"
+      ],
+      "range": "<=0.2.18",
+      "nodes": [
+        "node_modules/embedchain/node_modules/langchain"
+      ],
+      "fixAvailable": false
+    },
+    "openai": {
+      "name": "openai",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "axios"
+      ],
+      "effects": [
+        "langchain"
+      ],
+      "range": "2.0.0 - 3.3.0",
+      "nodes": [
+        "node_modules/embedchain/node_modules/langchain/node_modules/openai"
+      ],
+      "fixAvailable": false
+    },
+    "pdfjs-dist": {
+      "name": "pdfjs-dist",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1104044,
+          "name": "pdfjs-dist",
+          "dependency": "pdfjs-dist",
+          "title": "PDF.js vulnerable to arbitrary JavaScript execution upon opening a malicious PDF",
+          "url": "https://github.com/advisories/GHSA-wgrm-67xf-hhpq",
+          "severity": "high",
+          "cwe": [
+            "CWE-754"
+          ],
+          "cvss": {
+            "score": 8.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:H/A:H"
+          },
+          "range": "<=4.1.392"
+        }
+      ],
+      "effects": [],
+      "range": "<=4.1.392",
+      "nodes": [
+        "node_modules/pdfjs-dist"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 1,
+      "high": 5,
+      "critical": 0,
+      "total": 6
+    },
+    "dependencies": {
+      "prod": 945,
+      "dev": 497,
+      "optional": 68,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1507
+    }
+  }
+}
+Could not generate JSON report
