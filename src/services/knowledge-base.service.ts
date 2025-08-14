@@ -3,7 +3,7 @@
  * Manages trusted information for zero-hallucination responses
  */
 
-import { prisma } from '../db/prisma.js';
+import { getPrisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
 import { features } from '../config/feature-flags.js';
 import { pgvectorRepository } from '../vector/pgvector-enhanced.repository.js';
@@ -94,18 +94,21 @@ export class KnowledgeBaseService {
     channelId: string,
     authorId: string,
     tags: string[] = [],
-    confidence: number = 0.8
+    confidence: number = 0.8,
+    guildId?: string
   ): Promise<KnowledgeEntry> {
     try {
-      const entry = await prisma.knowledgeEntry.create({
+      const prisma = await getPrisma();
+      const entryRaw = await prisma.guildKnowledgeBase.create({
         data: {
+          guildId: guildId || 'global',
           content: this.cleanContent(content),
           source: 'discord_message',
           sourceId: messageId,
-          channelId,
-          authorId,
+          sourceUrl: null,
           tags: tags ? JSON.stringify(tags) : null,
           confidence,
+          addedBy: authorId,
           createdAt: new Date(),
           updatedAt: new Date()
         }
@@ -118,6 +121,19 @@ export class KnowledgeBaseService {
         confidence
       });
 
+      const entry: KnowledgeEntry = {
+        id: entryRaw.id,
+        content: entryRaw.content,
+        source: entryRaw.source,
+        sourceId: entryRaw.sourceId || messageId,
+        sourceUrl: entryRaw.sourceUrl || null,
+        channelId,
+        authorId,
+        tags: entryRaw.tags || (tags ? JSON.stringify(tags) : null),
+        confidence: entryRaw.confidence,
+        createdAt: entryRaw.createdAt,
+        updatedAt: entryRaw.updatedAt
+      };
       return entry;
     } catch (error) {
       logger.error('Failed to add knowledge from Discord message', error);
@@ -132,24 +148,42 @@ export class KnowledgeBaseService {
     question: string,
     answer: string,
     tags: string[] = [],
-    confidence: number = 0.9
+    confidence: number = 0.9,
+    guildId?: string,
+    addedBy?: string
   ): Promise<KnowledgeEntry> {
     try {
+      const prisma = await getPrisma();
       const content = `Q: ${question}\nA: ${answer}`;
-      
-      const entry = await prisma.knowledgeEntry.create({
+      const entryRaw = await prisma.guildKnowledgeBase.create({
         data: {
+          guildId: guildId || 'global',
           content: this.cleanContent(content),
           source: 'faq',
           sourceId: `faq_${Date.now()}`,
+          sourceUrl: null,
           tags: tags ? JSON.stringify(tags) : null,
           confidence,
+          addedBy: addedBy || 'system',
           createdAt: new Date(),
           updatedAt: new Date()
         }
       });
 
       logger.info('Added FAQ to knowledge base', { question, confidence });
+      const entry: KnowledgeEntry = {
+        id: entryRaw.id,
+        content: entryRaw.content,
+        source: entryRaw.source,
+        sourceId: entryRaw.sourceId || '',
+        sourceUrl: entryRaw.sourceUrl || null,
+        channelId: null,
+        authorId: entryRaw.addedBy || null,
+        tags: entryRaw.tags || (tags ? JSON.stringify(tags) : null),
+        confidence: entryRaw.confidence,
+        createdAt: entryRaw.createdAt,
+        updatedAt: entryRaw.updatedAt
+      };
       return entry;
     } catch (error) {
       logger.error('Failed to add FAQ', error);
@@ -201,6 +235,7 @@ export class KnowledgeBaseService {
 
       // Attempt vector retrieval via KBChunk if embeddings exist
       try {
+        const prisma = await getPrisma();
         const chunks = await prisma.kBChunk.findMany({ take: 200 });
         if (chunks && chunks.length > 0 && process.env.OPENAI_API_KEY) {
           const OpenAI = (await import('openai')).default;
@@ -234,19 +269,34 @@ export class KnowledgeBaseService {
         }
       } catch {}
 
-      // Fallback to keyword-based search
+      // Fallback to keyword-based search using GuildKnowledgeBase model
       const whereClause: Record<string, unknown> = {
         confidence: { gte: minConfidence }
       };
-      if (channelId) whereClause.channelId = channelId;
+      if (guildId) (whereClause as any).guildId = guildId;
 
-      const entries = await prisma.knowledgeEntry.findMany({
+      const prisma = await getPrisma();
+      const rawEntries = await prisma.guildKnowledgeBase.findMany({
         where: whereClause,
         orderBy: [ { confidence: 'desc' }, { updatedAt: 'desc' } ],
         take: limit * 5
       });
 
-      const relevantEntries = (entries as KnowledgeEntry[])
+      const entries: KnowledgeEntry[] = (rawEntries as any[]).map((e) => ({
+        id: e.id,
+        content: e.content,
+        source: e.source,
+        sourceId: e.sourceId || '',
+        sourceUrl: e.sourceUrl || null,
+        channelId: null,
+        authorId: e.addedBy || null,
+        tags: e.tags || null,
+        confidence: e.confidence,
+        createdAt: e.createdAt,
+        updatedAt: e.updatedAt
+      }));
+
+      const relevantEntries = entries
         .map((entry) => ({ entry, score: this.calculateRelevance(searchQuery, entry.content) }))
         .filter((e) => e.score > 0.2)
         .sort((a, b) => b.score - a.score)
@@ -261,7 +311,7 @@ export class KnowledgeBaseService {
       logger.info('Knowledge base search completed', {
         query: searchQuery,
         results: reranked.length,
-        totalSearched: entries.length
+  totalSearched: entries.length
       });
 
       return reranked;
@@ -301,7 +351,8 @@ export class KnowledgeBaseService {
    */
   async updateConfidence(entryId: string, newConfidence: number): Promise<void> {
     try {
-      await prisma.knowledgeEntry.update({
+      const prisma = await getPrisma();
+      await prisma.guildKnowledgeBase.update({
         where: { id: entryId },
         data: {
           confidence: Math.max(0, Math.min(1, newConfidence)),
@@ -320,7 +371,8 @@ export class KnowledgeBaseService {
    */
   async deleteEntry(entryId: string): Promise<void> {
     try {
-      await prisma.knowledgeEntry.delete({
+      const prisma = await getPrisma();
+      await prisma.guildKnowledgeBase.delete({
         where: { id: entryId }
       });
 
@@ -340,17 +392,18 @@ export class KnowledgeBaseService {
     recentAdditions: number;
   }> {
     try {
-      const totalEntries = await prisma.knowledgeEntry.count();
-      const avgConfidence = await prisma.knowledgeEntry.aggregate({
+      const prisma = await getPrisma();
+      const totalEntries = await prisma.guildKnowledgeBase.count();
+      const avgConfidence = await prisma.guildKnowledgeBase.aggregate({
         _avg: { confidence: true }
       });
 
-      const bySource = await prisma.knowledgeEntry.groupBy({
+      const bySource = await prisma.guildKnowledgeBase.groupBy({
         by: ['source'],
         _count: { source: true }
       });
 
-      const recentAdditions = await prisma.knowledgeEntry.count({
+      const recentAdditions = await prisma.guildKnowledgeBase.count({
         where: {
           createdAt: {
             gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days

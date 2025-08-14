@@ -37,6 +37,7 @@ interface HealthStatus {
 export class HealthCheck {
   private server: HttpServer;
   private port: number;
+  private isStarted: boolean = false;
 
   constructor(port = Number(process.env.HEALTH_CHECK_PORT ?? 3000)) {
     this.port = port;
@@ -124,14 +125,31 @@ export class HealthCheck {
   }
 
   start(): void {
+    if (this.isStarted) {
+      logger.warn('Health check server already started');
+      return;
+    }
+
+    this.server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        logger.warn(`Port ${this.port} is already in use, trying next port...`);
+        this.port += 1;
+        setTimeout(() => this.start(), 100);
+      } else {
+        logger.error('Health check server error:', error);
+      }
+    });
+
     this.server.listen(this.port, () => {
+      this.isStarted = true;
       logger.info(`Health check server running on port ${this.port}`);
     });
   }
 
   stop(): void {
-    if (this.server) {
+    if (this.server && this.isStarted) {
       this.server.close();
+      this.isStarted = false;
     }
   }
 }

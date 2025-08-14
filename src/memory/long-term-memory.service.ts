@@ -3,14 +3,7 @@
 import { getEnvAsBoolean, getEnvAsNumber } from '../utils/env.js';
 import { z } from 'zod';
 import cron from 'node-cron';
-
-// Try to use PrismaClient when available, otherwise fallback to shared prisma wrapper in tests
-let PrismaClientCtor: any = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod = require('@prisma/client');
-  PrismaClientCtor = mod?.PrismaClient || mod?.default?.PrismaClient || null;
-} catch {}
+import { getPrisma } from '../db/prisma.js';
 
 // Memory schemas
 const MemorySchema = z.object({
@@ -94,13 +87,7 @@ export class LongTermMemoryService {
   private readonly CONSOLIDATION_INTERVAL: number;
 
   constructor() {
-    if (PrismaClientCtor) {
-      this.prisma = new PrismaClientCtor();
-    } else {
-      // Fallback to shared prisma wrapper (mock in tests)
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      this.prisma = require('../db/prisma.js').prisma;
-    }
+    this.prisma = null;
     this.MAX_MEMORIES_PER_USER = getEnvAsNumber('MAX_MEMORIES_PER_USER', 1000);
     this.MEMORY_DECAY_RATE = getEnvAsNumber('MEMORY_DECAY_RATE', 0.01);
     this.IMPORTANCE_THRESHOLD = getEnvAsNumber('MEMORY_IMPORTANCE_THRESHOLD', 0.3);
@@ -111,6 +98,9 @@ export class LongTermMemoryService {
     if (this.isInitialized) return;
 
     try {
+      if (!this.prisma) {
+        this.prisma = await getPrisma().catch(() => null);
+      }
       // Initialize default consolidation rules
       this.consolidationRules = [
         {

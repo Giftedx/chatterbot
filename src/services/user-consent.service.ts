@@ -3,7 +3,7 @@
  * Handles user opt-in/opt-out, privacy consent, and data lifecycle
  */
 
-import { prisma } from '../db/prisma.js';
+import { getPrisma } from '../db/prisma.js';
 import { logger } from '../utils/logger.js';
 
 export interface UserConsent {
@@ -55,7 +55,10 @@ export class UserConsentService {
    */
   public async getUserConsent(userId: string): Promise<UserConsent | null> {
     try {
-      const user = await prisma.user.findUnique({
+  // Ensure prisma client is initialized
+  const prismaClient = await getPrisma();
+      
+      const user = await prismaClient.user.findUnique({
         where: { id: userId }
       });
 
@@ -121,8 +124,8 @@ export class UserConsentService {
   ): Promise<boolean> {
     try {
       const now = new Date();
-      
-      await prisma.user.upsert({
+  const prismaClient = await getPrisma();
+  await prismaClient.user.upsert({
         where: { id: userId },
         update: {
           username: username || undefined,
@@ -178,8 +181,8 @@ export class UserConsentService {
   public async optOutUser(userId: string): Promise<boolean> {
     try {
       const now = new Date();
-      
-      await prisma.user.update({
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({
         where: { id: userId },
         data: {
           optedOut: true,
@@ -210,8 +213,8 @@ export class UserConsentService {
   public async pauseUser(userId: string, minutes: number): Promise<Date | null> {
     try {
       const resumeAt = new Date(Date.now() + minutes * 60 * 1000);
-      
-      await prisma.user.update({
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({
         where: { id: userId },
         data: {
           pauseUntil: resumeAt,
@@ -242,7 +245,8 @@ export class UserConsentService {
    */
   public async resumeUser(userId: string): Promise<boolean> {
     try {
-      await prisma.user.update({
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({
         where: { id: userId },
         data: {
           pauseUntil: null,
@@ -290,12 +294,13 @@ export class UserConsentService {
    */
   public async exportUserData(userId: string): Promise<DataExportPayload | null> {
     try {
+  const prismaClient = await getPrisma();
       // Get user consent data
       const userConsent = await this.getUserConsent(userId);
       if (!userConsent) return null;
 
       // Get user memories
-      const memories = await prisma.userMemory.findMany({
+  const memories = await prismaClient.userMemory.findMany({
         where: { userId },
         include: {
           memoryEmbeddings: true
@@ -303,7 +308,7 @@ export class UserConsentService {
       });
 
       // Get conversation messages
-      const conversations = await prisma.conversationMessage.findMany({
+  const conversations = await prismaClient.conversationMessage.findMany({
         where: { userId },
         include: {
           mediaFiles: true
@@ -311,12 +316,12 @@ export class UserConsentService {
       });
 
       // Get analytics events
-      const analytics = await prisma.analyticsEvent.findMany({
+  const analytics = await prismaClient.analyticsEvent.findMany({
         where: { userId }
       });
 
       // Update export timestamp
-      await prisma.user.update({
+  await prismaClient.user.update({
         where: { id: userId },
         data: {
           dataExportedAt: new Date(),
@@ -371,8 +376,9 @@ export class UserConsentService {
    */
   public async forgetUser(userId: string): Promise<boolean> {
     try {
+  const prismaClient = await getPrisma();
       // Use transaction to ensure all data is deleted together
-      await prisma.$transaction(async (tx: any) => {
+  await prismaClient.$transaction(async (tx: any) => {
         // Delete user memories and embeddings (cascade will handle embeddings)
         await tx.userMemory.deleteMany({
           where: { userId }
@@ -425,7 +431,8 @@ export class UserConsentService {
    */
   public async updateUserActivity(userId: string): Promise<void> {
     try {
-      await prisma.user.update({
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({
         where: { id: userId },
         data: {
           lastActivity: new Date()
@@ -445,7 +452,8 @@ export class UserConsentService {
    */
   public async cleanupExpiredData(): Promise<number> {
     try {
-      const users = await prisma.user.findMany({
+  const prismaClient = await getPrisma();
+  const users = await prismaClient.user.findMany({
         where: {
           scheduledDeletion: {
             lte: new Date()
@@ -479,7 +487,8 @@ export class UserConsentService {
    */
   public async getExpiredUsers(): Promise<string[]> {
     try {
-      const users = await prisma.user.findMany({
+  const prismaClient = await getPrisma();
+  const users = await prismaClient.user.findMany({
         where: {
           lastActivity: {
             lt: new Date(Date.now() - this.DEFAULT_RETENTION_DAYS * 24 * 60 * 60 * 1000)
@@ -511,7 +520,8 @@ export class UserConsentService {
   /** Set DM preference */
   public async setDmPreference(userId: string, dmPreferred: boolean): Promise<void> {
     try {
-      await prisma.user.update({ where: { id: userId }, data: { dmPreferred } });
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({ where: { id: userId }, data: { dmPreferred } });
     } catch (error) {
       logger.error('Failed to set DM preference', { userId, dmPreferred, error: String(error) });
     }
@@ -520,7 +530,8 @@ export class UserConsentService {
   /** Set last personal thread ID */
   public async setLastThreadId(userId: string, threadId: string | null): Promise<void> {
     try {
-      await prisma.user.update({ where: { id: userId }, data: { lastThreadId: threadId } });
+  const prismaClient = await getPrisma();
+  await prismaClient.user.update({ where: { id: userId }, data: { lastThreadId: threadId } });
     } catch (error) {
       logger.error('Failed to set last thread ID', { userId, threadId, error: String(error) });
     }

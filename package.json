@@ -65,7 +65,7 @@
     "langchain": "^0.3.30",
     "lodash": "^4.17.21",
     "node-cron": "^4.2.1",
-    "openai": "^5.12.2",
+  "openai": "^5.12.2",
     "pg": "^8.16.3",
     "sanitize-html": "^2.17.0",
     "socket.io": "^4.8.1",
@@ -73,7 +73,12 @@
     "@opentelemetry/api": "^1.8.0",
     "@opentelemetry/sdk-node": "^0.55.0",
     "@opentelemetry/auto-instrumentations-node": "^0.55.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0"
+    "@opentelemetry/exporter-trace-otlp-http": "^0.55.0"
+  },
+  "overrides": {
+    "@browserbasehq/stagehand": {
+      "openai": "^4.62.1"
+    }
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
