@@ -19,81 +19,72 @@ export class OpenAIResponsesToolsProvider {
   }
 
   private getTools() {
+    // OpenAI Responses API expects top-level name/description/parameters for function tools
     return [
       {
         type: 'function',
-        function: {
-          name: 'memory_search',
-          description: 'Search persistent knowledge and memory for relevant information to ground answers.',
-          parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              query: { type: 'string', minLength: 1, description: 'The search query' }
-            },
-            required: ['query']
-          }
+        name: 'memory_search',
+        description: 'Search persistent knowledge and memory for relevant information to ground answers.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            query: { type: 'string', minLength: 1, description: 'The search query' }
+          },
+          required: ['query']
         }
       },
       {
         type: 'function',
-        function: {
-          name: 'web_search',
-          description: 'Search the web for recent, factual information using Brave Search if available.',
-          parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              query: { type: 'string', minLength: 1 },
-              count: { type: 'integer', minimum: 1, maximum: 10, default: 5 }
-            },
-            required: ['query']
-          }
+        name: 'web_search',
+        description: 'Search the web for recent, factual information using Brave Search if available.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            query: { type: 'string', minLength: 1 },
+            count: { type: 'integer', minimum: 1, maximum: 10, default: 5 }
+          },
+          required: ['query']
         }
       },
       {
         type: 'function',
-        function: {
-          name: 'content_extraction',
-          description: 'Extract content from one or more URLs (markdown if possible).',
-          parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              urls: { type: 'array', items: { type: 'string', format: 'uri' }, minItems: 1, maxItems: 5 }
-            },
-            required: ['urls']
-          }
+        name: 'content_extraction',
+        description: 'Extract content from one or more URLs (markdown if possible).',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            urls: { type: 'array', items: { type: 'string', format: 'uri' }, minItems: 1, maxItems: 5 }
+          },
+          required: ['urls']
         }
       },
       {
         type: 'function',
-        function: {
-          name: 'browser_automation',
-          description: 'Navigate to a URL and extract basic page info (links, title, description).',
-          parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              url: { type: 'string', format: 'uri' }
-            },
-            required: ['url']
-          }
+        name: 'browser_automation',
+        description: 'Navigate to a URL and extract basic page info (links, title, description).',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            url: { type: 'string', format: 'uri' }
+          },
+          required: ['url']
         }
       },
       {
         type: 'function',
-        function: {
-          name: 'sequential_thinking',
-          description: 'Perform structured, step-by-step reasoning to solve complex problems.',
-          parameters: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              thought: { type: 'string', minLength: 1 }
-            },
-            required: ['thought']
-          }
+        name: 'sequential_thinking',
+        description: 'Perform structured, step-by-step reasoning to solve complex problems.',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            thought: { type: 'string', minLength: 1 }
+          },
+          required: ['thought']
         }
       }
     ] as any[];

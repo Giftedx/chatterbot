@@ -824,7 +824,13 @@ export class AdvancedLangGraphWorkflow extends EventEmitter {
         setTimeout(() => reject(new Error('Workflow execution timeout')), this.config.execution_timeout_ms)
       );
 
-      const result = await Promise.race([executionPromise, timeoutPromise]) as ComplexAgentState;
+      // Provide checkpointer thread_id when available (required by MemorySaver)
+      const threadId = options?.user_context?.session_id || options?.user_context?.user_id || `thread_${Date.now()}`;
+      const result = await Promise.race([
+        // When compiled with a checkpointer, we must pass a configurable.thread_id
+        this.graph.invoke(initialState, { configurable: { thread_id: String(threadId) } }),
+        timeoutPromise
+      ]) as ComplexAgentState;
       
       // Update execution metrics
       const executionTime = Date.now() - executionStartTime;
@@ -867,7 +873,7 @@ export class AdvancedLangGraphWorkflow extends EventEmitter {
         success: true
       });
 
-      console.log(`✅ LangGraph workflow completed in ${(executionTime / 1000).toFixed(2)}s`);
+  console.log(`✅ LangGraph workflow completed in ${(executionTime / 1000).toFixed(2)}s`);
       return result;
 
     } catch (error) {

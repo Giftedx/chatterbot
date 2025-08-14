@@ -1,0 +1,11 @@
+title = "chatterbot gitleaks config"
+
+[allowlist]
+description = "Allow placeholder env values"
+regexes = [
+  '''your_[a-z0-9_]+_here''',
+  '''example(_|-)key''',
+]
+paths = [
+  "env.example"
+]

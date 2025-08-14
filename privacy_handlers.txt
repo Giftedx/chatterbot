@@ -1,0 +1,28 @@
+        } else if (interaction.customId === 'privacy_consent_agree') {
+            // Handle privacy consent agreement
+            try {
+                await this.userConsentService.optInUser(userId, interaction.user.username || 'Unknown', {
+                    consentToStore: true,
+                    consentToAnalyze: true,
+                    consentToPersonalize: true
+                });
+                await interaction.update({ 
+                    content: '✅ Thank you! Privacy consent granted. You can now use all bot features. Try using `/chat` again!', 
+                    embeds: [], 
+                    components: [] 
+                });
+            } catch (error) {
+                logger.error('Failed to grant privacy consent', { userId, error });
+                await interaction.reply({ 
+                    content: '❌ Failed to save consent. Please try again.', 
+                    flags: MessageFlags.Ephemeral 
+                });
+            }
+        } else if (interaction.customId === 'privacy_consent_decline') {
+            // Handle privacy consent decline
+            await interaction.update({ 
+                content: '❌ Privacy consent declined. You can change your mind anytime by using `/chat` again.', 
+                embeds: [], 
+                components: [] 
+            });
+        }

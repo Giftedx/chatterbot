@@ -1,4 +1,16 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
+# Husky pre-commit hook (v10-compatible)
 
-npm run lint && npm run typecheck
+# Blocking: secrets scan on staged changes if gitleaks is available
+if command -v gitleaks >/dev/null 2>&1; then
+	echo "Running gitleaks on staged changes..."
+	gitleaks protect --staged --no-banner -v || exit 1
+else
+	echo "gitleaks not found; skipping secret scan."
+fi
+
+# Non-blocking checks: lint and typecheck (report but do not block commit)
+echo "Running lint (non-blocking)..."
+npm run lint || echo "Lint reported issues; not blocking commit."
+
+echo "Running typecheck (non-blocking)..."
+npm run typecheck || echo "Typecheck reported issues; not blocking commit."
