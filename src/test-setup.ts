@@ -39,14 +39,36 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
   // Keep errors and warnings visible for debugging test failures
   // console.error remains unchanged; console.warn is filtered to reduce noise from expected fallbacks
   console.warn = (...args: unknown[]) => {
-    const first = args[0];
-    const msg = typeof first === 'string' ? first : '';
+    // Build a combined text snapshot from warn args for simple pattern checks
+    const text = args
+      .map((a) => {
+        if (typeof a === 'string') return a;
+        if (a && typeof a === 'object' && 'message' in (a as Record<string, unknown>)) {
+          const m = (a as { message?: unknown }).message;
+          return typeof m === 'string' ? m : '';
+        }
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return '';
+        }
+      })
+      .join(' ');
+
     // Silence noisy expected warnings from external provider fallbacks during tests
-    // Example: 'Gemini AI failed, using local reasoning: GoogleGenerativeAIError: [400 Bad Request] API key not valid...'
-    if (
-      msg.startsWith('Gemini AI failed, using local reasoning') ||
-      msg.includes('API key not valid. Please pass a valid API key.')
-    ) {
+    // Examples:
+    //  - 'Gemini AI failed, using local reasoning: ... API key not valid ...'
+    //  - 'Failed to generate embedding, using fallback: AuthenticationError: 401 Incorrect API key provided'
+    //  - Messages containing MODEL_AUTHENTICATION / invalid_api_key
+    const silencePatterns = [
+      'Gemini AI failed, using local reasoning',
+      'API key not valid. Please pass a valid API key.',
+      'Failed to generate embedding, using fallback',
+      'Incorrect API key provided',
+      'MODEL_AUTHENTICATION',
+      'invalid_api_key',
+    ];
+    if (silencePatterns.some((p) => text.includes(p))) {
       return; // ignore expected provider warnings in test mode
     }
     originalWarn(...(args as Parameters<typeof console.warn>));
