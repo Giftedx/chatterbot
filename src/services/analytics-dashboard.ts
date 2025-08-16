@@ -8,6 +8,7 @@ import { logger } from '../utils/logger.js';
 
 let server: http.Server | null = null;
 let metricsInterval: NodeJS.Timeout | null = null;
+let dashboardInstance: AnalyticsDashboard | null = null;
 
 export interface DashboardConfig {
   port: number;
@@ -137,6 +138,17 @@ export class AnalyticsDashboard {
         break;
       }
 
+      case '/api/decision-metrics': {
+        try {
+          const { getDecisionMetrics } = await import('./decision-metrics.service.js');
+          const m = getDecisionMetrics();
+          this.sendJson(res, m);
+        } catch (e) {
+          this.sendError(res, 500, 'Failed to load decision metrics');
+        }
+        break;
+      }
+
       case '/api/telemetry': {
         try {
           const { modelTelemetryStore } = await import('./advanced-capabilities/index.js');
@@ -210,13 +222,15 @@ export const analyticsDashboard = new AnalyticsDashboard();
 export function startAnalyticsDashboardIfEnabled(): void {
   if (process.env.ENABLE_ANALYTICS_DASHBOARD !== 'true') return;
 
-  if (!server) {
+  // Start the full AnalyticsDashboard HTTP API instead of a placeholder server
+  if (!dashboardInstance) {
     const port = parseInt(process.env.ANALYTICS_DASHBOARD_PORT || '3001', 10);
-    server = http.createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
-      res.end('Analytics dashboard is running.\n');
+    dashboardInstance = new AnalyticsDashboard({ port });
+    dashboardInstance.start().then(() => {
+      logger.info(`Analytics dashboard listening on :${port}`);
+    }).catch((err) => {
+      logger.error('Failed to start analytics dashboard', err as Error);
     });
-    server.listen(port, () => logger.info(`Analytics dashboard listening on :${port}`));
   }
 
   // Start periodic verification metrics logging every 15 minutes
@@ -238,8 +252,9 @@ export function stopAnalyticsDashboard(): void {
     clearInterval(metricsInterval);
     metricsInterval = null;
   }
-  if (server) {
-    server.close();
-    server = null;
+  if (dashboardInstance) {
+    dashboardInstance.stop().catch(() => {}).finally(() => {
+      dashboardInstance = null;
+    });
   }
 }

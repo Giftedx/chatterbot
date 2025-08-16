@@ -8,6 +8,24 @@
 
 // Suppress console output during tests except for errors
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
+  // Provide safe default env vars to avoid throwing in integration paths during tests
+  process.env.NODE_ENV = 'test';
+  process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'test-key';
+  process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
+  process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || 'test-key';
+  process.env.GROQ_API_KEY = process.env.GROQ_API_KEY || 'test-key';
+  process.env.MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || 'test-key';
+  process.env.DISCORD_TOKEN = process.env.DISCORD_TOKEN || 'test-token';
+  process.env.DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || 'test-client-id';
+  process.env.DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID || 'test-guild';
+  // Feature flags default off for deterministic tests unless a test enables them
+  process.env.ENABLE_AGENTIC_INTELLIGENCE = process.env.ENABLE_AGENTIC_INTELLIGENCE || 'false';
+  process.env.ENABLE_ENHANCED_INTELLIGENCE = process.env.ENABLE_ENHANCED_INTELLIGENCE || 'false';
+  process.env.ENABLE_ANSWER_VERIFICATION = process.env.ENABLE_ANSWER_VERIFICATION || 'false';
+  process.env.FEATURE_LANGGRAPH = process.env.FEATURE_LANGGRAPH || 'false';
+  process.env.FEATURE_VERCEL_AI = process.env.FEATURE_VERCEL_AI || 'false';
+  process.env.FEATURE_PGVECTOR = process.env.FEATURE_PGVECTOR || 'false';
+
   // Override console methods to be silent except for errors and warnings
   const originalLog = console.log;
   const originalInfo = console.info;
@@ -35,6 +53,11 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       // Use the mocked prisma client
       const { mockPrismaClient } = await import('./__mocks__/@prisma/client.js');
       mockPrismaInstance = mockPrismaClient;
+  // Make prisma available synchronously for modules that import prisma at top-level
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (global as any).__TEST_PRISMA__ = mockPrismaInstance;
+  // Also attach to a shape compatible with require('../../db/prisma.js') consumers once loaded
+  // Consumers import { prisma } from '../../db/prisma.js'; once the module evaluates, it will read this
       
       // Setup test database if real prisma is available  
       try {

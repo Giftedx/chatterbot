@@ -545,7 +545,7 @@ export class AdvancedVectorDatabaseService extends EventEmitter {
     const result: string[] = [];
     
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         const value = obj[key];
         const newKey = prefix ? `${prefix}.${key}` : key;
         

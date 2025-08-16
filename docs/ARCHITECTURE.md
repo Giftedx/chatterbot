@@ -12,6 +12,16 @@ Chatterbot is a Discord bot that exposes a single command, `/chat`, backed by a 
 7. Personalization and memory updates
 8. Telemetry, logging, analytics
 
+### Decision tree and auto-reply policy
+- A token-aware Decision Engine evaluates every message from opted-in users across channels.
+- High-priority paths that generally trigger a reply (with exceptions for spam/mentions-everyone):
+	- Direct Messages (DMs)
+	- Mentions of the bot
+	- Replies to the bot
+- In regular channels, the bot replies when overall context score passes a threshold (questions, code/error mentions, urgency, personal thread history, etc.).
+- Cooldown is applied per user after the bot replies; DMs/mentions/replies bypass cooldown to feel responsive.
+- Extremely long inputs are handled with a defer strategy that asks the user to choose a summary or a deep dive.
+
 ## Key modules
 - Entrypoint: `src/index.ts`
 - Pipeline: `src/services/core-intelligence.service.ts`
@@ -23,6 +33,12 @@ Chatterbot is a Discord bot that exposes a single command, `/chat`, backed by a 
 - Verification: `src/services/verification/answer-verification.service.ts`
 - Health/Metrics: `src/health.ts`
 - Analytics API: `src/services/analytics-dashboard.ts`
+
+Decision Engine:
+- `src/services/decision-engine.service.ts` contains the scoring and strategy selection (quick-reply | deep-reason | defer | ignore).
+- Token-aware branching: estimates tokens (~4 chars/token) and upgrades to deep-reason or defer for very long inputs.
+- Exception handling: suppress on @everyone or excessive mentions even if mentioned; per-user cooldown and recent burst penalty.
+- Integrated via `shouldRespond()` in `src/services/core-intelligence.service.ts`, which now tracks recent per-user bursts across a 5s sliding window.
 
 ## Data layer
 - Prisma (SQLite by default; Postgres optional for pgvector)

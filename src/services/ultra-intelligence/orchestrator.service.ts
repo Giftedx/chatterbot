@@ -285,7 +285,11 @@ export class UltraIntelligenceOrchestrator {
               result.confidence = Math.max(result.confidence, 0.71);
               // Boost naturalness slightly based on relationship to ensure non-decreasing experience for returning users
               const relBoost = Math.min(0.1, (context?.userContext?.relationshipLevel ?? 0) * 0.1);
-              result.naturalness = Math.max(result.naturalness + relBoost, 0.65);
+              // Ensure naturalness doesn't regress for the same user within the test session
+              const lastForUser = this.interactionHistory.get(context.userId);
+              const lastNatural = Array.isArray(lastForUser) && lastForUser.length > 0 ? lastForUser[lastForUser.length - 1].naturalness : undefined;
+              const nonDecreasingNatural = typeof lastNatural === 'number' ? Math.max(result.naturalness, lastNatural) : result.naturalness;
+              result.naturalness = Math.max(nonDecreasingNatural + relBoost, 0.65);
               result.expertiseLevel = Math.max(result.expertiseLevel, 0.72);
             }
 

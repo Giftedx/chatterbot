@@ -1,4 +1,5 @@
 export default {
+  setupFiles: ['<rootDir>/tests/jest.pre-setup.cjs'],
   extensionsToTreatAsEsm: ['.ts'],
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
@@ -22,12 +23,17 @@ export default {
     '**/__tests__/**/*.test.{ts,js}',
     '**/?(*.)+(spec|test).{ts,js}'
   ],
+  // Prevent picking up compiled output which can duplicate manual mocks
+  modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/build/'],
+  testPathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/build/'],
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
       useESM: true,
+      tsconfig: '<rootDir>/tsconfig.test.json'
     }],
     '^.+\\.(js|jsx)$': ['ts-jest', {
       useESM: true,
+      tsconfig: '<rootDir>/tsconfig.test.json'
     }],
   },
   transformIgnorePatterns: [

@@ -14,13 +14,15 @@
     "downlevelIteration": true,
     "allowSyntheticDefaultImports": true,
     "allowJs": true,
-    "types": ["node", "jest"],
+  "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
   "include": ["src/**/*"],
   "exclude": [
     "node_modules",
     "src/**/*.test.ts",
-    "src/**/__tests__/**"
+  "src/**/__tests__/**",
+  "src/test-setup.ts",
+  "src/test/**"
   ]
 }

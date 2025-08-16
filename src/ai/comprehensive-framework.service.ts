@@ -716,8 +716,6 @@ export class ComprehensiveAIFrameworkService extends EventEmitter {
       return 'langgraph_reasoning';
     } else if (this.capabilities.crewai_specialists) {
       return 'crewai_specialists';
-    } else if (this.capabilities.crewai_specialists) {
-      return 'crewai_specialists';
     }
     
     return 'basic_processing';
