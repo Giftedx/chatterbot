@@ -16,29 +16,70 @@ export default {
     '!src/test/**/*.ts',
     '!src/__mocks__/**/*.ts',
     '!src/**/index.ts',
+    // Exclude large experimental/edge areas from global coverage; they have their own roadmaps/tests
+    '!src/agents/**',
+    '!src/ai/**',
+    '!src/multimodal/**',
+    '!src/orchestration/temporal/**',
+    '!src/mlops/**',
+    '!src/services/autonomous-reasoning/**',
+    '!src/edge/**',
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  testMatch: [
-    '**/__tests__/**/*.test.{ts,js}',
-    '**/?(*.)+(spec|test).{ts,js}'
-  ],
+  coverageThreshold: {
+    global: {
+      lines: 45,
+      statements: 44,
+      branches: 34,
+      functions: 45,
+    },
+    './src/services/core-intelligence.service.ts': {
+      lines: 57,
+      statements: 57,
+      branches: 41,
+      functions: 55,
+    },
+    './src/services/decision-engine.service.ts': {
+      lines: 70,
+      statements: 70,
+      branches: 60,
+      functions: 70,
+    },
+    './src/services/core/message-analysis.service.ts': {
+      lines: 50,
+      statements: 45,
+      branches: 29,
+      functions: 55,
+    },
+    './src/services/core/unified-analytics.service.ts': {
+      lines: 60,
+      statements: 60,
+      branches: 45,
+      functions: 55,
+    },
+  },
+  testMatch: ['**/__tests__/**/*.test.{ts,js}', '**/?(*.)+(spec|test).{ts,js}'],
   // Prevent picking up compiled output which can duplicate manual mocks
   modulePathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/build/'],
   testPathIgnorePatterns: ['<rootDir>/dist/', '<rootDir>/build/'],
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: true,
-      tsconfig: '<rootDir>/tsconfig.test.json'
-    }],
-    '^.+\\.(js|jsx)$': ['ts-jest', {
-      useESM: true,
-      tsconfig: '<rootDir>/tsconfig.test.json'
-    }],
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: '<rootDir>/tsconfig.test.json',
+      },
+    ],
+    '^.+\\.(js|jsx)$': [
+      'ts-jest',
+      {
+        useESM: true,
+        tsconfig: '<rootDir>/tsconfig.test.json',
+      },
+    ],
   },
-  transformIgnorePatterns: [
-    'node_modules/(?!(.*\\.mjs$|discord\\.js|@discordjs))'
-  ],
+  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$|discord\\.js|@discordjs))'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  testTimeout: 30000
+  testTimeout: 30000,
 };

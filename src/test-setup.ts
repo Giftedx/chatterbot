@@ -31,6 +31,7 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
   const originalInfo = console.info;
   const originalDebug = console.debug;
   const originalWarn = console.warn;
+  const originalError = console.error;
 
   console.log = () => {};
   console.info = () => {};
@@ -38,6 +39,36 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
 
   // Keep errors and warnings visible for debugging test failures
   // console.error remains unchanged; console.warn is filtered to reduce noise from expected fallbacks
+  // Filter only specific, known-noisy error patterns from external providers so tests remain readable
+  console.error = (...args: unknown[]) => {
+    const text = args
+      .map((a) => {
+        if (typeof a === 'string') return a;
+        if (a && typeof a === 'object' && 'message' in (a as Record<string, unknown>)) {
+          const m = (a as { message?: unknown }).message;
+          return typeof m === 'string' ? m : '';
+        }
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return '';
+        }
+      })
+      .join(' ');
+
+    const silenceErrorPatterns = [
+      'MODEL_AUTHENTICATION',
+      'invalid_api_key',
+      'Incorrect API key provided',
+      'AI intent classification failed:',
+      // LangGraph analysis fallback noise under tests
+      'Analysis failed:',
+      // Unified analytics negative-path test noise
+      'Failed to log interaction:',
+    ];
+    if (silenceErrorPatterns.some((p) => text.includes(p))) return;
+    originalError(...(args as Parameters<typeof console.error>));
+  };
   console.warn = (...args: unknown[]) => {
     // Build a combined text snapshot from warn args for simple pattern checks
     const text = args
@@ -67,6 +98,20 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       'Incorrect API key provided',
       'MODEL_AUTHENTICATION',
       'invalid_api_key',
+      // Property-based web interaction tests generate random strings that are not valid URLs
+      // and intentionally exercise the fallback path. Silence those expected warnings.
+      'Web interaction failed, using fallback',
+      'TypeError: Invalid URL',
+      'ERR_INVALID_URL',
+      // MCP production integration tests trigger fallback logs intentionally
+      'function not available in current environment',
+      'function not available',
+      'fallback for test',
+      'MCP Tools Service initialization failed',
+      // TFJS Node advisory
+      'TensorFlow.js in Node.js',
+      // Provider/client mock advisories
+      'OpenAI client not available, using mock response',
     ];
     if (silencePatterns.some((p) => text.includes(p))) {
       return; // ignore expected provider warnings in test mode
@@ -80,6 +125,7 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
     console.info = originalInfo;
     console.debug = originalDebug;
     console.warn = originalWarn;
+    console.error = originalError;
   };
 
   // Setup mocked Prisma for tests
