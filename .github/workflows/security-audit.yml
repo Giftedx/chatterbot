@@ -35,3 +35,29 @@ jobs:
         with:
           name: npm-audit-report
           path: ${{ steps.audit.outputs.report_path }}
+          retention-days: 14
+      - name: Summarize audit findings
+        if: always()
+        run: |
+          node -e '
+            const fs = require("fs");
+            try {
+              const text = fs.readFileSync("audit.json", "utf8");
+              const counts = { critical: 0, high: 0, moderate: 0, low: 0 };
+              for (const sev of Object.keys(counts)) {
+                const re = new RegExp(`\\"severity\\"\\s*:\\s*\\"${sev}\\"`, "gi");
+                const m = text.match(re);
+                counts[sev] = m ? m.length : 0;
+              }
+              const total = Object.values(counts).reduce((a,b)=>a+b,0);
+              const lines = [
+                "# npm audit summary",
+                "",
+                `Total matches: ${total}`,
+                ...Object.entries(counts).map(([k,v])=>`- ${k}: ${v}`)
+              ];
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n"));
+            } catch (e) {
+              console.log("No audit.json to summarize or parse failed.");
+            }
+          '
