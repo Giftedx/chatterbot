@@ -30,36 +30,51 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
   const originalLog = console.log;
   const originalInfo = console.info;
   const originalDebug = console.debug;
-  
+  const originalWarn = console.warn;
+
   console.log = () => {};
   console.info = () => {};
   console.debug = () => {};
-  
+
   // Keep errors and warnings visible for debugging test failures
-  // console.error and console.warn remain unchanged
-  
+  // console.error remains unchanged; console.warn is filtered to reduce noise from expected fallbacks
+  console.warn = (...args: unknown[]) => {
+    const first = args[0];
+    const msg = typeof first === 'string' ? first : '';
+    // Silence noisy expected warnings from external provider fallbacks during tests
+    // Example: 'Gemini AI failed, using local reasoning: GoogleGenerativeAIError: [400 Bad Request] API key not valid...'
+    if (
+      msg.startsWith('Gemini AI failed, using local reasoning') ||
+      msg.includes('API key not valid. Please pass a valid API key.')
+    ) {
+      return; // ignore expected provider warnings in test mode
+    }
+    originalWarn(...(args as Parameters<typeof console.warn>));
+  };
+
   // Optionally restore logging for specific test cases if needed
   (global as unknown as { restoreConsole: () => void }).restoreConsole = () => {
     console.log = originalLog;
     console.info = originalInfo;
     console.debug = originalDebug;
+    console.warn = originalWarn;
   };
-  
+
   // Setup mocked Prisma for tests
   let mockPrismaInstance: any;
-  
+
   beforeAll(async () => {
     try {
       // Use the mocked prisma client
       const { mockPrismaClient } = await import('./__mocks__/@prisma/client.js');
       mockPrismaInstance = mockPrismaClient;
-  // Make prisma available synchronously for modules that import prisma at top-level
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (global as any).__TEST_PRISMA__ = mockPrismaInstance;
-  // Also attach to a shape compatible with require('../../db/prisma.js') consumers once loaded
-  // Consumers import { prisma } from '../../db/prisma.js'; once the module evaluates, it will read this
-      
-      // Setup test database if real prisma is available  
+      // Make prisma available synchronously for modules that import prisma at top-level
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (global as any).__TEST_PRISMA__ = mockPrismaInstance;
+      // Also attach to a shape compatible with require('../../db/prisma.js') consumers once loaded
+      // Consumers import { prisma } from '../../db/prisma.js'; once the module evaluates, it will read this
+
+      // Setup test database if real prisma is available
       try {
         const { prisma } = await import('./db/prisma.js');
         // If real prisma is available, we can still use it for integration tests
@@ -75,12 +90,12 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       console.warn('Failed to setup test database:', error);
     }
   });
-  
+
   afterAll(async () => {
     if (mockPrismaInstance?._reset) {
       mockPrismaInstance._reset();
     }
-    
+
     // Cleanup real prisma connections if used
     try {
       const { prisma } = await import('./db/prisma.js');
@@ -108,7 +123,11 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
 
   const hasUnref = (h: unknown): h is { unref: () => void } =>
     typeof (h as { unref?: () => void }).unref === 'function';
-  global.setInterval = ((fn: (...args: unknown[]) => unknown, delay?: number, ...args: unknown[]): ReturnType<typeof setInterval> => {
+  global.setInterval = ((
+    fn: (...args: unknown[]) => unknown,
+    delay?: number,
+    ...args: unknown[]
+  ): ReturnType<typeof setInterval> => {
     const id = originalSetInterval(fn, delay as number, ...args);
     if (typeof (id as { unref?: () => void })?.unref === 'function') {
       (id as { unref: () => void }).unref();
@@ -117,7 +136,11 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
     return id;
   }) as typeof setInterval;
 
-  global.setTimeout = ((fn: (...args: unknown[]) => unknown, delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
+  global.setTimeout = ((
+    fn: (...args: unknown[]) => unknown,
+    delay?: number,
+    ...args: unknown[]
+  ): ReturnType<typeof setTimeout> => {
     const id = originalSetTimeout(fn, delay as number, ...args);
     if (typeof (id as { unref?: () => void })?.unref === 'function') {
       (id as { unref: () => void }).unref();
@@ -126,7 +149,10 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
     return id;
   }) as typeof setTimeout;
 
-  global.setImmediate = ((fn: (...args: unknown[]) => unknown, ...args: unknown[]): ReturnType<typeof setImmediate> => {
+  global.setImmediate = ((
+    fn: (...args: unknown[]) => unknown,
+    ...args: unknown[]
+  ): ReturnType<typeof setImmediate> => {
     const id = originalSetImmediate(fn, ...args);
     if (hasUnref(id)) {
       id.unref();
