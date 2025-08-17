@@ -10,6 +10,6 @@ describe('Enhanced Intelligence slash command registration', () => {
     const cmd = service.createSlashCommand();
 
     expect(cmd.name).toBe('chat');
-    expect(cmd.description).toBe('Opt into enhanced AI conversation with images, research and more');
+  expect(cmd.description).toBe('Opt in to start chatting (initial setup only)');
   });
 });

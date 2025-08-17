@@ -35,16 +35,17 @@ export default {
       functions: 45,
     },
     './src/services/core-intelligence.service.ts': {
-      lines: 57,
-      statements: 57,
-      branches: 41,
-      functions: 55,
+  lines: 60,
+  statements: 60,
+  branches: 45,
+  functions: 58,
     },
     './src/services/decision-engine.service.ts': {
-      lines: 70,
-      statements: 70,
-      branches: 60,
-      functions: 70,
+      // Strong gate: this module is heavily tested
+      lines: 95,
+      statements: 95,
+      branches: 85,
+      functions: 98,
     },
     './src/services/core/message-analysis.service.ts': {
       lines: 50,
@@ -57,6 +58,20 @@ export default {
       statements: 60,
       branches: 45,
       functions: 55,
+    },
+    './src/services/model-router.service.ts': {
+      // Health-aware routing, retry/fallback covered by tests
+  lines: 73,
+  statements: 70,
+  branches: 40,
+  functions: 70,
+    },
+    './src/services/verification/answer-verification.service.ts': {
+      // Verification toggles and reruns are well covered
+  lines: 88,
+  statements: 88,
+  branches: 90,
+  functions: 72,
     },
   },
   testMatch: ['**/__tests__/**/*.test.{ts,js}', '**/?(*.)+(spec|test).{ts,js}'],

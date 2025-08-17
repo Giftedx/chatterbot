@@ -43,12 +43,12 @@ export class AnalyticsDashboard {
       this.server = http.createServer(this.handleRequest.bind(this));
       
       this.server.listen(this.config.port, this.config.host, () => {
-        console.log(`📊 Analytics Dashboard API running on http://${this.config.host}:${this.config.port}`);
+        logger.info(`Analytics Dashboard API running on http://${this.config.host}:${this.config.port}`);
         resolve();
       });
 
       this.server.on('error', (error) => {
-        console.error('Analytics Dashboard server error:', error);
+        logger.error('Analytics Dashboard server error:', error);
         reject(error);
       });
     });
@@ -61,7 +61,7 @@ export class AnalyticsDashboard {
     return new Promise((resolve) => {
       if (this.server) {
         this.server.close(() => {
-          console.log('📊 Analytics Dashboard API stopped');
+          logger.info('Analytics Dashboard API stopped');
           resolve();
         });
       } else {
@@ -105,7 +105,7 @@ export class AnalyticsDashboard {
       }
 
     } catch (error) {
-      console.error('Request handling error:', error);
+      logger.error('Request handling error:', error);
       this.sendError(res, 500, 'Internal Server Error');
     }
   }

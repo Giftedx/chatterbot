@@ -79,15 +79,11 @@ describe('CoreIntelligenceService - slash command defer path', () => {
     const interaction = makeInteraction();
     await svc.handleInteraction(interaction as any);
 
-    expect(interaction.reply).toHaveBeenCalled();
-    expect(interaction.followUp).toHaveBeenCalled();
-    const payload = interaction.followUp.mock.calls[0][0];
-    expect(typeof payload.content).toBe('string');
-    expect(payload.content).toMatch(/lengthy|deep dive|summary/i);
+  expect(interaction.reply).toHaveBeenCalled();
+  // /chat is opt-in only now; followUp with generated content is no longer sent here
 
     const interaction2 = makeInteraction();
     await svc.handleInteraction(interaction2 as any);
-    expect(interaction2.reply).toHaveBeenCalled();
-    expect(interaction2.followUp).toHaveBeenCalled();
+  expect(interaction2.reply).toHaveBeenCalled();
   });
 });

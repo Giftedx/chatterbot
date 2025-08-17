@@ -199,12 +199,7 @@ describe('CoreIntelligenceService - E2E pipeline (slash → DM) with MCP outputs
 
     await service.handleInteraction(interaction as any);
 
-    // The DM channel should receive a message payload with content and optional embeds/files
-    expect(dmSend).toHaveBeenCalledTimes(1);
-    const payload: any = dmSend.mock.calls[0][0];
-    expect(payload).toHaveProperty('content');
-    // Ensure code paths for embeds/files are safe (presence is allowed but not required)
-    expect(Array.isArray(payload.embeds) || payload.embeds === undefined).toBe(true);
-    expect(Array.isArray(payload.files) || payload.files === undefined).toBe(true);
+  // /chat is now opt-in only; no DM content is sent by the command itself
+  expect(dmSend).not.toHaveBeenCalled();
   });
 });

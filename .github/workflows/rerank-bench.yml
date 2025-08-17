@@ -1,0 +1,57 @@
+name: Reranker Benchmark
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'benchmarks/**'
+      - 'scripts/rerank-bench.mjs'
+      - 'package.json'
+      - '.github/workflows/rerank-bench.yml'
+
+jobs:
+  bench:
+    name: Run reranker benchmark
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run reranker bench (conditional)
+        id: runbench
+        env:
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+          COHERE_RERANK_MODEL: ${{ vars.COHERE_RERANK_MODEL }}
+          VOYAGE_RERANK_MODEL: ${{ vars.VOYAGE_RERANK_MODEL }}
+        run: |
+          if [ -z "${COHERE_API_KEY}" ] && [ -z "${VOYAGE_API_KEY}" ]; then
+            echo "No reranker keys present; skipping benchmark."
+            echo "skipped=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          node --version
+          set -e
+          # Run the benchmark and capture JSON output
+          BENCH_OUT=$(npm run --silent bench:rerank)
+          echo "$BENCH_OUT" | tee rerank-bench.json
+          echo "skipped=false" >> $GITHUB_OUTPUT
+
+      - name: Upload benchmark artifact
+        if: steps.runbench.outputs.skipped == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: rerank-bench-${{ github.run_number }}
+          path: rerank-bench.json
+          if-no-files-found: warn

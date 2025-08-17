@@ -520,3 +520,15 @@ model InteractionLog {
   @@index([createdAt])
   @@index([confidence])
 }
+
+/// Guild-specific overrides for the DecisionEngine. Optional DB-backed configuration.
+model GuildDecisionOverride {
+  id        Int      @id @default(autoincrement())
+  guildId   String   @unique
+  overrides Json     // Partial<DecisionEngineOptions> shape
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("guild_decision_overrides")
+  @@index([guildId])
+}

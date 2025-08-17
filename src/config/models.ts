@@ -119,6 +119,33 @@ export const MODEL_CARDS: ModelCard[] = [
     supportsFunctionCalling: true,
     bestFor: ['self_hosted', 'custom_endpoints'],
     safetyLevel: 'standard'
+  },
+  // Additional OpenAI-compatible entries for convenience presets
+  {
+    provider: 'openai_compat',
+    model: process.env.OPENAI_COMPAT_MODEL_GEMMA3 || 'google/gemma-3-27b-it',
+    displayName: 'Gemma 3 (OpenAI-Compatible)',
+    contextWindowK: 128,
+    costTier: 'low',
+    speedTier: 'medium',
+    strengths: ['reasoning', 'general'],
+    modalities: ['text', 'tools'],
+    supportsFunctionCalling: true,
+    bestFor: ['general', 'self_hosted', 'custom_endpoints'],
+    safetyLevel: 'standard'
+  },
+  {
+    provider: 'openai_compat',
+    model: process.env.OPENAI_COMPAT_MODEL_GPT_OSS || 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B',
+    displayName: 'GPT-OSS (OpenAI-Compatible)',
+    contextWindowK: 128,
+    costTier: 'low',
+    speedTier: 'medium',
+    strengths: ['reasoning', 'math'],
+    modalities: ['text', 'tools'],
+    supportsFunctionCalling: true,
+    bestFor: ['reasoning', 'self_hosted', 'custom_endpoints'],
+    safetyLevel: 'standard'
   }
 ];
 

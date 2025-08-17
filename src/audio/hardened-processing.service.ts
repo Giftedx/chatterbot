@@ -4,7 +4,7 @@ import { getEnvAsBoolean, getEnvAsString, getEnvAsNumber } from '../utils/env.js
 // Note: ElevenLabs client is dynamically imported at runtime to avoid ESM/type issues in tests
 import { z } from 'zod';
 import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as _path from 'path';
 import { EventEmitter } from 'events';
 
 // Audio processing schemas

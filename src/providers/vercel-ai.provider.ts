@@ -7,11 +7,9 @@ import {
   generateText, 
   generateObject, 
   streamText, 
-  streamObject,
   tool,
   CoreMessage,
   LanguageModel,
-  StreamTextResult,
   GenerateObjectResult
 } from 'ai';
 import { openai } from '@ai-sdk/openai';
@@ -20,6 +18,7 @@ import { anthropic } from '@ai-sdk/anthropic';
 import { z } from 'zod';
 import { logger } from '../utils/logger.js';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface AIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;

@@ -1,0 +1,55 @@
+name: Eval Harness
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - 'promptfooconfig.yaml'
+      - 'src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'yarn.lock'
+      - 'package-lock.json'
+  push:
+    branches: [ main ]
+    paths:
+      - 'promptfooconfig.yaml'
+      - 'src/**'
+      - 'package.json'
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Promptfoo evals (skips if no key)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPTFOO_DISABLE_TELEMETRY: '1'
+          PROMPTFOO_CACHE_PATH: .cache/promptfoo
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY not set; skipping evals"
+            echo "{}" > promptfoo-results.json
+            exit 0
+          fi
+          npm run eval:ci
+
+      - name: Upload Promptfoo results
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptfoo-results
+          path: |
+            promptfoo-results.json
+            .promptfoo/**

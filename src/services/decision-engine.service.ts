@@ -10,6 +10,7 @@ export interface DecisionContext {
   repliedToBot: boolean;
   lastBotReplyAt?: number; // epoch ms
   recentUserBurstCount?: number; // number of recent messages by same user in a short window
+  channelRecentBurstCount?: number; // number of recent messages in this channel in a short window
 }
 
 export interface DecisionResult {
@@ -24,6 +25,11 @@ export interface DecisionEngineOptions {
   cooldownMs?: number;
   maxMentionsAllowed?: number;
   defaultModelTokenLimit?: number;
+  ambientThreshold?: number; // minimum score to respond in ambient channels
+  shortMessageMinLen?: number; // min characters considered not "too short"
+  burstCountThreshold?: number; // number of recent messages to trigger burst penalty
+  /** Optional custom token estimator; when provided, overrides internal heuristic */
+  tokenEstimator?: (message: Message) => number;
 }
 
 /**
@@ -37,11 +43,19 @@ export class DecisionEngine {
   private readonly cooldownMs: number;
   private readonly maxMentionsAllowed: number;
   private readonly defaultModelTokenLimit: number;
+  private readonly ambientThreshold: number;
+  private readonly shortMessageMinLen: number;
+  private readonly burstCountThreshold: number;
+  private readonly customTokenEstimator?: (message: Message) => number;
 
   constructor(opts: DecisionEngineOptions = {}) {
     this.cooldownMs = opts.cooldownMs ?? 8000;
     this.maxMentionsAllowed = opts.maxMentionsAllowed ?? 6;
     this.defaultModelTokenLimit = opts.defaultModelTokenLimit ?? 8000;
+  this.ambientThreshold = opts.ambientThreshold ?? 25;
+  this.shortMessageMinLen = opts.shortMessageMinLen ?? 3;
+  this.burstCountThreshold = opts.burstCountThreshold ?? 3;
+  this.customTokenEstimator = opts.tokenEstimator;
   }
 
   analyze(message: Message, ctx: DecisionContext): DecisionResult {
@@ -50,7 +64,9 @@ export class DecisionEngine {
       return { shouldRespond: false, reason: 'User not opted-in', confidence: 1, tokenEstimate: this.estimateTokens(message), strategy: 'ignore' };
     }
 
-    const tokenEstimate = this.estimateTokens(message);
+    const tokenEstimate = this.customTokenEstimator
+      ? safeEstimate(this.customTokenEstimator, message, () => this.estimateTokens(message))
+      : this.estimateTokens(message);
     const content = message.content || '';
 
     // Base score
@@ -58,11 +74,20 @@ export class DecisionEngine {
     const reasons: string[] = [];
 
     // Hard exceptions
-    if (message.mentions.everyone) {
+  if ((message as any)?.mentions?.everyone) {
       score -= 40; reasons.push('mentions-everyone');
     }
-    if ((message.mentions.users?.size || 0) > this.maxMentionsAllowed) {
-      score -= 25; reasons.push('too-many-mentions');
+    try {
+      const userMentions = message.mentions?.users?.size || 0;
+      // Include roles and channels to capture mass-mention patterns beyond users
+      const roleMentions = (message as any).mentions?.roles?.size || 0;
+      const channelMentions = (message as any).mentions?.channels?.size || 0;
+      const totalMentions = userMentions + roleMentions + channelMentions;
+      if (totalMentions > this.maxMentionsAllowed) {
+        score -= 25; reasons.push('too-many-mentions');
+      }
+    } catch {
+      // If mention structures are unavailable, skip without failing
     }
 
     // Priority defaults
@@ -79,7 +104,7 @@ export class DecisionEngine {
     if (/urgent|asap|now|quick/i.test(content)) { score += 10; reasons.push('urgency'); }
 
     // Light penalty for very short interjections unless directly addressed
-    if (content.trim().length < 3 && !(ctx.mentionedBot || ctx.repliedToBot || ctx.isDM)) {
+  if (content.trim().length < this.shortMessageMinLen && !(ctx.mentionedBot || ctx.repliedToBot || ctx.isDM)) {
       score -= 20; reasons.push('too-short');
     }
 
@@ -88,7 +113,16 @@ export class DecisionEngine {
       const since = Date.now() - ctx.lastBotReplyAt;
       if (since < this.cooldownMs) { score -= 30; reasons.push('cooldown'); }
     }
-    if ((ctx.recentUserBurstCount || 0) >= 3) { score -= 15; reasons.push('user-burst'); }
+    if ((ctx.recentUserBurstCount || 0) >= this.burstCountThreshold) { score -= 15; reasons.push('user-burst'); }
+    // Channel-level busyness penalty to avoid being overly chatty in active channels
+    // Don't penalize when directly addressed or in DMs/personal threads
+    if (!(ctx.isDM || ctx.mentionedBot || ctx.repliedToBot || ctx.isPersonalThread)) {
+      if ((ctx.channelRecentBurstCount || 0) >= this.burstCountThreshold * 2) {
+        score -= 20; reasons.push('channel-busy');
+      } else if ((ctx.channelRecentBurstCount || 0) >= this.burstCountThreshold) {
+        score -= 10; reasons.push('channel-active');
+      }
+    }
 
     // Estimate strategy based on token size
     let strategy: ResponseStrategy = 'quick-reply';
@@ -114,7 +148,7 @@ export class DecisionEngine {
     }
 
     // Otherwise, require score surpassing a threshold to avoid chattiness
-    const threshold = 25; // tweaked to be helpful but not intrusive
+  const threshold = this.ambientThreshold; // configurable: helpful but not intrusive
     const should = score >= threshold;
     const confidence = clamp01(0.5 + (score - threshold) / 100);
     return { shouldRespond: should, reason: reasons.join(','), confidence, tokenEstimate, strategy: should ? strategy : 'ignore' };
@@ -133,3 +167,17 @@ export class DecisionEngine {
 }
 
 function clamp01(x: number): number { return Math.max(0, Math.min(1, x)); }
+
+function safeEstimate(
+  fn: (message: Message) => number,
+  message: Message,
+  fallback: () => number,
+): number {
+  try {
+    const n = fn(message);
+    if (typeof n === 'number' && isFinite(n) && n >= 0) return Math.ceil(n);
+    return fallback();
+  } catch {
+    return fallback();
+  }
+}

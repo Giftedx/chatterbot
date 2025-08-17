@@ -23,7 +23,7 @@ describe('End-to-End Enhanced Intelligence Integration', () => {
       
       expect(slashCommand).toBeDefined();
       expect(slashCommand.name).toBe('chat');
-      expect(slashCommand.description).toContain('enhanced AI conversation');
+  expect(slashCommand.description).toBe('Opt in to start chatting (initial setup only)');
     });
 
     it('should be available and ready', () => {

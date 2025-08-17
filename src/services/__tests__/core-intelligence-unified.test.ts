@@ -118,30 +118,28 @@ describe('Core Intelligence Service - Unified Architecture', () => {
       
       expect(commands).toHaveLength(1);
       expect(commands[0].name).toBe('chat');
-      expect(commands[0].description).toBe('Engage with intelligent conversation features.');
+      expect(commands[0].description).toBe('Opt in to start chatting (initial setup only).');
     });
   });
 
   describe('Message Processing with Unified Architecture', () => {
     test('should process message using unified services', async () => {
-      const mockInteraction = {
-        id: 'test-interaction',
-        isChatInputCommand: () => true,
-        commandName: 'chat',
-        options: {
-          getString: jest.fn().mockReturnValue('test message'),
-          getAttachment: jest.fn().mockReturnValue(null)
-        },
-        user: { id: 'test-user' },
+      const mockMessage = {
+        id: 'test-message',
+        content: 'test message',
+        author: { id: 'test-user', bot: false },
+        attachments: new Map(),
+        channel: { sendTyping: jest.fn() },
         channelId: 'test-channel',
         guildId: 'test-guild',
-        deferReply: jest.fn().mockResolvedValue(undefined),
-        editReply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined)
       } as any;
 
-      await coreIntelligenceService.handleInteraction(mockInteraction);
+      // Simulate user is opted-in
+      (coreIntelligenceService as any).optedInUsers.add('test-user');
 
-      expect(mockInteraction.deferReply).toHaveBeenCalled();
+      await coreIntelligenceService.handleMessage(mockMessage);
+
       expect(mockMessageAnalysis.analyzeMessage).toHaveBeenCalled();
       expect(mockMCPOrchestrator.orchestrateIntelligentResponse).toHaveBeenCalled();
       expect(mockAnalyticsService.logInteraction).toHaveBeenCalled();
@@ -150,26 +148,23 @@ describe('Core Intelligence Service - Unified Architecture', () => {
     test('should handle message analysis errors gracefully', async () => {
       mockMessageAnalysis.analyzeMessage = jest.fn().mockRejectedValue(new Error('Analysis failed'));
 
-      const mockInteraction = {
-        id: 'test-interaction',
-        isChatInputCommand: () => true,
-        commandName: 'chat',
-        options: {
-          getString: jest.fn().mockReturnValue('test message'),
-          getAttachment: jest.fn().mockReturnValue(null)
-        },
-        user: { id: 'test-user' },
+      const mockMessage = {
+        id: 'test-message',
+        content: 'test message',
+        author: { id: 'test-user', bot: false },
+        attachments: new Map(),
+        channel: { sendTyping: jest.fn() },
         channelId: 'test-channel',
         guildId: 'test-guild',
-        deferReply: jest.fn().mockResolvedValue(undefined),
-        editReply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined)
       } as any;
 
-      await coreIntelligenceService.handleInteraction(mockInteraction);
+      // Simulate user is opted-in
+      (coreIntelligenceService as any).optedInUsers.add('test-user');
 
-      expect(mockInteraction.editReply).toHaveBeenCalledWith({
-        content: expect.stringContaining('critical internal error')
-      });
+      await coreIntelligenceService.handleMessage(mockMessage);
+
+      expect(mockMessage.reply).toHaveBeenCalled();
     });
   });
 
@@ -228,22 +223,20 @@ describe('Core Intelligence Service - Unified Architecture', () => {
 
   describe('Analytics Integration', () => {
     test('should log interaction analytics using unified service', async () => {
-      const mockInteraction = {
-        id: 'test-interaction',
-        isChatInputCommand: () => true,
-        commandName: 'chat',
-        options: {
-          getString: jest.fn().mockReturnValue('test message'),
-          getAttachment: jest.fn().mockReturnValue(null)
-        },
-        user: { id: 'test-user' },
+      const mockMessage = {
+        id: 'test-message',
+        content: 'test message',
+        author: { id: 'test-user', bot: false },
+        attachments: new Map(),
+        channel: { sendTyping: jest.fn() },
         channelId: 'test-channel',
         guildId: 'test-guild',
-        deferReply: jest.fn().mockResolvedValue(undefined),
-        editReply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined)
       } as any;
 
-      await coreIntelligenceService.handleInteraction(mockInteraction);
+      (coreIntelligenceService as any).optedInUsers.add('test-user');
+
+      await coreIntelligenceService.handleMessage(mockMessage);
 
       expect(mockAnalyticsService.logInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -410,23 +403,20 @@ describe('Core Intelligence Service - Unified Architecture', () => {
 
   describe('Performance and Monitoring', () => {
     test('should track processing times through analytics', async () => {
-      
-      const mockInteraction = {
-        id: 'test-interaction',
-        isChatInputCommand: () => true,
-        commandName: 'chat',
-        options: {
-          getString: jest.fn().mockReturnValue('test message'),
-          getAttachment: jest.fn().mockReturnValue(null)
-        },
-        user: { id: 'test-user' },
+      const mockMessage = {
+        id: 'test-message',
+        content: 'test message',
+        author: { id: 'test-user', bot: false },
+        attachments: new Map(),
+        channel: { sendTyping: jest.fn() },
         channelId: 'test-channel',
         guildId: 'test-guild',
-        deferReply: jest.fn().mockResolvedValue(undefined),
-        editReply: jest.fn().mockResolvedValue(undefined)
+        reply: jest.fn().mockResolvedValue(undefined)
       } as any;
 
-      await coreIntelligenceService.handleInteraction(mockInteraction);
+      (coreIntelligenceService as any).optedInUsers.add('test-user');
+
+      await coreIntelligenceService.handleMessage(mockMessage);
 
       // Check that analytics was called with timing information
       expect(mockAnalyticsService.logInteraction).toHaveBeenCalledWith(

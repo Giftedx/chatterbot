@@ -21,6 +21,9 @@ import {
 // Unified Core Services
 import { UnifiedAnalyticsService } from './core/unified-analytics.service.js';
 
+// Performance Monitoring
+import { performanceMonitor } from './performance-monitoring.service.js';
+
 // Agentic and Gemini
 import {
   AgenticIntelligenceService,
@@ -97,8 +100,23 @@ import { urlToGenerativePart } from '../utils/image-helper.js';
 import { prisma } from '../db/prisma.js';
 import { sendStream } from '../ui/stream-utils.js';
 import { intelligenceAnalysisService } from './intelligence/analysis.service.js';
-import { DecisionEngine, type ResponseStrategy } from './decision-engine.service.js';
+import { DecisionEngine, type ResponseStrategy, type DecisionEngineOptions } from './decision-engine.service.js';
+import { fetchGuildDecisionOverrides, updateGuildDecisionOverridesPartial, deleteGuildDecisionOverrides } from './decision-overrides-db.service.js';
+
+// AI Enhancement Services
+import { EnhancedLangfuseService } from './enhanced-langfuse.service.js';
+import { MultiProviderTokenizationService } from './multi-provider-tokenization.service.js';
+import { EnhancedSemanticCacheService } from './enhanced-semantic-cache.service.js';
+import { QdrantVectorService } from './qdrant-vector.service.js';
+import { QwenVLMultimodalService } from './qwen-vl-multimodal.service.js';
+import { Neo4jKnowledgeGraphService } from './neo4j-knowledge-graph.service.js';
+import { DSPyRAGOptimizationService } from './dspy-rag-optimization.service.js';
+import { Crawl4AIWebService } from './crawl4ai-web.service.js';
+import { AIEvaluationTestingService } from './ai-evaluation-testing.service.js';
+
+import { getEnvAsNumber, getEnvAsString } from '../utils/env.js';
 import { recordDecision } from './decision-metrics.service.js';
+import { getActivePersona, setActivePersona, listPersonas } from './persona-manager.js';
 
 interface CommonAttachment {
   name?: string | null;
@@ -121,6 +139,10 @@ export interface CoreIntelligenceConfig {
     messageAnalysisService?: typeof unifiedMessageAnalysisService;
     geminiService?: GeminiService;
     advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
+    // For tests: allow injecting DB-backed guild overrides fetcher
+    fetchGuildDecisionOverrides?: (
+      guildId: string,
+    ) => Promise<Partial<DecisionEngineOptions> | null>;
   };
 }
 
@@ -138,8 +160,24 @@ export class CoreIntelligenceService {
   private lastReplyAt = new Map<string, number>();
   // Maintain lightweight per-user message timestamps for recent burst detection
   private recentUserMessages = new Map<string, number[]>();
+  // Maintain lightweight per-channel message timestamps for ambient activity detection
+  private recentChannelMessages = new Map<string, number[]>();
   private userThreadCache = new Map<string, string>();
-  private decisionEngine = new DecisionEngine({ cooldownMs: 8000, defaultModelTokenLimit: 8000 });
+  private decisionEngine = new DecisionEngine({
+    cooldownMs: getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
+    defaultModelTokenLimit: getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
+    maxMentionsAllowed: getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
+    ambientThreshold: getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
+    burstCountThreshold: getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
+    shortMessageMinLen: getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
+    tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
+  });
+  private decisionEngineByGuild = new Map<string, DecisionEngine>();
+  private guildDecisionOverrides: Record<string, Partial<DecisionEngineOptions>> = {};
+  private guildDecisionDbLoaded = new Set<string>();
+  private guildDecisionLastApplied = new Map<string, string>(); // stable JSON of applied options
+  private overridesRefreshTimer?: NodeJS.Timeout;
+  private readonly overridesRefreshIntervalMs = getEnvAsNumber('DECISION_OVERRIDES_TTL_MS', 60_000);
 
   private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
   private readonly analyticsService: UnifiedAnalyticsService;
@@ -153,6 +191,10 @@ export class CoreIntelligenceService {
   private readonly messageAnalysisService: typeof unifiedMessageAnalysisService;
   private readonly userMemoryService: UserMemoryService;
   private readonly userConsentService: UserConsentService;
+  // Pluggable fetcher for DB-backed overrides (primarily to aid tests)
+  private readonly fetchDecisionOverrides: (
+    guildId: string,
+  ) => Promise<Partial<DecisionEngineOptions> | null>;
 
   private enhancedMemoryService?: EnhancedMemoryService;
   private enhancedUiService?: EnhancedUIService;
@@ -164,6 +206,17 @@ export class CoreIntelligenceService {
   private advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
   private memoryManager?: AdvancedMemoryManager;
   private ultra?: UltraIntelligenceOrchestrator;
+
+  // AI Enhancement Services
+  private enhancedLangfuseService?: EnhancedLangfuseService;
+  private multiProviderTokenizationService?: MultiProviderTokenizationService;
+  private enhancedSemanticCacheService?: EnhancedSemanticCacheService;
+  private qdrantVectorService?: QdrantVectorService;
+  private qwenVLMultimodalService?: QwenVLMultimodalService;
+  private neo4jKnowledgeGraphService?: Neo4jKnowledgeGraphService;
+  private dspyRAGOptimizationService?: DSPyRAGOptimizationService;
+  private crawl4aiWebService?: Crawl4AIWebService;
+  private aiEvaluationTestingService?: AIEvaluationTestingService;
 
   constructor(config: CoreIntelligenceConfig) {
     this.config = config;
@@ -184,6 +237,26 @@ export class CoreIntelligenceService {
     this.capabilityService = intelligenceCapabilityService;
     this.userMemoryService = new UserMemoryService();
     this.userConsentService = UserConsentService.getInstance();
+
+    // Allow tests to inject a custom overrides fetcher; default to real implementation
+    this.fetchDecisionOverrides =
+      config.dependencies?.fetchGuildDecisionOverrides ?? fetchGuildDecisionOverrides;
+
+    // Load optional per-guild decision overrides from environment
+    try {
+      const raw = getEnvAsString('DECISION_OVERRIDES_JSON');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          // Expect shape: { [guildId]: { cooldownMs?: number, ... } }
+          this.guildDecisionOverrides = parsed as Record<string, Partial<DecisionEngineOptions>>;
+        }
+      }
+    } catch (e) {
+      logger.warn('[CoreIntelSvc] Failed to parse DECISION_OVERRIDES_JSON, ignoring', {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
 
     if (config.enableEnhancedMemory) {
       this.memoryManager = new AdvancedMemoryManager({
@@ -242,6 +315,9 @@ export class CoreIntelligenceService {
       });
     }
 
+    // Initialize AI Enhancement Services with feature flag controls
+    this.initializeAIEnhancementServices();
+
     this.loadOptedInUsers().catch((err) => logger.error('Failed to load opted-in users', err));
 
     // Initialize MCP Orchestrator with comprehensive null safety
@@ -261,6 +337,234 @@ export class CoreIntelligenceService {
     }
 
     logger.info('CoreIntelligenceService initialized', { config: this.config });
+
+    // Periodically refresh DB-backed overrides and swap engines if effective options change
+    try {
+      if (this.overridesRefreshIntervalMs > 0) {
+        this.overridesRefreshTimer = setInterval(() => {
+          this.refreshGuildDecisionEngines().catch(() => {});
+        }, this.overridesRefreshIntervalMs);
+        try { (this.overridesRefreshTimer as any)?.unref?.(); } catch {}
+      }
+    } catch {}
+  }
+
+  /**
+   * Initialize AI Enhancement Services with feature flag controls
+   */
+  private initializeAIEnhancementServices(): void {
+    try {
+      // Import feature flags from config/feature-flags.ts
+      const { featureFlags } = require('../config/feature-flags.js');
+      
+      // Phase 1: Core Infrastructure
+      if (featureFlags.enhancedLangfuse) {
+        this.enhancedLangfuseService = new EnhancedLangfuseService();
+        logger.info('Enhanced Langfuse Service initialized');
+      }
+      
+      if (featureFlags.multiProviderTokenization) {
+        this.multiProviderTokenizationService = new MultiProviderTokenizationService();
+        logger.info('Multi-Provider Tokenization Service initialized');
+      }
+      
+      if (featureFlags.semanticCacheEnhanced) {
+        this.enhancedSemanticCacheService = new EnhancedSemanticCacheService();
+        logger.info('Enhanced Semantic Cache Service initialized');
+      }
+      
+      // Phase 2: Vector Database
+      if (featureFlags.qdrantVectorDB) {
+        this.qdrantVectorService = new QdrantVectorService();
+        logger.info('Qdrant Vector Service initialized');
+      }
+      
+      // Phase 3: Web Intelligence
+      if (featureFlags.crawl4aiWebAccess) {
+        this.crawl4aiWebService = new Crawl4AIWebService();
+        logger.info('Crawl4AI Web Service initialized');
+      }
+      
+      // Phase 4: Multimodal
+      if (featureFlags.qwen25vlMultimodal) {
+        this.qwenVLMultimodalService = new QwenVLMultimodalService();
+        logger.info('Qwen VL Multimodal Service initialized');
+      }
+      
+      // Phase 5: Knowledge Graphs
+      if (featureFlags.knowledgeGraphs) {
+        this.neo4jKnowledgeGraphService = new Neo4jKnowledgeGraphService();
+        logger.info('Neo4j Knowledge Graph Service initialized');
+      }
+      
+      // Phase 6: RAG Optimization
+      if (featureFlags.dspyOptimization) {
+        this.dspyRAGOptimizationService = new DSPyRAGOptimizationService();
+        logger.info('DSPy RAG Optimization Service initialized');
+      }
+      
+      // Phase 7: Evaluation & Testing
+      if (featureFlags.aiEvaluationFramework) {
+        this.aiEvaluationTestingService = new AIEvaluationTestingService();
+        logger.info('AI Evaluation Testing Service initialized');
+      }
+      
+      logger.info('AI Enhancement Services initialization completed', {
+        services: {
+          langfuse: !!this.enhancedLangfuseService,
+          tokenization: !!this.multiProviderTokenizationService,
+          cache: !!this.enhancedSemanticCacheService,
+          vector: !!this.qdrantVectorService,
+          web: !!this.crawl4aiWebService,
+          multimodal: !!this.qwenVLMultimodalService,
+          knowledge: !!this.neo4jKnowledgeGraphService,
+          rag: !!this.dspyRAGOptimizationService,
+          evaluation: !!this.aiEvaluationTestingService
+        }
+      });
+    } catch (error) {
+      logger.warn('AI Enhancement Services initialization failed', { error });
+    }
+  }
+
+  /**
+   * Enhanced token estimation using multi-provider tokenization service
+   */
+  private async getEnhancedTokenEstimate(message: Message): Promise<number> {
+    if (this.multiProviderTokenizationService) {
+      try {
+        const text = message.content || '';
+        const attachmentCount = message.attachments?.size || 0;
+        
+        // Use multi-provider tokenization for accurate count
+        const result = await this.multiProviderTokenizationService.countTokens({
+          text,
+          provider: 'openai', // Default provider
+          model: 'gpt-4o',
+          includeSpecialTokens: true
+        });
+        
+        // Add attachment budget
+        const attachmentTokens = attachmentCount * 256;
+        
+        return result.tokens + attachmentTokens;
+      } catch (error) {
+        logger.debug('Multi-provider tokenization failed, using fallback', { error });
+      }
+    }
+    
+    // Fallback to original provider-aware estimate
+    return providerAwareTokenEstimate(message);
+  }
+
+  /**
+   * Synchronous wrapper for enhanced token estimation with caching
+   */
+  private getEnhancedTokenEstimateSync(message: Message): number {
+    // For synchronous calls (decision engine), use cached or fallback
+    const cacheKey = `${message.id}-${message.content?.slice(0, 50)}`;
+    
+    // Use fallback for now in synchronous context
+    return providerAwareTokenEstimate(message);
+  }
+
+  private getDecisionEngineForGuild(guildId?: string): DecisionEngine {
+    if (!guildId) return this.decisionEngine;
+    const existing = this.decisionEngineByGuild.get(guildId);
+    if (existing) return existing;
+
+    // First access for this guild: return the default engine immediately so callers
+    // (including tests that spy on the default engine) observe the analyze() call.
+    // Then, initialize a guild-specific engine asynchronously if overrides exist.
+    this.decisionEngineByGuild.set(guildId, this.decisionEngine);
+
+    // Kick off async setup of a dedicated engine using env/DB overrides.
+    const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
+    const initGuildEngine = async () => {
+      try {
+        const dbOverrides = await this.fetchDecisionOverrides(guildId).catch(() => null);
+        const hasAnyOverrides =
+          (envOverrides && Object.keys(envOverrides).length > 0) ||
+          (dbOverrides && Object.keys(dbOverrides).length > 0);
+        if (!hasAnyOverrides) {
+          // No overrides — keep using the shared default engine for this guild.
+          return;
+        }
+        const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
+        const nextStr = stableStringifyOptions(effective);
+        const prevStr = this.guildDecisionLastApplied.get(guildId);
+        if (prevStr !== nextStr) {
+          const engine = new DecisionEngine({
+            ...effective,
+            tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
+          });
+          this.decisionEngineByGuild.set(guildId, engine);
+          this.guildDecisionLastApplied.set(guildId, nextStr);
+          logger.info('[CoreIntelSvc] Initialized guild-specific decision engine', { guildId });
+        }
+      } catch {
+        // Already logged in underlying services; keep default engine.
+      }
+    };
+
+    if (!this.guildDecisionDbLoaded.has(guildId)) {
+      this.guildDecisionDbLoaded.add(guildId);
+      // Fire-and-forget; do not block the current call path.
+      initGuildEngine();
+    }
+
+    return this.decisionEngine;
+  }
+
+  private buildEffectiveOptions(
+    envOverrides: Partial<DecisionEngineOptions>,
+    dbOverrides: Partial<DecisionEngineOptions> | null,
+  ): DecisionEngineOptions {
+    return {
+      cooldownMs:
+        dbOverrides?.cooldownMs ?? envOverrides.cooldownMs ?? getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
+      defaultModelTokenLimit:
+        dbOverrides?.defaultModelTokenLimit ?? envOverrides.defaultModelTokenLimit ?? getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
+      maxMentionsAllowed:
+        dbOverrides?.maxMentionsAllowed ?? envOverrides.maxMentionsAllowed ?? getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
+      ambientThreshold:
+        dbOverrides?.ambientThreshold ?? envOverrides.ambientThreshold ?? getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
+      burstCountThreshold:
+        dbOverrides?.burstCountThreshold ?? envOverrides.burstCountThreshold ?? getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
+      shortMessageMinLen:
+        dbOverrides?.shortMessageMinLen ?? envOverrides.shortMessageMinLen ?? getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
+    };
+  }
+
+  private async refreshGuildDecisionEngines(): Promise<void> {
+    // Gather guild IDs we know about from env JSON or from prior engine creations
+    const ids = new Set<string>();
+    Object.keys(this.guildDecisionOverrides).forEach((id) => ids.add(id));
+    Array.from(this.decisionEngineByGuild.keys()).forEach((id) => ids.add(id));
+    if (ids.size === 0) return;
+
+    await Promise.all(
+      Array.from(ids).map(async (guildId) => {
+        try {
+          const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
+          const dbOverrides = await this.fetchDecisionOverrides(guildId);
+          const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
+          const nextStr = stableStringifyOptions(effective);
+          const prevStr = this.guildDecisionLastApplied.get(guildId);
+          if (prevStr !== nextStr) {
+            const engine = new DecisionEngine({
+              ...effective,
+              tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
+            });
+            this.decisionEngineByGuild.set(guildId, engine);
+            this.guildDecisionLastApplied.set(guildId, nextStr);
+            logger.info('[CoreIntelSvc] Refreshed decision engine overrides for guild', { guildId });
+          }
+        } catch {
+          // logged in fetch service
+        }
+      }),
+    );
   }
 
   /**
@@ -295,16 +599,7 @@ export class CoreIntelligenceService {
     const commands: SlashCommandBuilder[] = [];
     const chatCommand = new SlashCommandBuilder()
       .setName('chat')
-      .setDescription('Engage with intelligent conversation features.')
-      .addStringOption((option) =>
-        option
-          .setName('prompt')
-          .setDescription('Your message, question, or request.')
-          .setRequired(true),
-      )
-      .addAttachmentOption((option) =>
-        option.setName('attachment').setDescription('Optional file attachment.').setRequired(false),
-      );
+  .setDescription('Opt in to start chatting (initial setup only).');
     commands.push(chatCommand as SlashCommandBuilder);
     return commands;
   }
@@ -441,8 +736,6 @@ export class CoreIntelligenceService {
   }
 
   private async processChatCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    const promptText = interaction.options.getString('prompt', true);
-    const discordAttachment = interaction.options.getAttachment('attachment');
     const userId = interaction.user.id;
     const username = interaction.user.username;
 
@@ -529,50 +822,9 @@ export class CoreIntelligenceService {
       });
     }
 
-    // If prompt provided, process and send to destination
-    const commonAttachments: CommonAttachment[] = [];
-    if (discordAttachment) {
-      commonAttachments.push({
-        name: discordAttachment.name,
-        url: discordAttachment.url,
-        contentType: discordAttachment.contentType,
-      });
-    }
-
-    // Create a mock message context targeting the destination channel
-    const estTokens = Math.ceil(promptText.length / 4);
-    const inferredStrategy = this.determineStrategyFromTokens(estTokens);
-    const messageOptions = await this._processPromptAndGenerateResponse(
-      promptText,
-      userId,
-      targetChannelId,
-      interaction.guildId,
-      commonAttachments,
-      interaction,
-      inferredStrategy,
-    );
-
-    try {
-      // Send message to the destination
-      if (routing.dmPreferred) {
-        const dm = await interaction.user.createDM();
-        await dm.send(messageOptions as any);
-        this.markBotReply(userId);
-      } else if (targetChannelId !== interaction.channelId && interaction.client.channels) {
-        const chan = await interaction.client.channels.fetch(targetChannelId);
-        if (chan && 'isTextBased' in chan && (chan as any).isTextBased()) {
-          await (chan as any).send(messageOptions);
-          this.markBotReply(userId);
-        }
-      } else {
-        await interaction.followUp(messageOptions);
-        this.markBotReply(userId);
-      }
-    } catch (_) {
-      // As last resort, send as follow-up in current context
-      await interaction.followUp(messageOptions);
-      this.markBotReply(userId);
-    }
+  // This command is now opt-in only; do not process prompts or attachments.
+  // After acknowledging and setting up routing above, simply return.
+  return;
   }
 
   private async loadOptedInUsers(): Promise<void> {
@@ -664,6 +916,8 @@ export class CoreIntelligenceService {
 
     // Compute recent burst count: messages from this user in the last 5 seconds (across channels)
     let recentBurst = 0;
+    // Compute channel activity burst in last 5 seconds
+    let channelBurst = 0;
     try {
       const now = Date.now();
       const windowMs = 5000;
@@ -672,9 +926,13 @@ export class CoreIntelligenceService {
       const pruned = arr.filter((ts) => now - ts <= windowMs);
       recentBurst = pruned.length;
       this.recentUserMessages.set(userId, [...pruned, now]);
+      const carr = this.recentChannelMessages.get(message.channelId) || [];
+      const cpruned = carr.filter((ts) => now - ts <= windowMs);
+      channelBurst = cpruned.length;
+      this.recentChannelMessages.set(message.channelId, [...cpruned, now]);
     } catch {}
 
-    const result = this.decisionEngine.analyze(message, {
+  const result = this.getDecisionEngineForGuild(message.guildId ?? undefined).analyze(message, {
       optedIn,
       isDM,
       isPersonalThread,
@@ -682,6 +940,7 @@ export class CoreIntelligenceService {
       repliedToBot,
       lastBotReplyAt: lastAt,
       recentUserBurstCount: recentBurst,
+      channelRecentBurstCount: channelBurst,
     });
     return {
       yes: result.shouldRespond,
@@ -693,10 +952,39 @@ export class CoreIntelligenceService {
   }
 
   private classifyControlIntent(content: string): {
-    intent: 'NONE' | 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD';
+  intent: 'NONE' | 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD' | 'PERSONA_LIST' | 'PERSONA_SET' | 'OVERRIDES_SHOW' | 'OVERRIDES_SET' | 'OVERRIDES_CLEAR';
     payload?: any;
   } {
     const text = content.toLowerCase();
+    // Persona controls (DM-only, admin-gated at handling)
+    // List personas: "list personas", "show personas", "what personas are available"
+    if (/\b(list|show)\s+(personas|persona\s+list|available\s+personas)\b/.test(text) || /\bwhat\s+(personas|persona\s+profiles)\b/.test(text)) {
+      return { intent: 'PERSONA_LIST' };
+    }
+    // Set persona: "persona set <name>", "use persona <name>", "switch persona to <name>", "become <name> persona"
+    const setMatch = text.match(/\b(?:persona\s+set|use\s+persona|switch\s+persona\s*(?:to)?|become)\s+([\w\- ]{2,})/i);
+    if (setMatch && setMatch[1]) {
+      const raw = setMatch[1].trim().replace(/^"|^'|"$|'$/g, '');
+      return { intent: 'PERSONA_SET', payload: { name: raw } };
+    }
+    // Decision override controls (admin-only). Examples:
+    // - "show decision overrides" (or "show overrides")
+    // - "set override ambientThreshold 35" or "override ambientThreshold=35"
+    // - "clear overrides" or "clear override ambientThreshold"
+    if (/\b(show|list)\b.*\b(decision\s+)?overrides\b/.test(text)) {
+      return { intent: 'OVERRIDES_SHOW' };
+    }
+    const setOvEq = content.match(/\boverride\s+([a-zA-Z][\w]*)\s*=\s*([\d\.]+)/);
+    const setOvSpace = content.match(/\bset\s+override\s+([a-zA-Z][\w]*)\s+([\d\.]+)/);
+    if (setOvEq || setOvSpace) {
+      const [, key, val] = (setOvEq || setOvSpace) as RegExpMatchArray;
+      const num = Number(val);
+      if (isFinite(num)) return { intent: 'OVERRIDES_SET', payload: { key, value: num } };
+    }
+    const clearAll = /\bclear\s+(all\s+)?(decisions?\s+)?overrides\b/i.test(content);
+    const clearOne = content.match(/\bclear\s+override\s+([a-zA-Z][\w]*)\b/);
+    if (clearAll) return { intent: 'OVERRIDES_CLEAR', payload: { all: true } };
+    if (clearOne) return { intent: 'OVERRIDES_CLEAR', payload: { key: clearOne[1] } };
     if (/\bpause\b/.test(text)) {
       const m = text.match(/\b(\d{1,4})\s*(min|mins|minutes|hour|hours|hr|hrs)?\b/);
       let minutes = 60;
@@ -719,7 +1007,7 @@ export class CoreIntelligenceService {
   }
 
   private async handleControlIntent(
-    intent: 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD',
+  intent: 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD' | 'PERSONA_LIST' | 'PERSONA_SET' | 'OVERRIDES_SHOW' | 'OVERRIDES_SET' | 'OVERRIDES_CLEAR',
     payload: any,
     message: Message,
   ): Promise<boolean> {
@@ -808,6 +1096,147 @@ export class CoreIntelligenceService {
         }
         await message.reply('❌ I couldn’t create a thread here.');
         return true;
+      }
+      // Persona controls (DM-only for listing; setting allowed in DM (default scope) or guild (guild scope))
+      if (intent === 'PERSONA_LIST') {
+        const isDM = !message.guildId;
+        const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'persona', {
+          guildId: message.guildId || undefined,
+          channelId: message.channelId,
+          userId,
+        });
+        if (!isDM || !isAdmin) {
+          await message.reply('❌ Persona list is available to admins via DM only.');
+          return true;
+        }
+        try {
+          const personas = listPersonas();
+          if (!personas || personas.length === 0) {
+            await message.reply('No personas are registered.');
+            return true;
+          }
+          const names = personas.map((p) => `• ${p.name}`).join('\n');
+          await message.reply(`Available personas:\n${names}`);
+        } catch (e) {
+          await message.reply('❌ Failed to fetch personas.');
+        }
+        return true;
+      }
+      if (intent === 'PERSONA_SET') {
+        const name = String(payload?.name || '').trim();
+        if (!name) {
+          await message.reply('Please specify a persona name, e.g., "persona set friendly"');
+          return true;
+        }
+        const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'persona', {
+          guildId: message.guildId || undefined,
+          channelId: message.channelId,
+          userId,
+        });
+        if (!isAdmin) {
+          await message.reply('❌ Only admins can change the active persona.');
+          return true;
+        }
+        const scopeId = message.guildId || 'default';
+        try {
+          setActivePersona(scopeId, name);
+          await message.reply(`✅ Active persona set to “${name}” for ${message.guildId ? 'this server' : 'DM/default'}.`);
+        } catch (e: any) {
+          await message.reply(`❌ ${e?.message || 'Failed to set persona.'}`);
+        }
+        return true;
+      }
+      // Decision overrides via natural language (admin-only)
+      if (intent === 'OVERRIDES_SHOW' || intent === 'OVERRIDES_SET' || intent === 'OVERRIDES_CLEAR') {
+        const guildId = message.guildId;
+        if (!guildId) {
+          await message.reply('❌ Decision overrides are server-specific. Use this in a server channel.');
+          return true;
+        }
+        const isAdmin = await this.permissionService.hasAdminCommandPermission(message.author.id, 'overrides', {
+          guildId,
+          channelId: message.channelId,
+          userId: message.author.id,
+        });
+        if (!isAdmin) {
+          await message.reply('❌ Only server admins can view or change decision overrides.');
+          return true;
+        }
+
+        if (intent === 'OVERRIDES_SHOW') {
+          try {
+            const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
+            const dbOverrides = await this.fetchDecisionOverrides(guildId);
+            const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
+            const lines = [
+              'Current decision overrides (effective):',
+              `- cooldownMs: ${effective.cooldownMs}`,
+              `- defaultModelTokenLimit: ${effective.defaultModelTokenLimit}`,
+              `- maxMentionsAllowed: ${effective.maxMentionsAllowed}`,
+              `- ambientThreshold: ${effective.ambientThreshold}`,
+              `- burstCountThreshold: ${effective.burstCountThreshold}`,
+              `- shortMessageMinLen: ${effective.shortMessageMinLen}`,
+              '',
+              dbOverrides && Object.keys(dbOverrides).length > 0
+                ? 'Source: DB overrides take precedence over environment JSON.'
+                : Object.keys(envOverrides).length > 0
+                ? 'Source: Environment JSON overrides active (no DB overrides).'
+                : 'Source: Defaults (no env or DB overrides).',
+            ];
+            await message.reply(lines.join('\n'));
+          } catch (e) {
+            await message.reply('❌ Failed to retrieve decision overrides.');
+          }
+          return true;
+        }
+
+        if (intent === 'OVERRIDES_SET') {
+          const key = String(payload?.key || '').trim();
+          const value = Number(payload?.value);
+          const allowed: Array<keyof DecisionEngineOptions> = [
+            'cooldownMs',
+            'defaultModelTokenLimit',
+            'maxMentionsAllowed',
+            'ambientThreshold',
+            'burstCountThreshold',
+            'shortMessageMinLen',
+          ];
+          if (!allowed.includes(key as keyof DecisionEngineOptions) || !isFinite(value)) {
+            await message.reply('❌ Invalid override. Allowed keys: ' + allowed.join(', '));
+            return true;
+          }
+          try {
+            await updateGuildDecisionOverridesPartial(guildId, { [key]: value } as any);
+            // Hot-refresh engine for this guild immediately
+            await this.refreshGuildDecisionEngines();
+            await message.reply(`✅ Override set: ${key} = ${value}. DB overrides now active.`);
+          } catch (e) {
+            await message.reply('❌ Failed to update override.');
+          }
+          return true;
+        }
+
+        if (intent === 'OVERRIDES_CLEAR') {
+          try {
+            const key = payload?.key as string | undefined;
+            if (payload?.all) {
+              await deleteGuildDecisionOverrides(guildId);
+              await this.refreshGuildDecisionEngines();
+              await message.reply('✅ All DB decision overrides cleared for this server.');
+              return true;
+            }
+            if (!key) {
+              await message.reply('❌ Specify which override to clear, e.g., "clear override ambientThreshold" or say "clear all overrides".');
+              return true;
+            }
+            await updateGuildDecisionOverridesPartial(guildId, { [key]: null } as any);
+            await this.refreshGuildDecisionEngines();
+            await message.reply(`✅ Cleared override: ${key}.`);
+          } catch (e) {
+            await message.reply('❌ Failed to clear override.');
+          }
+          return true;
+        }
       }
       return false;
     } catch (err) {
@@ -948,6 +1377,39 @@ export class CoreIntelligenceService {
     strategy?: ResponseStrategy,
   ): Promise<any> {
     const startTime = Date.now();
+    
+    // Performance Monitoring - Start overall processing operation
+    const processingOperationId = process.env.ENABLE_PERFORMANCE_MONITORING === 'true' 
+      ? performanceMonitor.startOperation(
+          'core_intelligence_service',
+          'process_prompt_and_generate_response'
+        )
+      : 'disabled';
+    
+    // Enhanced Observability - Start conversation trace
+    let conversationTrace: any = null;
+    if (this.enhancedLangfuseService) {
+      try {
+        const conversationId = `${userId}-${channelId}-${Date.now()}`;
+        const traceId = await this.enhancedLangfuseService.startConversationTrace({
+          conversationId,
+          userId,
+          sessionId: guildId || 'dm',
+          metadata: {
+            prompt: promptText,
+            attachments: commonAttachments.length,
+            strategy: strategy || 'quick-reply',
+            channelId,
+            guildId
+          }
+        });
+        conversationTrace = { id: traceId, conversationId };
+        logger.debug('Enhanced Langfuse conversation trace started', { traceId });
+      } catch (error) {
+        logger.warn('Failed to start Langfuse trace', { error });
+      }
+    }
+    
     const analyticsData = {
       guildId: guildId || undefined,
       userId,
@@ -956,6 +1418,7 @@ export class CoreIntelligenceService {
       promptLength: promptText.length,
       attachmentCount: commonAttachments.length,
       startTime,
+      conversationTrace,
     };
 
     let mode: ResponseStrategy = strategy || 'quick-reply';
@@ -965,6 +1428,77 @@ export class CoreIntelligenceService {
     }
     const lightweight = mode === 'quick-reply';
     const deep = mode === 'deep-reason';
+
+    // Enhanced Semantic Caching - Check for cached response
+    if (this.enhancedSemanticCacheService && !lightweight) {
+      const cacheOperationId = performanceMonitor.startOperation(
+        'enhanced_semantic_cache_service',
+        'cache_lookup'
+      );
+      try {
+        const cachedResponse = await this.enhancedSemanticCacheService.get(promptText);
+        if (cachedResponse && cachedResponse.similarity > 0.85) { // High similarity threshold
+          logger.debug('Returning cached response from enhanced semantic cache', { 
+            similarity: cachedResponse.similarity 
+          });
+          
+          performanceMonitor.endOperation(
+            cacheOperationId,
+            'enhanced_semantic_cache_service',
+            'cache_lookup',
+            true,
+            undefined,
+            { cacheHit: true, similarity: cachedResponse.similarity }
+          );
+          
+          // Track cache hit in Langfuse if available
+          if (conversationTrace && this.enhancedLangfuseService) {
+            await this.enhancedLangfuseService.trackGeneration({
+              traceId: conversationTrace.id,
+              name: 'cached_response',
+              input: promptText,
+              output: cachedResponse.entry.content,
+              model: 'semantic_cache',
+              startTime: new Date(startTime),
+              endTime: new Date(),
+              usage: { input: 0, output: 0, total: 0 },
+              metadata: { cacheHit: true, similarity: cachedResponse.similarity }
+            });
+          }
+          
+          // End overall processing operation with cache hit
+          performanceMonitor.endOperation(
+            processingOperationId,
+            'core_intelligence_service',
+            'process_prompt_and_generate_response',
+            true,
+            undefined,
+            { cacheHit: true, totalProcessingTime: Date.now() - startTime }
+          );
+          
+          return { content: cachedResponse.entry.content };
+        } else {
+          performanceMonitor.endOperation(
+            cacheOperationId,
+            'enhanced_semantic_cache_service',
+            'cache_lookup',
+            true,
+            undefined,
+            { cacheHit: false, similarity: cachedResponse?.similarity || 0 }
+          );
+        }
+      } catch (error) {
+        performanceMonitor.endOperation(
+          cacheOperationId,
+          'enhanced_semantic_cache_service',
+          'cache_lookup',
+          false,
+          String(error),
+          { cacheHit: false }
+        );
+        logger.warn('Semantic cache check failed, continuing with generation', { error });
+      }
+    }
 
     // If message is too long, gracefully defer and ask for confirmation to proceed heavy
     if (mode === 'defer') {
@@ -1060,6 +1594,313 @@ export class CoreIntelligenceService {
         guildId,
         analyticsData,
       );
+      
+      // Qwen VL Multimodal Analysis - Analyze image attachments for enhanced understanding
+      let multimodalAnalysis: any = null;
+      if (this.qwenVLMultimodalService && !lightweight && commonAttachments.length > 0) {
+        const multimodalOperationId = performanceMonitor.startOperation(
+          'qwen_vl_multimodal_service',
+          'image_analysis'
+        );
+        try {
+          // Filter for image attachments
+          const imageAttachments = commonAttachments.filter(att => 
+            att.contentType && att.contentType.startsWith('image/')
+          );
+
+          if (imageAttachments.length > 0) {
+            const imageAnalysisPromises = imageAttachments.map(async (attachment) => {
+              const imageInput = {
+                type: 'url' as const,
+                data: attachment.url,
+                mimeType: attachment.contentType || undefined
+              };
+
+              return await this.qwenVLMultimodalService!.analyzeImage(imageInput, {
+                prompt: `Analyze this image in the context of the conversation: "${promptText.substring(0, 200)}"`,
+                analysisType: 'detailed',
+                extractText: true,
+                identifyObjects: true,
+                analyzeMood: true,
+                describeScene: true,
+                includeConfidence: true,
+                maxTokens: 1000
+              });
+            });
+
+            const imageAnalyses = await Promise.all(imageAnalysisPromises);
+            const successfulAnalyses = imageAnalyses.filter(analysis => analysis.success);
+            
+            if (successfulAnalyses.length > 0) {
+              multimodalAnalysis = {
+                imageCount: successfulAnalyses.length,
+                descriptions: successfulAnalyses.map(analysis => analysis.analysis.description),
+                extractedText: successfulAnalyses
+                  .filter(analysis => analysis.analysis.extractedText)
+                  .map(analysis => analysis.analysis.extractedText)
+                  .join(' '),
+                identifiedObjects: successfulAnalyses
+                  .flatMap(analysis => analysis.analysis.identifiedObjects || [])
+                  .map(obj => obj.name),
+                overallMood: successfulAnalyses
+                  .filter(analysis => analysis.analysis.moodAnalysis)
+                  .map(analysis => analysis.analysis.moodAnalysis?.overallMood)
+                  .filter(Boolean)[0],
+                visualContext: successfulAnalyses
+                  .map(analysis => analysis.analysis.detailedDescription || analysis.analysis.description)
+                  .join('. ')
+              };
+
+              logger.debug('Multimodal image analysis completed', {
+                userId,
+                imagesAnalyzed: successfulAnalyses.length,
+                totalObjects: multimodalAnalysis.identifiedObjects.length,
+                hasExtractedText: !!multimodalAnalysis.extractedText,
+                mood: multimodalAnalysis.overallMood
+              });
+
+              // Track multimodal analysis in Langfuse if available
+              if (conversationTrace && this.enhancedLangfuseService) {
+                await this.enhancedLangfuseService.trackGeneration({
+                  traceId: conversationTrace.id,
+                  name: 'multimodal_image_analysis',
+                  input: `Analyzed ${successfulAnalyses.length} images with context: ${promptText.substring(0, 100)}...`,
+                  output: multimodalAnalysis.visualContext,
+                  model: 'qwen_vl_multimodal',
+                  startTime: new Date(),
+                  endTime: new Date(),
+                  usage: { 
+                    input: 0, 
+                    output: successfulAnalyses.reduce((sum, analysis) => sum + analysis.metadata.tokensUsed, 0), 
+                    total: successfulAnalyses.reduce((sum, analysis) => sum + analysis.metadata.tokensUsed, 0)
+                  },
+                  metadata: {
+                    operation: 'image_analysis',
+                    imageCount: successfulAnalyses.length,
+                    objectsIdentified: multimodalAnalysis.identifiedObjects.length,
+                    textExtracted: !!multimodalAnalysis.extractedText,
+                    moodDetected: !!multimodalAnalysis.overallMood
+                  }
+                });
+              }
+            }
+            
+            performanceMonitor.endOperation(
+              multimodalOperationId,
+              'qwen_vl_multimodal_service',
+              'image_analysis',
+              true,
+              undefined,
+              {
+                imagesAnalyzed: successfulAnalyses.length,
+                objectsIdentified: multimodalAnalysis?.identifiedObjects?.length || 0,
+                textExtracted: !!multimodalAnalysis?.extractedText,
+                processingSuccess: true
+              }
+            );
+          } else {
+            performanceMonitor.endOperation(
+              multimodalOperationId,
+              'qwen_vl_multimodal_service',
+              'image_analysis',
+              true,
+              undefined,
+              { imagesAnalyzed: 0, reason: 'no_image_attachments' }
+            );
+          }
+        } catch (error) {
+          performanceMonitor.endOperation(
+            multimodalOperationId,
+            'qwen_vl_multimodal_service',
+            'image_analysis',
+            false,
+            String(error),
+            { imagesAnalyzed: 0, processingSuccess: false }
+          );
+          logger.warn('Multimodal image analysis failed, continuing without visual enhancement', {
+            error,
+            userId,
+            imageCount: commonAttachments.filter(att => att.contentType?.startsWith('image/')).length
+          });
+        }
+      }
+      
+      // Crawl4AI Web Analysis - Extract and analyze web content from URLs
+      let webAnalysis: any = null;
+      if (this.crawl4aiWebService && !lightweight) {
+        try {
+          // Extract URLs from the prompt text
+          const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
+          const urlMatches = promptText.match(urlRegex);
+          
+          if (urlMatches && urlMatches.length > 0) {
+            // Limit to first 2 URLs to avoid excessive processing
+            const urlsToProcess = urlMatches.slice(0, 2);
+            
+            const webAnalysisPromises = urlsToProcess.map(async (url) => {
+              return await this.crawl4aiWebService!.crawlUrl({
+                url: url.trim(),
+                extractText: true,
+                extractLinks: true,
+                extractMedia: false, // Skip media for performance
+                onlyText: true,
+                removeUnwantedLines: true,
+                wordCountThreshold: 50,
+                timeout: 10000, // 10 second timeout
+                excludeTags: ['script', 'style', 'nav', 'footer', 'aside']
+              });
+            });
+
+            const webResults = await Promise.all(webAnalysisPromises);
+            const successfulResults = webResults.filter(result => result.success && result.markdown);
+            
+            if (successfulResults.length > 0) {
+              webAnalysis = {
+                urlCount: successfulResults.length,
+                titles: successfulResults.map(result => result.title).filter(Boolean),
+                content: successfulResults
+                  .map(result => {
+                    const content = result.markdown || result.cleanedHtml || '';
+                    return content.substring(0, 1500); // Limit content size
+                  })
+                  .join('\n\n---\n\n'),
+                metadata: successfulResults.map(result => ({
+                  url: result.url,
+                  title: result.title,
+                  wordCount: result.metadata?.wordCount || 0,
+                  description: result.metadata?.description
+                })),
+                summaryContext: successfulResults
+                  .map(result => `${result.title}: ${result.metadata?.description || 'Web content extracted'}`)
+                  .join('; ')
+              };
+
+              logger.debug('Web content analysis completed', {
+                userId,
+                urlsProcessed: successfulResults.length,
+                totalContent: webAnalysis.content.length,
+                titles: webAnalysis.titles
+              });
+
+              // Track web analysis in Langfuse if available
+              if (conversationTrace && this.enhancedLangfuseService) {
+                await this.enhancedLangfuseService.trackGeneration({
+                  traceId: conversationTrace.id,
+                  name: 'web_content_analysis',
+                  input: `Analyzed ${urlsToProcess.length} URLs: ${urlsToProcess.join(', ')}`,
+                  output: webAnalysis.summaryContext,
+                  model: 'crawl4ai_web_scraper',
+                  startTime: new Date(),
+                  endTime: new Date(),
+                  usage: { 
+                    input: urlsToProcess.length, 
+                    output: webAnalysis.content.length, 
+                    total: urlsToProcess.length + webAnalysis.content.length
+                  },
+                  metadata: {
+                    operation: 'web_content_extraction',
+                    urlCount: successfulResults.length,
+                    contentLength: webAnalysis.content.length,
+                    titles: webAnalysis.titles
+                  }
+                });
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn('Web content analysis failed, continuing without web enhancement', {
+            error,
+            userId
+          });
+        }
+      }
+      
+      // DSPy RAG Optimization - Enhance retrieval and query processing
+      let ragOptimization: any = null;
+      if (this.dspyRAGOptimizationService && !lightweight) {
+        try {
+          // First analyze the query for optimal retrieval strategy
+          const queryAnalysis = await this.dspyRAGOptimizationService.analyzeQuery(promptText, {
+            hasMultimodalContext: !!multimodalAnalysis,
+            hasWebContext: !!webAnalysis,
+            userId,
+            channelId,
+            guildId
+          });
+
+          // Perform adaptive retrieval for enhanced context
+          const retrievalResult = await this.dspyRAGOptimizationService.adaptiveRetrieve(
+            promptText,
+            queryAnalysis,
+            {
+              retriever: {
+                type: 'hybrid',
+                topK: 5,
+                similarityThreshold: 0.7
+              },
+              generator: {
+                model: 'gpt-4',
+                temperature: 0.3,
+                maxTokens: 1000
+              }
+            }
+          );
+
+          if (retrievalResult.documents.length > 0) {
+            ragOptimization = {
+              documentsRetrieved: retrievalResult.documents.length,
+              queryAnalysis: retrievalResult.queryAnalysis,
+              retrievalStrategy: retrievalResult.retrievalStrategy,
+              relevantContent: retrievalResult.documents
+                .filter(doc => doc.relevance === 'high')
+                .map(doc => `${doc.source}: ${doc.content.substring(0, 300)}`)
+                .join('\n\n'),
+              topicInsights: retrievalResult.queryAnalysis.topics,
+              intentClassification: retrievalResult.queryAnalysis.intent,
+              complexityLevel: retrievalResult.queryAnalysis.complexity
+            };
+
+            logger.debug('DSPy RAG optimization completed', {
+              userId,
+              documentsFound: retrievalResult.documents.length,
+              queryIntent: retrievalResult.queryAnalysis.intent,
+              complexity: retrievalResult.queryAnalysis.complexity,
+              retrievalTime: retrievalResult.retrievalTime
+            });
+
+            // Track RAG optimization in Langfuse if available
+            if (conversationTrace && this.enhancedLangfuseService) {
+              await this.enhancedLangfuseService.trackGeneration({
+                traceId: conversationTrace.id,
+                name: 'dspy_rag_optimization',
+                input: `Query analysis and retrieval for: ${promptText.substring(0, 100)}...`,
+                output: `Retrieved ${retrievalResult.documents.length} relevant documents using ${retrievalResult.retrievalStrategy}`,
+                model: 'dspy_rag_optimizer',
+                startTime: new Date(),
+                endTime: new Date(),
+                usage: { 
+                  input: promptText.length, 
+                  output: ragOptimization.relevantContent.length, 
+                  total: promptText.length + ragOptimization.relevantContent.length
+                },
+                metadata: {
+                  operation: 'adaptive_retrieval',
+                  documentsRetrieved: retrievalResult.documents.length,
+                  queryIntent: retrievalResult.queryAnalysis.intent,
+                  complexity: retrievalResult.queryAnalysis.complexity,
+                  retrievalTime: retrievalResult.retrievalTime
+                }
+              });
+            }
+          }
+        } catch (error) {
+          logger.warn('DSPy RAG optimization failed, continuing with standard processing', {
+            error,
+            userId
+          });
+        }
+      }
+      
       const unifiedAnalysis = await this._analyzeInput(
         messageForPipeline,
         commonAttachments,
@@ -1187,6 +2028,30 @@ export class CoreIntelligenceService {
 
       const history = await getHistory(channelId);
 
+      // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
+      let vectorContext = '';
+      if (this.qdrantVectorService && !lightweight) {
+        try {
+          // Placeholder for vector context retrieval - requires embedding generation
+          // The Qdrant service is initialized but needs embedding integration
+          logger.debug('Qdrant vector service available but embeddings not integrated yet', {
+            hasService: !!this.qdrantVectorService,
+            userId
+          });
+          
+          // TODO: Integrate embedding generation for vector search
+          // 1. Generate embeddings for promptText 
+          // 2. Search similar conversation contexts
+          // 3. Provide relevant context snippets
+        } catch (error) {
+          logger.warn('Qdrant vector search preparation failed', { 
+            error,
+            userId,
+            guildId: guildId || undefined
+          });
+        }
+      }
+
       // Hybrid retrieval grounding
       let __hybrid = '';
       try {
@@ -1211,6 +2076,9 @@ export class CoreIntelligenceService {
         mcpOrchestrationResult,
         history,
         analyticsData,
+        multimodalAnalysis,
+        webAnalysis,
+        ragOptimization
       );
 
       let { fullResponseText } = await this._generateAgenticResponse(
@@ -1279,6 +2147,70 @@ export class CoreIntelligenceService {
             .forEach((result: any, index: number) => {
               fullResponseText += `${index + 1}. ${result.title}: ${result.snippet}\n`;
             });
+        }
+      }
+
+      // Neo4j Knowledge Graph - Entity extraction and relationship mapping
+      if (this.neo4jKnowledgeGraphService && !lightweight && fullResponseText) {
+        try {
+          const conversationId = `${userId}-${channelId}-${Date.now()}`;
+          
+          // Extract entities from both prompt and response for comprehensive knowledge capture
+          const promptEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
+            promptText,
+            conversationId
+          );
+          
+          const responseEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
+            fullResponseText,
+            conversationId
+          );
+
+          // Add entities to conversation graph
+          const allEntities = [...promptEntities, ...responseEntities];
+          if (allEntities.length > 0) {
+            for (const entity of allEntities) {
+              await this.neo4jKnowledgeGraphService.addToConversationGraph(
+                conversationId,
+                entity,
+                'MENTIONED_IN'
+              );
+            }
+
+            logger.debug('Updated knowledge graph with conversation entities', {
+              conversationId,
+              promptEntitiesCount: promptEntities.length,
+              responseEntitiesCount: responseEntities.length,
+              totalEntities: allEntities.length,
+              userId
+            });
+
+            // Track knowledge graph operation in Langfuse if available
+            if (conversationTrace && this.enhancedLangfuseService) {
+              await this.enhancedLangfuseService.trackGeneration({
+                traceId: conversationTrace.id,
+                name: 'knowledge_graph_update',
+                input: `Entities from prompt: ${promptEntities.length}, response: ${responseEntities.length}`,
+                output: `Knowledge graph updated with ${allEntities.length} entities`,
+                model: 'neo4j_knowledge_graph',
+                startTime: new Date(),
+                endTime: new Date(),
+                usage: { input: 0, output: 0, total: 0 },
+                metadata: {
+                  operation: 'entity_extraction_and_graph_update',
+                  conversationId,
+                  entitiesCount: allEntities.length,
+                  entityTypes: allEntities.map(e => e.labels[0]).filter((v, i, a) => a.indexOf(v) === i)
+                }
+              });
+            }
+          }
+        } catch (error) {
+          logger.warn('Knowledge graph update failed, continuing without graph updates', {
+            error,
+            userId,
+            guildId: guildId || undefined
+          });
         }
       }
 
@@ -1354,8 +2286,165 @@ export class CoreIntelligenceService {
       const responsePayload: any = { content: fullResponseText, components: finalComponents };
       if (embeds.length > 0) responsePayload.embeds = embeds;
       if (files.length > 0) responsePayload.files = files;
+      
+      // Enhanced Semantic Caching - Store response after generation (for non-lightweight responses)
+      if (this.enhancedSemanticCacheService && !lightweight && fullResponseText) {
+        try {
+          await this.enhancedSemanticCacheService.set({
+            key: promptText,
+            content: fullResponseText,
+            ttl: 3600000, // Cache for 1 hour in milliseconds
+            tags: [mode, 'generated_response'],
+            metadata: {
+              userId,
+              guildId,
+              strategy: mode,
+              timestamp: new Date().toISOString(),
+              responseLength: fullResponseText.length
+            }
+          });
+          logger.debug('Stored response in enhanced semantic cache', { 
+            promptLength: promptText.length,
+            responseLength: fullResponseText.length 
+          });
+          
+          // Track cache store via generation tracking in Langfuse if available
+          if (conversationTrace && this.enhancedLangfuseService) {
+            await this.enhancedLangfuseService.trackGeneration({
+              traceId: conversationTrace.id,
+              name: 'cache_store_operation',
+              input: `Cache key: ${promptText.substring(0, 100)}...`,
+              output: 'Cache stored successfully',
+              model: 'semantic_cache',
+              startTime: new Date(),
+              endTime: new Date(),
+              usage: { input: 0, output: 0, total: 0 },
+              metadata: { 
+                operation: 'cache_store',
+                promptLength: promptText.length, 
+                responseLength: fullResponseText.length,
+                strategy: mode
+              }
+            });
+          }
+        } catch (error) {
+          logger.warn('Failed to store response in semantic cache', { error });
+        }
+      }
+      
+      // AI Evaluation Testing Service - Post-processing evaluation and testing
+      if (this.aiEvaluationTestingService && process.env.ENABLE_AI_EVALUATION_TESTING === 'true') {
+        try {
+          // Create a test function that evaluates the conversation processing
+          const conversationTestFunction = async (testCase: any) => {
+            return {
+              output: {
+                responseGenerated: !!fullResponseText,
+                responseLength: fullResponseText?.length || 0,
+                hasEmbeds: embeds.length > 0,
+                hasFiles: files.length > 0,
+                featuresUsed: {
+                  advancedCapabilities: !!advancedCapabilitiesResult,
+                  multimodalAnalysis: !!multimodalAnalysis,
+                  webAnalysis: !!webAnalysis,
+                  ragOptimization: !!ragOptimization,
+                  semanticCaching: !!this.enhancedSemanticCacheService,
+                  knowledgeGraph: !!this.neo4jKnowledgeGraphService
+                }
+              },
+              duration: Date.now() - startTime,
+              cost: 0 // Could be calculated based on token usage
+            };
+          };
+
+          // Run background benchmark evaluation of the conversation processing
+          const evaluationMetrics = await this.aiEvaluationTestingService.runBenchmark(
+            'conversation_processing_pipeline',
+            conversationTestFunction
+          );
+          
+          // Track evaluation in Langfuse if available
+          if (conversationTrace && this.enhancedLangfuseService) {
+            await this.enhancedLangfuseService.trackGeneration({
+              traceId: conversationTrace.id,
+              name: 'ai_evaluation_benchmark',
+              input: `Pipeline evaluation for conversation processing`,
+              output: `Benchmark completed - Ranking: ${evaluationMetrics.ranking}`,
+              model: 'ai_evaluation_testing',
+              startTime: new Date(),
+              endTime: new Date(),
+              usage: { input: 0, output: 0, total: 0 },
+              metadata: {
+                operation: 'pipeline_evaluation',
+                benchmarkName: evaluationMetrics.benchmarkName,
+                benchmarkRanking: evaluationMetrics.ranking,
+                processingTimeMs: Date.now() - startTime,
+                featuresUsed: {
+                  advancedCapabilities: !!advancedCapabilitiesResult,
+                  multimodalAnalysis: !!multimodalAnalysis,
+                  webAnalysis: !!webAnalysis,
+                  ragOptimization: !!ragOptimization,
+                  semanticCaching: !!this.enhancedSemanticCacheService,
+                  knowledgeGraph: !!this.neo4jKnowledgeGraphService
+                }
+              }
+            });
+          }
+          
+          logger.debug('AI Evaluation Testing completed', {
+            benchmarkName: evaluationMetrics.benchmarkName,
+            ranking: evaluationMetrics.ranking,
+            processingTimeMs: Date.now() - startTime
+          });
+        } catch (error) {
+          logger.warn('AI Evaluation Testing failed, continuing without evaluation', {
+            error,
+            userId,
+            guildId: guildId || undefined
+          });
+        }
+      }
+      
+      // End overall processing operation successfully
+      performanceMonitor.endOperation(
+        processingOperationId,
+        'core_intelligence_service',
+        'process_prompt_and_generate_response',
+        true,
+        undefined,
+        {
+          totalProcessingTime: Date.now() - startTime,
+          responseLength: typeof responsePayload.content === 'string' ? responsePayload.content.length : 0,
+          hasEmbeds: responsePayload.embeds ? responsePayload.embeds.length > 0 : false,
+          hasFiles: responsePayload.files ? responsePayload.files.length > 0 : false,
+          servicesUsed: {
+            langfuse: !!this.enhancedLangfuseService,
+            semanticCache: !!this.enhancedSemanticCacheService,
+            multimodal: !!multimodalAnalysis,
+            webAnalysis: !!webAnalysis,
+            knowledgeGraph: !!this.neo4jKnowledgeGraphService,
+            ragOptimization: !!ragOptimization,
+            aiEvaluation: !!this.aiEvaluationTestingService
+          }
+        }
+      );
+      
       return responsePayload;
     } catch (error: any) {
+      // End overall processing operation with error
+      performanceMonitor.endOperation(
+        processingOperationId,
+        'core_intelligence_service',
+        'process_prompt_and_generate_response',
+        false,
+        error.message,
+        {
+          totalProcessingTime: Date.now() - startTime,
+          errorType: error.constructor.name,
+          errorStep: 'processing_pipeline'
+        }
+      );
+      
       logger.error(
         `[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`,
         { error, stack: error.stack, ...analyticsData },
@@ -1642,6 +2731,9 @@ export class CoreIntelligenceService {
     mcpOrchestrationResult: MCPOrchestrationResult,
     history: ChatMessage[],
     analyticsData: any,
+    multimodalAnalysis?: any,
+    webAnalysis?: any,
+    ragOptimization?: any
   ): Promise<EnhancedContext> {
     logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, {
       userId: messageForAnalysis.author.id,
@@ -1654,6 +2746,65 @@ export class CoreIntelligenceService {
         capabilities,
         mcpOrchestrationResult,
       );
+      
+      // Enhance context with multimodal and web analysis
+      if (multimodalAnalysis || webAnalysis || ragOptimization) {
+        let enhancedSystemPrompt = agenticContextData.systemPrompt || '';
+        
+        if (multimodalAnalysis) {
+          enhancedSystemPrompt += '\n\n## Visual Context\n';
+          if (multimodalAnalysis.visualContext) {
+            enhancedSystemPrompt += `Images in conversation: ${multimodalAnalysis.visualContext}\n`;
+          }
+          if (multimodalAnalysis.extractedText) {
+            enhancedSystemPrompt += `Text extracted from images: ${multimodalAnalysis.extractedText}\n`;
+          }
+          if (multimodalAnalysis.identifiedObjects.length > 0) {
+            enhancedSystemPrompt += `Objects identified: ${multimodalAnalysis.identifiedObjects.join(', ')}\n`;
+          }
+          if (multimodalAnalysis.overallMood) {
+            enhancedSystemPrompt += `Visual mood detected: ${multimodalAnalysis.overallMood}\n`;
+          }
+        }
+        
+        if (webAnalysis) {
+          enhancedSystemPrompt += '\n\n## Web Content Context\n';
+          enhancedSystemPrompt += `Web content summary: ${webAnalysis.summaryContext}\n`;
+          if (webAnalysis.content) {
+            enhancedSystemPrompt += `\n### Extracted Web Content:\n${webAnalysis.content}\n`;
+          }
+        }
+        
+        if (ragOptimization) {
+          enhancedSystemPrompt += '\n\n## RAG-Optimized Context\n';
+          enhancedSystemPrompt += `Query Intent: ${ragOptimization.intentClassification}\n`;
+          enhancedSystemPrompt += `Complexity Level: ${ragOptimization.complexityLevel}\n`;
+          if (ragOptimization.topicInsights.length > 0) {
+            enhancedSystemPrompt += `Key Topics: ${ragOptimization.topicInsights.join(', ')}\n`;
+          }
+          if (ragOptimization.relevantContent) {
+            enhancedSystemPrompt += `\n### Retrieved Context:\n${ragOptimization.relevantContent}\n`;
+          }
+        }
+        
+        // Update the system prompt with enhanced context
+        agenticContextData.systemPrompt = enhancedSystemPrompt;
+        
+        // Add to additional context if available
+        if ((agenticContextData as any).additionalContext) {
+          (agenticContextData as any).additionalContext += `\n## Enhanced Analysis\n`;
+          if (multimodalAnalysis) {
+            (agenticContextData as any).additionalContext += `- Analyzed ${multimodalAnalysis.imageCount} images\n`;
+          }
+          if (webAnalysis) {
+            (agenticContextData as any).additionalContext += `- Processed ${webAnalysis.urlCount} web URLs\n`;
+          }
+          if (ragOptimization) {
+            (agenticContextData as any).additionalContext += `- Retrieved ${ragOptimization.documentsRetrieved} optimized context documents\n`;
+          }
+        }
+      }
+      
       this.recordAnalyticsInteraction({
         ...analyticsData,
         step: 'context_aggregated',
@@ -1764,7 +2915,17 @@ export class CoreIntelligenceService {
 
       // Optional: derive intent with LangGraph to condition a concise, precise system prompt
       let systemPrompt: string | undefined;
-      if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
+
+      // Inject active persona system prompt (guild-scoped) to shape voice and style
+      try {
+        const persona = getActivePersona(guildId || 'default');
+        if (persona?.systemPrompt) {
+          systemPrompt = `${persona.systemPrompt}${systemPrompt ? `\n${systemPrompt}` : ''}`;
+        }
+      } catch (e) {
+        logger.debug('[CoreIntelSvc] Persona injection skipped', { error: String(e) });
+      }
+  if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
         try {
           const sessionId = (uiContext as any)?.channel?.isThread?.()
             ? (uiContext as any).channel.id
@@ -1778,7 +2939,8 @@ export class CoreIntelligenceService {
             },
           });
           if (state && (state as any).intent) {
-            systemPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+    const intentPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+    systemPrompt = systemPrompt ? `${systemPrompt}\n${intentPrompt}` : intentPrompt;
           }
         } catch (e) {
           logger.debug('[CoreIntelSvc] LangGraph execute skipped or failed', { error: String(e) });
@@ -2152,7 +3314,7 @@ export class CoreIntelligenceService {
         logger.debug('[Consent] optInUser result', { userId, ok });
 
         const successMsg = ok
-          ? '✅ Thank you! Privacy consent granted. You can now use all bot features. Try using `/chat` again!'
+          ? '✅ Thank you! Privacy consent granted. You can now send me messages directly (in DM or your personal thread). No need to use /chat again.'
           : '⚠️ Consent saved partially. You can start using the bot, but some settings may not have persisted.';
 
         try {
@@ -2222,5 +3384,63 @@ export class CoreIntelligenceService {
     if (tokens > limit * 0.9) return 'defer';
     if (tokens > limit * 0.5) return 'deep-reason';
     return 'quick-reply';
+  }
+
+}
+
+function stableStringifyOptions(obj: unknown): string {
+  try {
+    return JSON.stringify(obj, Object.keys(obj as Record<string, unknown>).sort());
+  } catch {
+    // Fallback non-stable
+    try { return JSON.stringify(obj); } catch { return String(obj); }
+  }
+
+}
+
+// --- Helper: provider-aware token estimation for DecisionEngine ---
+function providerAwareTokenEstimate(message: Message): number {
+  try {
+    const text = message.content || '';
+    // Prefer precise tokenization when available
+    let tokens = (() => {
+      try {
+        if (process.env.FEATURE_PRECISE_TOKENIZER === 'true') {
+          const { countTokens } = require('../utils/tokenizer.js');
+          return countTokens(text);
+        }
+      } catch {}
+      // Base: ~4 chars per token
+      return Math.ceil(text.length / 4);
+    })();
+    // Attachment budget
+    try { tokens += (message.attachments?.size || 0) * 256; } catch {}
+
+    // Provider hint: use env/default provider when available to scale thresholds
+    // We avoid importing router here to keep this lightweight and side-effect free.
+    const provider = (process.env.DEFAULT_PROVIDER || 'gemini').toLowerCase();
+    switch (provider) {
+      case 'openai':
+      case 'openai_compat':
+        // OpenAI GPT-4o/mini tokens are closer to ~4 chars/token; keep as-is
+        break;
+      case 'anthropic':
+        // Claude tokenization often yields slightly fewer tokens for same text
+  tokens = Math.ceil(tokens * 0.95);
+        break;
+      case 'groq':
+      case 'mistral':
+        // Llama-ish BPE sometimes yields more tokens on punctuation-heavy text
+        tokens = Math.ceil(tokens * 1.05);
+        break;
+      case 'gemini':
+      default:
+        // Keep default heuristic for Gemini or unknown
+        break;
+    }
+    return tokens;
+  } catch {
+    const text = (message as any)?.content || '';
+    return Math.ceil(String(text).length / 4);
   }
 }

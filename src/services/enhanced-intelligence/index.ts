@@ -169,12 +169,7 @@ export class EnhancedInvisibleIntelligenceService {
   createSlashCommand() {
     return new SlashCommandBuilder()
       .setName('chat')
-      .setDescription('Opt into enhanced AI conversation with images, research and more')
-      .addStringOption(option =>
-        option.setName('message')
-          .setDescription('Your message, question, or request')
-          .setRequired(true)
-      );
+  .setDescription('Opt in to start chatting (initial setup only)');
   }
 
   /**
@@ -217,8 +212,9 @@ export class EnhancedInvisibleIntelligenceService {
         }
       }
       
-      const content = interaction.options.getString('message', true);
-      const attachments = Array.from(interaction.options.resolved?.attachments?.values() || []);
+  // /chat is now opt-in only; do not accept or process a message payload
+  const content = '';
+  const attachments: Attachment[] = [];
       
       // Step 2: Create processing context
       const attachmentInfo = attachments.map(att => ({
@@ -227,7 +223,7 @@ export class EnhancedInvisibleIntelligenceService {
         contentType: att.contentType || undefined
       }));
       
-      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(content, attachmentInfo);
+  const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage('opt-in', []);
       
       const context: ProcessingContext = {
         userId: interaction.user.id,
@@ -253,7 +249,7 @@ export class EnhancedInvisibleIntelligenceService {
       }));
       
       // Add timeout protection for MCP processing
-      const processingPromise = this.mcpToolsService.processWithAllTools(content, convertedAttachments, context);
+  const processingPromise = Promise.resolve();
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Processing timeout')), 25000) // 25 second timeout
       );
@@ -268,7 +264,8 @@ export class EnhancedInvisibleIntelligenceService {
       // Step 5: Generate enhanced response with ultra-intelligence, advanced memory and personalization
       let finalResponse: string;
       try {
-        let baseResponse = await this.responseService.generateEnhancedResponse(content, context);
+  // Provide onboarding guidance only
+  let baseResponse = '✅ You\'re opted in. From now on, just send me messages directly (DM or your personal thread). No need to use /chat again.';
         
         // Apply Ultra-Intelligence processing if available
         if (this.ultraIntelligence) {
@@ -358,11 +355,7 @@ export class EnhancedInvisibleIntelligenceService {
         }
         
         // Apply personalization if available
-        finalResponse = await this.adaptPersonalizedResponse(
-          interaction.user.id, 
-          memoryEnhancedResponse, 
-          interaction.guildId || undefined
-        );
+  finalResponse = memoryEnhancedResponse;
       } catch (responseError) {
         console.error('❌ Failed to generate enhanced response:', responseError);
         finalResponse = 'I encountered an issue while processing your request. Please try again with a simpler prompt.';
@@ -370,7 +363,7 @@ export class EnhancedInvisibleIntelligenceService {
       
       // Step 6: Send final response
       try {
-        await this.uiService.finalizeStreamingResponse(interaction, finalResponse, context, content);
+        await this.uiService.finalizeStreamingResponse(interaction, finalResponse, context, 'opt-in');
       } catch (uiError) {
         console.error('❌ Failed to finalize UI response:', uiError);
         
@@ -389,7 +382,7 @@ export class EnhancedInvisibleIntelligenceService {
       // Step 7: Store in memory and update analytics
       try {
         // Store in traditional memory service
-        await this.memoryService.storeConversationMemory(context, content, finalResponse);
+  await this.memoryService.storeConversationMemory(context, 'opt-in', finalResponse);
         
         // Store in advanced memory system if available
         if (this.advancedMemoryManager) {

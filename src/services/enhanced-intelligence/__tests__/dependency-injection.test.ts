@@ -300,13 +300,11 @@ describe('EnhancedInvisibleIntelligenceService - Dependency Injection', () => {
       const command = service.createSlashCommand();
       
       expect(command.name).toBe('chat');
-      expect(command.description).toContain('enhanced AI conversation');
+  expect(command.description).toBe('Opt in to start chatting (initial setup only)');
       
       // Convert to JSON to access the properties
-      const commandData = command.toJSON();
-      expect(commandData.options).toHaveLength(1);
-      expect(commandData.options![0].name).toBe('message');
-      expect(commandData.options![0].required).toBe(true);
+  const commandData = command.toJSON();
+  expect((commandData as any).options || []).toHaveLength(0);
     });
   });
 });

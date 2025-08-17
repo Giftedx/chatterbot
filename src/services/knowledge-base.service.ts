@@ -33,17 +33,79 @@ function reRankEntries(entries: Array<{ content: string } & Record<string, any>>
   return selected;
 }
 
+// Optional: local reranker using Transformers.js and sentence-transformers
+async function localRerank(query: string, entries: Array<{ content: string } & Record<string, any>>, limit: number): Promise<any[]> {
+  try {
+    if (process.env.FEATURE_LOCAL_RERANK !== 'true') return entries.slice(0, limit);
+    // Lazy import to avoid bundling when feature is off; tolerate missing dep
+    let pipeline: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      pipeline = (await import('@xenova/transformers')).pipeline;
+    } catch {
+      return entries.slice(0, limit);
+    }
+    // Default small model; can be overridden via env
+    const model = process.env.LOCAL_RERANK_MODEL || 'Xenova/all-MiniLM-L6-v2';
+    const embedder = await pipeline('feature-extraction', model);
+    const qEmbAny: any = await embedder(query, { pooling: 'mean', normalize: true });
+    const qEmb = new Float32Array(qEmbAny.data);
+    const scored = [] as Array<{ idx: number; score: number }>;
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const dEmbAny: any = await embedder(e.content, { pooling: 'mean', normalize: true });
+      const dEmb = new Float32Array(dEmbAny.data);
+      const score = cosineSim(qEmb, dEmb);
+      scored.push({ idx: i, score: isFinite(score) ? score : 0 });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const out = scored.slice(0, limit).map(s => entries[s.idx]);
+    return out.length ? out : entries.slice(0, limit);
+  } catch (e) {
+    return entries.slice(0, limit);
+  }
+}
+
 async function cohereRerank(query: string, entries: Array<{ content: string } & Record<string, any>>, limit: number): Promise<any[]> {
   try {
-    if (!process.env.COHERE_API_KEY || process.env.FEATURE_RERANK !== 'true') return entries.slice(0, limit);
+  if (!process.env.COHERE_API_KEY || process.env.FEATURE_RERANK !== 'true') return entries.slice(0, limit);
     const { CohereClient } = await import('cohere-ai');
     const cohere = new CohereClient({ token: process.env.COHERE_API_KEY! });
     const documents = entries.map((e, idx) => ({ id: String(idx), text: e.content }));
-    const result = await cohere.rerank({ model: 'rerank-english-v3.0', query, documents });
+    const model = process.env.COHERE_RERANK_MODEL || 'rerank-english-v3.0';
+    const result = await cohere.rerank({ model, query, documents });
     const ranked = result.results
       .sort((a: any, b: any) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
       .slice(0, limit)
       .map((r: any) => entries[Number(r.document?.id ?? r.index)]);
+    return ranked.length ? ranked : entries.slice(0, limit);
+  } catch {
+    return entries.slice(0, limit);
+  }
+}
+
+async function voyageRerank(query: string, entries: Array<{ content: string } & Record<string, any>>, limit: number): Promise<any[]> {
+  try {
+    if (!process.env.VOYAGE_API_KEY || process.env.FEATURE_RERANK !== 'true') return entries.slice(0, limit);
+    const res = await fetch('https://api.voyageai.com/v1/rerank', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.VOYAGE_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: process.env.VOYAGE_RERANK_MODEL || 'rerank-2.5',
+        query,
+        documents: entries.map(e => e.content),
+        top_k: limit
+      })
+    });
+    if (!res.ok) return entries.slice(0, limit);
+    const data: any = await res.json();
+    const ranked: any[] = (data?.data || data?.results || [])
+      .sort((a: any, b: any) => (b.score ?? 0) - (a.score ?? 0))
+      .slice(0, limit)
+      .map((r: any) => entries[r.index ?? Number(r.document_id) ?? 0]);
     return ranked.length ? ranked : entries.slice(0, limit);
   } catch {
     return entries.slice(0, limit);
@@ -197,6 +259,7 @@ export class KnowledgeBaseService {
   async search(query: KnowledgeQuery): Promise<KnowledgeEntry[]> {
     try {
       const { query: searchQuery, channelId, guildId, tags, minConfidence = 0.5, limit = 5 } = query;
+  const rerankProvider = (process.env.RERANK_PROVIDER || 'auto').toLowerCase(); // 'cohere' | 'voyage' | 'local' | 'auto'
 
       // Vector-first search using pgvector if enabled
       if (features.pgvector && process.env.OPENAI_API_KEY) {
@@ -224,8 +287,35 @@ export class KnowledgeBaseService {
                 updatedAt: new Date()
               } as any));
               const heuristic = reRankEntries(mapped, limit) as KnowledgeEntry[];
-              const reranked = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
-              return reranked && reranked.length ? reranked : heuristic;
+              if (rerankProvider === 'cohere') {
+                const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (co && co.length) return co;
+                const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (vo && vo.length) return vo;
+                const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                return lo && lo.length ? lo : heuristic;
+              } else if (rerankProvider === 'voyage') {
+                const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (vo && vo.length) return vo;
+                const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (co && co.length) return co;
+                const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                return lo && lo.length ? lo : heuristic;
+              } else if (rerankProvider === 'local') {
+                const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (lo && lo.length) return lo;
+                const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (co && co.length) return co;
+                const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                return vo && vo.length ? vo : heuristic;
+              } else {
+                const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (co && co.length) return co;
+                const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                if (vo && vo.length) return vo;
+                const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+                return lo && lo.length ? lo : heuristic;
+              }
             }
           }
         } catch (e) {
@@ -263,8 +353,35 @@ export class KnowledgeBaseService {
               updatedAt: s.chunk.createdAt
             } as any));
             const heuristic = reRankEntries(mapped, limit) as KnowledgeEntry[];
-            const reranked = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
-            return reranked && reranked.length ? reranked : heuristic;
+            if (rerankProvider === 'cohere') {
+              const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (co && co.length) return co;
+              const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (vo && vo.length) return vo;
+              const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              return lo && lo.length ? lo : heuristic;
+            } else if (rerankProvider === 'voyage') {
+              const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (vo && vo.length) return vo;
+              const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (co && co.length) return co;
+              const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              return lo && lo.length ? lo : heuristic;
+            } else if (rerankProvider === 'local') {
+              const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (lo && lo.length) return lo;
+              const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (co && co.length) return co;
+              const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              return vo && vo.length ? vo : heuristic;
+            } else {
+              const co = await cohereRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (co && co.length) return co;
+              const vo = await voyageRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              if (vo && vo.length) return vo;
+              const lo = await localRerank(searchQuery, mapped, limit) as KnowledgeEntry[];
+              return lo && lo.length ? lo : heuristic;
+            }
           }
         }
       } catch {}
@@ -304,11 +421,54 @@ export class KnowledgeBaseService {
 
       let reranked = reRankEntries(relevantEntries, limit) as KnowledgeEntry[];
       try {
-        const re = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
-        if (re && re.length) reranked = re as KnowledgeEntry[];
+        if (rerankProvider === 'cohere') {
+          const co = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+          if (co && co.length) reranked = co as KnowledgeEntry[];
+          else {
+            const vo = await voyageRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+            if (vo && vo.length) reranked = vo as KnowledgeEntry[];
+            else {
+              const lo = await localRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+              if (lo && lo.length) reranked = lo as KnowledgeEntry[];
+            }
+          }
+        } else if (rerankProvider === 'voyage') {
+          const vo = await voyageRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+          if (vo && vo.length) reranked = vo as KnowledgeEntry[];
+          else {
+            const co = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+            if (co && co.length) reranked = co as KnowledgeEntry[];
+            else {
+              const lo = await localRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+              if (lo && lo.length) reranked = lo as KnowledgeEntry[];
+            }
+          }
+        } else if (rerankProvider === 'local') {
+          const lo = await localRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+          if (lo && lo.length) reranked = lo as KnowledgeEntry[];
+          else {
+            const co = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+            if (co && co.length) reranked = co as KnowledgeEntry[];
+            else {
+              const vo = await voyageRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+              if (vo && vo.length) reranked = vo as KnowledgeEntry[];
+            }
+          }
+        } else {
+          const co = await cohereRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+          if (co && co.length) reranked = co as KnowledgeEntry[];
+          else {
+            const vo = await voyageRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+            if (vo && vo.length) reranked = vo as KnowledgeEntry[];
+            else {
+              const lo = await localRerank(searchQuery, relevantEntries, limit) as KnowledgeEntry[];
+              if (lo && lo.length) reranked = lo as KnowledgeEntry[];
+            }
+          }
+        }
       } catch {}
 
-      logger.info('Knowledge base search completed', {
+    logger.info('Knowledge base search completed', {
         query: searchQuery,
         results: reranked.length,
   totalSearched: entries.length

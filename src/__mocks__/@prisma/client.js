@@ -6,7 +6,8 @@ const __db = {
   moderationConfigs: new Map(),
   moderationIncidents: [],
   userMemories: new Map(),
-  analytics: []
+  analytics: [],
+  guildDecisionOverrides: new Map(), // key: guildId, value: { guildId, overrides }
 };
 
 const mockPrismaClient = {
@@ -246,7 +247,33 @@ const mockPrismaClient = {
     __db.moderationIncidents = [];
     __db.userMemories.clear();
     __db.analytics = [];
+    __db.guildDecisionOverrides.clear();
   }
+};
+
+// Add mock model for guildDecisionOverride used by decision overrides service
+mockPrismaClient.guildDecisionOverride = {
+  findUnique: jest.fn(({ where }) => {
+    const guildId = where?.guildId;
+    if (!guildId) return Promise.resolve(null);
+    const row = __db.guildDecisionOverrides.get(guildId) || null;
+    return Promise.resolve(row);
+  }),
+  upsert: jest.fn(({ where, update, create }) => {
+    const guildId = where?.guildId || create?.guildId;
+    const current = __db.guildDecisionOverrides.get(guildId) || null;
+    const next = current
+      ? { ...current, overrides: update?.overrides ?? current.overrides }
+      : { guildId, overrides: create?.overrides ?? {} };
+    __db.guildDecisionOverrides.set(guildId, next);
+    return Promise.resolve(next);
+  }),
+  delete: jest.fn(({ where }) => {
+    const guildId = where?.guildId;
+    const existed = __db.guildDecisionOverrides.get(guildId) || null;
+    __db.guildDecisionOverrides.delete(guildId);
+    return Promise.resolve(existed);
+  }),
 };
 
 // Export as both default and named export for compatibility

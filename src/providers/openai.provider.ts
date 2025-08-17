@@ -14,7 +14,14 @@ export class OpenAIProvider {
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY not configured');
     }
-    this.client = new OpenAI({ apiKey });
+  // Optional: route via Helicone proxy for observability/caching/rate limits
+  const heliBase = process.env.HELICONE_BASE_URL;
+  const heliKey = process.env.HELICONE_API_KEY;
+  const headers: Record<string, string> = {};
+  if (heliKey) headers['Helicone-Auth'] = `Bearer ${heliKey}`;
+  if (process.env.HELICONE_CACHE_ENABLED === 'true') headers['Helicone-Cache-Enabled'] = 'true';
+  if (process.env.HELICONE_CACHE_MAX_AGE) headers['Cache-Control'] = `max-age=${process.env.HELICONE_CACHE_MAX_AGE}`;
+  this.client = new OpenAI({ apiKey, baseURL: heliBase || undefined, defaultHeaders: Object.keys(headers).length ? headers : undefined });
     this.model = options.model || process.env.OPENAI_MODEL || 'gpt-4o-mini';
   }
 

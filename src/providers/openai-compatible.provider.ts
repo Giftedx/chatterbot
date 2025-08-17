@@ -14,7 +14,11 @@ export class OpenAICompatProvider {
     const apiKey = options.apiKey || process.env.OPENAI_COMPAT_API_KEY;
     const baseURL = options.baseURL || process.env.OPENAI_COMPAT_BASE_URL;
     if (!apiKey || !baseURL) throw new Error('OPENAI_COMPAT_API_KEY or OPENAI_COMPAT_BASE_URL not configured');
-    this.client = new OpenAI({ apiKey, baseURL });
+  const headers: Record<string, string> = {};
+  if (process.env.HELICONE_API_KEY) headers['Helicone-Auth'] = `Bearer ${process.env.HELICONE_API_KEY}`;
+  if (process.env.HELICONE_CACHE_ENABLED === 'true') headers['Helicone-Cache-Enabled'] = 'true';
+  if (process.env.HELICONE_CACHE_MAX_AGE) headers['Cache-Control'] = `max-age=${process.env.HELICONE_CACHE_MAX_AGE}`;
+  this.client = new OpenAI({ apiKey, baseURL, defaultHeaders: Object.keys(headers).length ? headers : undefined });
     this.model = options.model || process.env.OPENAI_COMPAT_MODEL || 'qwen2.5-32b-instruct';
   }
 

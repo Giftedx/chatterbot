@@ -65,6 +65,17 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       'Analysis failed:',
       // Unified analytics negative-path test noise
       'Failed to log interaction:',
+      // Provider-only auth failures that are expected in CI without real keys
+      'API key not valid. Please pass a valid API key.',
+      // Property-based web tests intentionally trigger invalid URL branches
+      'TypeError: Invalid URL',
+  // Core intelligence service intentionally exercised failure branches
+  // in tests produce critical error logs; keep assertions visible while
+  // silencing these known noisy messages
+  'Critical Error in _processPromptAndGenerateResponse',
+  'Critical: Failed to generate agentic response',
+  'Critical: Failed to analyze input',
+  'Critical: Failed to aggregate agentic context',
     ];
     if (silenceErrorPatterns.some((p) => text.includes(p))) return;
     originalError(...(args as Parameters<typeof console.error>));
@@ -101,6 +112,7 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       // Property-based web interaction tests generate random strings that are not valid URLs
       // and intentionally exercise the fallback path. Silence those expected warnings.
       'Web interaction failed, using fallback',
+  'Failed to scrape ',
       'TypeError: Invalid URL',
       'ERR_INVALID_URL',
       // MCP production integration tests trigger fallback logs intentionally
