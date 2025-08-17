@@ -62,3 +62,20 @@ agent-debug-*
 # Processing and status files (temporary)
 Copilot-Processing-Summary.md
 SERVICE_INTEGRATION_STATUS.md
+
+# Archive directory - contains historical/backup files not needed for main repo
+archive/
+
+# Binary files and generated content
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.csv
+*.chart
+
+# Backup and temporary files
+*.backup
+*~
+*.swp
+*.tmp
