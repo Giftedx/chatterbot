@@ -1,0 +1,141 @@
+// Manual Jest mock for capability registry to support enhanced autonomous activation tests
+
+const defaultState = {
+  status: 'inactive',
+  activationCount: 0,
+  failureCount: 0,
+  healthScore: 1.0,
+};
+
+const capabilities = new Map([
+  [
+    'core-intelligence',
+    {
+      id: 'core-intelligence',
+      name: 'Core Intelligence Service',
+      description: 'Primary AI reasoning and decision-making engine',
+      category: 'core',
+      priority: 'critical',
+      purpose: 'Process messages, make decisions, orchestrate responses',
+      inputs: ['user_messages', 'context', 'history'],
+      outputs: ['responses', 'actions', 'decisions'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: true, contextual: false, conditions: [], triggers: [] },
+      contexts: { suitable: ['all'], inappropriate: [], performance_impact: 'medium', reliability: 'stable' },
+    },
+  ],
+  [
+    'advanced-reasoning',
+    {
+      id: 'advanced-reasoning',
+      name: 'Sequential Thinking Engine',
+      description: 'Multi-step reasoning',
+      category: 'intelligence',
+      priority: 'high',
+      purpose: 'Complex reasoning',
+      inputs: ['complex_queries'],
+      outputs: ['reasoning_chains'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: false, contextual: true, conditions: [], triggers: [] },
+      contexts: { suitable: ['complex_problems'], inappropriate: [], performance_impact: 'medium', reliability: 'stable' },
+      fallbackCapabilities: ['core-intelligence'],
+    },
+  ],
+  [
+    'multimodal-analysis',
+    {
+      id: 'multimodal-analysis',
+      name: 'Multimodal Analysis',
+      description: 'Analyze images/documents',
+      category: 'intelligence',
+      priority: 'medium',
+      purpose: 'Vision',
+      inputs: ['images'],
+      outputs: ['analysis'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: false, contextual: true, conditions: [], triggers: [] },
+      contexts: { suitable: ['image_analysis'], inappropriate: [], performance_impact: 'high', reliability: 'stable' },
+      fallbackCapabilities: ['core-intelligence'],
+    },
+  ],
+  [
+    'smart-context-management',
+    {
+      id: 'smart-context-management',
+      name: 'Smart Context Management',
+      description: 'Context strategy',
+      category: 'storage',
+      priority: 'medium',
+      purpose: 'Manage context',
+      inputs: ['messages'],
+      outputs: ['context'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: false, contextual: true, conditions: [], triggers: [] },
+      contexts: { suitable: ['all'], inappropriate: [], performance_impact: 'low', reliability: 'stable' },
+    },
+  ],
+  [
+    'advanced-intent-detection',
+    {
+      id: 'advanced-intent-detection',
+      name: 'Advanced Intent Detection',
+      description: 'Classify intents',
+      category: 'intelligence',
+      priority: 'medium',
+      purpose: 'Intent classification',
+      inputs: ['text'],
+      outputs: ['intents'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: false, contextual: true, conditions: [], triggers: [] },
+      contexts: { suitable: ['analysis'], inappropriate: [], performance_impact: 'low', reliability: 'stable' },
+    },
+  ],
+  [
+    'model-routing-optimization',
+    {
+      id: 'model-routing-optimization',
+      name: 'Model Routing Optimization',
+      description: 'Optimize model selection',
+      category: 'orchestration',
+      priority: 'medium',
+      purpose: 'Routing',
+      inputs: ['requirements'],
+      outputs: ['routing_plan'],
+      dependencies: [],
+      softDependencies: [],
+      preconditions: [],
+      resourceRequirements: {},
+      activationPolicy: { automatic: false, contextual: true, conditions: [], triggers: [] },
+      contexts: { suitable: ['all'], inappropriate: [], performance_impact: 'low', reliability: 'stable' },
+    },
+  ],
+]);
+
+const states = new Map(Array.from(capabilities.keys()).map((id) => [id, { id, ...defaultState }]));
+
+export const capabilityRegistry = {
+  getCapability: (id) => capabilities.get(id),
+  getCapabilityState: (id) => states.get(id),
+  getAllCapabilities: () => Array.from(capabilities.values()),
+  updateCapabilityState: (id, updates) => {
+    const current = states.get(id) || { id, ...defaultState };
+    states.set(id, { ...current, ...updates });
+  },
+  logActivation: () => {},
+  runHealthChecks: async () => new Map(),
+};

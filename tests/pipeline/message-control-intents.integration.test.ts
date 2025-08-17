@@ -68,7 +68,7 @@ describe('CoreIntelligenceService - message control intents', () => {
 
     // Should respond with pause confirmation
     expect((msg.reply as jest.Mock).mock.calls.length).toBeGreaterThan(0);
-    const calledWith = (msg.reply as jest.Mock).mock.calls.map((c) => c[0]);
+  const calledWith = (msg.reply as jest.Mock).mock.calls.map((c: unknown[]) => c[0]);
     expect(JSON.stringify(calledWith)).toMatch(/Paused for/i);
   });
 });

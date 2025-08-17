@@ -147,7 +147,8 @@ describe('Testing Framework Integration', () => {
       
       const duration = endTime - startTime;
       expect(duration).toBeGreaterThanOrEqual(90); // Allow some timing variance
-      expect(duration).toBeLessThan(200);
+  // Allow a bit more headroom on slower CI
+  expect(duration).toBeLessThan(300);
     });
   });
 

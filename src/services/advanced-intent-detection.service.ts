@@ -82,7 +82,34 @@ export class AdvancedIntentDetectionService {
 
     // Sort by score and get top matches
     scores.sort((a, b) => b.score - a.score);
-    const topMatch = scores[0];
+    let topMatch = scores[0];
+
+    // Prefer more specific intents when scores are close
+    const second = scores[1];
+    if (second && Math.abs(topMatch.score - second.score) < 0.05) {
+      const topSpecificity = (topMatch.pattern.subCategory ? 1 : 0) + (topMatch.pattern.patterns.length > 2 ? 1 : 0);
+      const secondSpecificity = (second.pattern.subCategory ? 1 : 0) + (second.pattern.patterns.length > 2 ? 1 : 0);
+      if (secondSpecificity > topSpecificity) {
+        topMatch = second;
+      }
+    }
+
+    // Prefer definition only when explicit directive like "define", otherwise treat as general question
+    if (topMatch.pattern.intent === 'question') {
+      const explicitDefine = /(^(define|explain)\b)|(tell me about\b)/i.test(cleanMessage);
+      const defCandidate = scores.find(s => s.pattern.intent === 'definition');
+      if (explicitDefine && defCandidate && defCandidate.score >= topMatch.score - 0.15) {
+        topMatch = defCandidate;
+      }
+    }
+    // If 'definition' is top but there is no explicit directive and it's a general question, prefer 'question' when close
+    if (topMatch.pattern.intent === 'definition') {
+      const explicitDefine = /(^(define|explain)\b)|(tell me about\b)/i.test(cleanMessage);
+      const questionCandidate = scores.find(s => s.pattern.intent === 'question');
+      if (!explicitDefine && (features.hasQuestionMark || features.startsWithQuestion) && questionCandidate && questionCandidate.score >= topMatch.score - 0.1) {
+        topMatch = questionCandidate;
+      }
+    }
     const secondaryMatches = scores
       .slice(1, 4)
       .filter(s => s.score > 0.3)
@@ -90,10 +117,27 @@ export class AdvancedIntentDetectionService {
 
     // Determine urgency and complexity
     const urgency = this.assessUrgency(cleanMessage, features);
-    const complexity = this.assessComplexity(cleanMessage, features, context);
+  let complexity = this.assessComplexity(cleanMessage, features, context);
 
     // Build reasoning
     const reasoning = this.buildReasoning(topMatch, features, context);
+
+    // Complexity floors based on selected category/intent
+    if (topMatch.pattern.category === 'multimodal' && (features.hasImages || features.hasAttachments)) {
+      complexity = this.raiseComplexityFloor(complexity, 'complex');
+    }
+    if (topMatch.pattern.category === 'analytical') {
+      complexity = this.raiseComplexityFloor(complexity, 'complex');
+    }
+    if (topMatch.pattern.intent === 'code_review') {
+      complexity = this.raiseComplexityFloor(complexity, features.hasCodeBlock ? 'expert' : 'complex');
+    }
+    if (topMatch.pattern.intent === 'coding_help') {
+      complexity = this.raiseComplexityFloor(complexity, 'complex');
+    }
+    if (topMatch.pattern.category === 'memory') {
+      complexity = this.raiseComplexityFloor(complexity, 'moderate');
+    }
 
     return {
       primary: topMatch.pattern.intent,
@@ -125,7 +169,7 @@ export class AdvancedIntentDetectionService {
         contextClues: [],
         complexityLevel: 'simple',
         requiredCapabilities: ['conversation'],
-        confidence: 0.95
+  confidence: 1.0
       },
 
       {
@@ -310,7 +354,7 @@ export class AdvancedIntentDetectionService {
           /mention.*earlier.*project/i
         ],
         keywords: ['remember', 'recall', 'mentioned', 'earlier', 'before', 'said', 'previously'],
-        contextClues: [],
+  contextClues: ['earlier', 'before', 'previously', 'remember', 'recall', 'mentioned'],
         complexityLevel: 'moderate',
         requiredCapabilities: ['memory', 'context'],
         confidence: 0.90
@@ -327,10 +371,10 @@ export class AdvancedIntentDetectionService {
           /what.*can.*help.*with/i
         ],
         keywords: ['capabilities', 'features', 'can', 'you', 'help', 'able', 'to', 'what'],
-        contextClues: [],
+  contextClues: ['what can you', 'can you', 'are you able'],
         complexityLevel: 'simple',
         requiredCapabilities: ['meta', 'explanation'],
-        confidence: 0.90
+  confidence: 0.95
       }
     ];
 
@@ -386,7 +430,7 @@ export class AdvancedIntentDetectionService {
   ): number {
     let score = 0;
 
-    // Pattern matching (50% of score) - most important
+  // Pattern matching (50% of score) - most important
     let patternScore = 0;
     for (const regex of pattern.patterns) {
       if (regex.test(message)) {
@@ -412,15 +456,28 @@ export class AdvancedIntentDetectionService {
       }
     }
 
-    // Feature alignment bonus (10% of score)
-    let featureBonus = 0;
+  // Feature alignment bonus (10-15% of score)
+  let featureBonus = 0;
     if (pattern.intent === 'image_analysis' && (features.hasImages || features.hasAttachments)) featureBonus += 0.1;
     if (pattern.intent === 'coding_help' && features.hasCodeBlock) featureBonus += 0.1;
     if (pattern.category === 'informational' && features.hasQuestionMark) featureBonus += 0.05;
-    if (pattern.category === 'conversational' && message.length < 50) featureBonus += 0.05;
+  if (pattern.category === 'conversational' && message.length < 50) featureBonus += 0.1;
+  if (pattern.intent === 'greeting' && /^(hi|hello|hey|greetings)/i.test(message)) featureBonus += 0.05;
+  // Slight penalty for conversational if it's clearly a question
+  if (pattern.category === 'conversational' && features.hasQuestionMark) featureBonus -= 0.05;
+  // Specificity bonus for more specific intents
+  if (pattern.subCategory) featureBonus += 0.03;
+  if (pattern.intent === 'definition' || pattern.intent === 'code_review' || pattern.intent === 'image_analysis') featureBonus += 0.02;
+    if (pattern.intent === 'memory_recall') {
+      featureBonus += 0.05;
+      if ((features.hasQuestionMark || features.startsWithQuestion) && /(earlier|before|previously|remember|mentioned)/i.test(message)) {
+        featureBonus += 0.05;
+      }
+    }
+  if (pattern.intent === 'capability_inquiry') featureBonus += 0.05;
     if (pattern.category === 'technical' && (features.hasCodeBlock || /\b(function|class|method|code|debug)\b/i.test(message))) featureBonus += 0.1;
     
-    score += Math.min(featureBonus, 0.1);
+  score += Math.min(featureBonus, 0.15);
 
     // Apply pattern confidence multiplier
     return Math.min(score * pattern.confidence, 1.0);
@@ -457,13 +514,24 @@ export class AdvancedIntentDetectionService {
     if (features.wordCount > 100) complexityScore += 1;
     
     // Pattern indicators
-    if (/(analyze|compare|evaluate|complex|advanced|detailed)/i.test(message)) complexityScore += 2;
-    if (/(step by step|how to|explain|because|therefore)/i.test(message)) complexityScore += 1;
+  if (/(analyze|compare|evaluate|complex|advanced|detailed)/i.test(message)) complexityScore += 2;
+  if (/(step by step|how to|explain|because|therefore)/i.test(message)) complexityScore += 1;
+  if (/(debug|function|error|bug|stack trace|traceback|exception)/i.test(message)) complexityScore += 2;
+  if (features.startsWithQuestion && /(code|function|algorithm|implementation)/i.test(message)) complexityScore += 1;
     
     if (complexityScore >= 6) return 'expert';
     if (complexityScore >= 4) return 'complex';
     if (complexityScore >= 2) return 'moderate';
     return 'simple';
+  }
+
+  /** Raise complexity to a minimum floor */
+  private raiseComplexityFloor(
+    current: IntentClassification['complexity'],
+    floor: IntentClassification['complexity']
+  ): IntentClassification['complexity'] {
+    const order: IntentClassification['complexity'][] = ['simple', 'moderate', 'complex', 'expert'];
+    return order.indexOf(current) < order.indexOf(floor) ? floor : current;
   }
 
   /**

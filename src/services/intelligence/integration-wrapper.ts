@@ -42,7 +42,7 @@ export class IntelligenceIntegrationWrapper {
       const userCapabilities = await intelligencePermissionService.getUserCapabilities(
         message.author.id,
         {
-          guildId: message.guild?.id,
+          guildId: message.guildId || undefined,
           channelId: message.channel.id,
           userId: message.author.id,
         },
@@ -65,7 +65,7 @@ export class IntelligenceIntegrationWrapper {
         messageId,
         content: message.content,
         userId: message.author.id,
-        guildId: message.guild?.id,
+  guildId: message.guildId || undefined,
         channelId: message.channel.id,
         messageType: this.determineMessageType(message),
         conversationHistory: await this.getConversationHistory(message),
@@ -75,8 +75,8 @@ export class IntelligenceIntegrationWrapper {
             (cap) => userCapabilities[cap as keyof UserCapabilities],
           ),
           channelContext: {
-            name: 'name' in message.channel ? message.channel.name : 'DM',
-            type: message.channel.type,
+            name: 'name' in (message.channel as any) ? (message.channel as any).name : 'DM',
+            type: (message.channel as any).type,
           },
           previousMessages: [], // Would be populated from context service
         },
@@ -132,18 +132,19 @@ export class IntelligenceIntegrationWrapper {
   private determineMessageType(
     message: Message,
   ): 'dm' | 'mention' | 'reply' | 'thread' | 'ambient' {
-    if (!message.guild) return 'dm';
-    if (message.mentions.has(message.client.user!)) return 'mention';
+  if (!message.guildId) return 'dm';
+  if (message.mentions?.has && message.client.user && message.mentions.has(message.client.user)) return 'mention';
     if (message.reference) return 'reply';
-    if (message.channel.isThread()) return 'thread';
+  if (message.channel.isThread && message.channel.isThread()) return 'thread';
     return 'ambient';
   }
 
   private async getConversationHistory(message: Message): Promise<string[]> {
     try {
       // Get last few messages from the channel
-      const messages = await message.channel.messages.fetch({ limit: 5, before: message.id });
-      return messages.map((msg) => `${msg.author.username}: ${msg.content}`).reverse();
+  const messages = await (message.channel as any).messages?.fetch({ limit: 5, before: message.id });
+  if (!messages) return [];
+  return (messages as any[]).map((msg: any) => `${msg.author.username}: ${msg.content}`).reverse();
     } catch (error) {
       logger.warn('Failed to fetch conversation history:', error);
       return [];
@@ -223,7 +224,7 @@ export class IntelligenceIntegrationWrapper {
     try {
       userCapabilities = await intelligencePermissionService.getUserCapabilities(
         message.author.id,
-        { guildId: message.guild?.id, channelId: message.channel.id, userId: message.author.id },
+  { guildId: message.guildId || undefined, channelId: message.channel.id, userId: message.author.id },
       );
     } catch {
       userCapabilities = {

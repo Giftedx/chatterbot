@@ -363,3 +363,12 @@ export class AutonomousOrchestrationTest {
 
 // Global test instance
 export const orchestrationTest = new AutonomousOrchestrationTest();
+
+// Minimal smoke test to ensure this suite contains at least one test.
+// Full integration runs are driven by higher-level harnesses.
+describe('Autonomous Orchestration - smoke', () => {
+  it('should export a test harness instance', () => {
+    expect(orchestrationTest).toBeDefined();
+    expect(typeof orchestrationTest.getSystemStatus).toBe('function');
+  });
+});

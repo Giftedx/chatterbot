@@ -99,7 +99,7 @@ export class SmartContextManagerService {
         }
       });
 
-      return result;
+  return result;
 
     } catch (error) {
       logger.error('Smart context selection failed', {
@@ -108,7 +108,7 @@ export class SmartContextManagerService {
       });
 
       // Fallback to basic context
-      return this.getFallbackContext(channelId);
+  return this.getFallbackContext(channelId);
     }
   }
 
@@ -264,13 +264,19 @@ export class SmartContextManagerService {
       reasoning.push('Conversation continuity requires expanded context');
     }
 
-    // Fresh context detection
+    // Fresh context detection, but prefer minimal for conversational
     if (this.shouldUseFreshContext(messageAnalysis, intentClassification)) {
-      strategy = 'fresh';
-      maxMessages = 1;
-      includeMultimodal = false;
-      contextWeight = 0.1;
-      reasoning.push('Fresh context needed for new topic/task');
+      if (intentClassification?.category === 'conversational') {
+        strategy = 'minimal';
+        maxMessages = Math.max(maxMessages, 3);
+        reasoning.push('Prefer minimal over fresh for conversational continuity');
+      } else {
+        strategy = 'fresh';
+        maxMessages = 1;
+        includeMultimodal = false;
+        contextWeight = 0.1;
+        reasoning.push('Fresh context needed for new topic/task');
+      }
     }
 
     return {
@@ -585,29 +591,53 @@ export class SmartContextManagerService {
    * Fallback context when smart selection fails
    */
   private async getFallbackContext(channelId: string): Promise<SmartContextResult> {
-    const fallbackMessages = await this.contextManager.getHistory(channelId);
-    const recentMessages = fallbackMessages.slice(-10); // Last 10 messages
+    try {
+      const fallbackMessages = await this.contextManager.getHistory(channelId);
+      const recentMessages = fallbackMessages.slice(-10); // Last 10 messages
 
-    return {
-      strategy: {
-        strategy: 'selective',
-        maxMessages: 10,
-        includeMultimodal: true,
-        prioritizeRecent: true,
-        requiresMemory: false,
-        contextWeight: 0.5,
-        reasoning: ['Fallback strategy due to smart selection failure']
-      },
-      contextMessages: recentMessages,
-      totalTokensEstimate: recentMessages.length * this.AVERAGE_TOKENS_PER_MESSAGE,
-      effectiveness: 0.5,
-      metadata: {
-        originalLength: fallbackMessages.length,
-        selectedLength: recentMessages.length,
-        reductionRatio: recentMessages.length / Math.max(fallbackMessages.length, 1),
-        strategyConfidence: 0.5
-      }
-    };
+      return {
+        strategy: {
+          strategy: 'selective',
+          maxMessages: 10,
+          includeMultimodal: true,
+          prioritizeRecent: true,
+          requiresMemory: false,
+          contextWeight: 0.5,
+          reasoning: ['Fallback strategy due to smart selection failure']
+        },
+        contextMessages: recentMessages,
+        totalTokensEstimate: recentMessages.length * this.AVERAGE_TOKENS_PER_MESSAGE,
+        effectiveness: 0.5,
+        metadata: {
+          originalLength: fallbackMessages.length,
+          selectedLength: recentMessages.length,
+          reductionRatio: recentMessages.length / Math.max(fallbackMessages.length, 1),
+          strategyConfidence: 0.5
+        }
+      };
+    } catch (err) {
+      // If even basic history retrieval fails, return a safe empty context result
+      return {
+        strategy: {
+          strategy: 'selective',
+          maxMessages: 0,
+          includeMultimodal: false,
+          prioritizeRecent: true,
+          requiresMemory: false,
+          contextWeight: 0.5,
+          reasoning: ['Fallback strategy due to smart selection failure', 'No history available']
+        },
+        contextMessages: [],
+        totalTokensEstimate: 0,
+        effectiveness: 0.5,
+        metadata: {
+          originalLength: 0,
+          selectedLength: 0,
+          reductionRatio: 0,
+          strategyConfidence: 0.5
+        }
+      };
+    }
   }
 
   /**

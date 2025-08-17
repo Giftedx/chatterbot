@@ -338,8 +338,8 @@ export class IntelligenceContextService {
     const descriptions = [];
 
     for (const attachment of attachments) {
-      const type = this.detectAttachmentType(attachment);
-      const size = this.formatFileSize(attachment.size);
+  const type = this.detectAttachmentType(attachment);
+  const size = this.formatFileSize(attachment.size ?? 0);
       
       descriptions.push(`${type} file "${attachment.name}" (${size})`);
     }

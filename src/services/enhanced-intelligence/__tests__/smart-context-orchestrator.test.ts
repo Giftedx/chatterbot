@@ -109,6 +109,28 @@ describe('SmartContextOrchestratorService', () => {
       needsMCPTools: true,
       mcpRequirements: ['webSearch'],
       
+      // Additional required fields
+      reasoningLevel: 'advanced',
+      contextRequirement: 'short',
+      responseSpeed: 'balanced',
+      modelCapabilities: {
+        needsCoding: false,
+        needsReasoning: true,
+        needsCreativity: false,
+        needsFactuality: true,
+        needsMultimodal: false,
+        needsTools: true
+      },
+      intelligenceServices: {
+        coreIntelligence: true,
+        agenticIntelligence: true,
+        enhancedIntelligence: true,
+        advancedCapabilities: false,
+        mcpIntegration: true
+      },
+      urgency: 'normal',
+      userExpertise: 'intermediate',
+
       // Analysis metadata
       confidence: 0.8,
       processingRecommendations: []
@@ -447,6 +469,28 @@ describe('SmartContextOrchestratorService', () => {
         needsMCPTools: false,
         mcpRequirements: [],
         
+        // Additional required fields
+        reasoningLevel: 'basic',
+        contextRequirement: 'short',
+        responseSpeed: 'fast',
+        modelCapabilities: {
+          needsCoding: false,
+          needsReasoning: false,
+          needsCreativity: false,
+          needsFactuality: true,
+          needsMultimodal: false,
+          needsTools: false
+        },
+        intelligenceServices: {
+          coreIntelligence: true,
+          agenticIntelligence: false,
+          enhancedIntelligence: false,
+          advancedCapabilities: false,
+          mcpIntegration: false
+        },
+        urgency: 'normal',
+        userExpertise: 'beginner',
+
         // Analysis metadata
         confidence: 0.9,
         processingRecommendations: []
@@ -475,6 +519,28 @@ describe('SmartContextOrchestratorService', () => {
         needsMCPTools: true,
         mcpRequirements: ['webSearch'],
         
+        // Additional required fields
+        reasoningLevel: 'advanced',
+        contextRequirement: 'long',
+        responseSpeed: 'thorough',
+        modelCapabilities: {
+          needsCoding: false,
+          needsReasoning: true,
+          needsCreativity: false,
+          needsFactuality: true,
+          needsMultimodal: false,
+          needsTools: true
+        },
+        intelligenceServices: {
+          coreIntelligence: true,
+          agenticIntelligence: true,
+          enhancedIntelligence: true,
+          advancedCapabilities: false,
+          mcpIntegration: true
+        },
+        urgency: 'normal',
+        userExpertise: 'intermediate',
+
         // Analysis metadata
         confidence: 0.7,
         processingRecommendations: ['use-streaming', 'enable-citations']

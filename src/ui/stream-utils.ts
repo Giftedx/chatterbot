@@ -1,4 +1,4 @@
-import { ChatInputCommandInteraction, MessageEditOptions } from 'discord.js';
+import { ChatInputCommandInteraction } from 'discord.js';
 import { streamControlRows } from './components.js';
 
 /**
@@ -36,10 +36,10 @@ export async function sendStream(
 
   // Stream finished – disable buttons if they are present
   if (withControls) {
-    const disableRows: MessageEditOptions['components'] = streamControlRows.map(row => {
+    const disableRows: any = streamControlRows.map((row: any) => {
       // discord.js v14 allows cloning via toJSON() but we manually disable
       const disabledRow = row.toJSON();
-      disabledRow.components = disabledRow.components.map(c => ({ ...c, disabled: true }));
+      disabledRow.components = disabledRow.components.map((c: any) => ({ ...c, disabled: true }));
       return disabledRow;
     });
     await safeEdit(interaction, truncate(accumulator), disableRows);
@@ -49,7 +49,7 @@ export async function sendStream(
   return accumulator;
 }
 
-async function safeEdit(interaction: ChatInputCommandInteraction, content: string, components?: MessageEditOptions['components']) {
+async function safeEdit(interaction: ChatInputCommandInteraction, content: string, components?: any) {
   if (interaction.replied || interaction.deferred) {
     await interaction.editReply({ content, components });
   }

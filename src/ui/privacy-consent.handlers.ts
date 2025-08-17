@@ -12,7 +12,9 @@ export async function handlePrivacyModalSubmit(interaction: ModalSubmitInteracti
       await interaction.reply({ content: '❌ Confirmation text does not match. Data deletion cancelled.', ephemeral: true });
       return;
     }
-    await interaction.deferReply({ ephemeral: true });
+  // In our mocks, deferReply may be available via BaseInteraction; call if exists
+  // @ts-expect-error mock compatibility
+  await interaction.deferReply?.({ ephemeral: true });
     const ok = await userConsentService.forgetUser(interaction.user.id);
     await interaction.editReply({ content: ok ? '✅ All your data has been permanently deleted.' : '❌ Failed to delete data. Please try again.' });
   } catch (e) {

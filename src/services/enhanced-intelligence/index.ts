@@ -228,7 +228,7 @@ export class EnhancedInvisibleIntelligenceService {
       const context: ProcessingContext = {
         userId: interaction.user.id,
         channelId: interaction.channelId,
-        guildId: interaction.guildId,
+        guildId: interaction.guildId ?? null,
         analysis: this.adaptAnalysisInterface(unifiedAnalysis),
         results: new Map(),
         errors: []
@@ -278,7 +278,7 @@ export class EnhancedInvisibleIntelligenceService {
               attachments: attachments,
               conversationHistory: [], // Would be populated from actual conversation history
               serverContext: {
-                culture: this.inferServerCulture(interaction.guildId),
+                culture: this.inferServerCulture(interaction.guildId ?? null),
                 activityLevel: 'moderate',
                 memberCount: 100, // Would be actual member count
                 commonTopics: []
@@ -537,7 +537,7 @@ export class EnhancedInvisibleIntelligenceService {
 
       const content = message.content;
       const attachments = Array.from(message.attachments.values()).map((att: Attachment) => ({
-        name: att.name,
+        name: att.name || 'file',
         url: att.url,
         contentType: att.contentType || undefined
       }));
@@ -552,12 +552,12 @@ export class EnhancedInvisibleIntelligenceService {
       }
 
       // Create processing context
-      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(content, attachments);
+  const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(content, attachments as { name: string; url: string; contentType?: string }[]);
       
       const context: ProcessingContext = {
         userId: message.author.id,
         channelId: message.channelId,
-        guildId: message.guildId,
+  guildId: message.guildId ?? null,
         analysis: this.adaptAnalysisInterface(unifiedAnalysis),
         results: new Map(),
         errors: []
@@ -569,7 +569,7 @@ export class EnhancedInvisibleIntelligenceService {
       }
 
       // Process with intelligent tool selection using registry and personalization
-      await this.processWithIntelligentToolSelection(content, attachments, context);
+  await this.processWithIntelligentToolSelection(content, attachments as { name: string; url: string; contentType?: string }[], context);
       
       // Generate enhanced response with personalization
       const baseResponse = await this.responseService.generateEnhancedResponse(content, context);
@@ -732,10 +732,10 @@ export class EnhancedInvisibleIntelligenceService {
     if (message.author.bot) return false;
     
     // Process DMs
-    if (!message.guildId) return true;
+  if (!message.guildId) return true;
     
-    // Process mentions
-    if (message.mentions.has(message.client.user)) return true;
+  // Process mentions
+  if (message.mentions?.has && message.client.user && message.mentions.has(message.client.user)) return true;
     
     // Don't process other guild messages (only slash commands in guilds)
     return false;

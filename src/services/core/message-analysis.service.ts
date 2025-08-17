@@ -190,6 +190,33 @@ export class UnifiedMessageAnalysisService {
       });
       
       analysis.intents = intentResult.intents;
+
+      // Preserve conversation-management intent when content implies summarization/threading
+      try {
+        const lower = content.toLowerCase();
+        const impliesConversationMgmt =
+          /\b(summary|summarize|thread|conversation|context)\b/.test(lower) ||
+          (analysis.hasAttachments && /\b(summarize|analyze|review|discuss)\b/.test(lower));
+        if (impliesConversationMgmt && !analysis.intents.includes('conversation-management')) {
+          analysis.intents.push('conversation-management');
+          analysis.needsConversationManagement = true;
+          if (!analysis.conversationActions.includes('summary')) analysis.conversationActions.push('summary');
+          if (!analysis.conversationActions.includes('thread') && /\b(thread)\b/.test(lower)) {
+            analysis.conversationActions.push('thread');
+          }
+        }
+      } catch {}
+
+      // Ensure 'comparison' intent is present when implied by content structure
+      try {
+        const lower = content.toLowerCase();
+        const impliesComparison =
+          analysis.urls.length >= 2 ||
+          /\b(vs\.?|versus|compare|difference|diff)\b/.test(lower);
+        if (impliesComparison && !analysis.intents.includes('comparison')) {
+          analysis.intents.push('comparison');
+        }
+      } catch {}
       
       // Use advanced classification to enhance analysis
       const { intentClassification } = intentResult;
@@ -209,8 +236,25 @@ export class UnifiedMessageAnalysisService {
         analysis.userExpertise = 'beginner';
       }
       
-      // Map to required tools
-      analysis.requiredTools = this.mapIntentsToTools(analysis.intents, analysis.attachmentTypes, analysis.urls);
+      // Map to required tools (initial)
+      analysis.requiredTools = this.mapIntentsToTools(
+        analysis.intents,
+        analysis.attachmentTypes,
+        analysis.urls,
+      );
+
+      // Ensure conversation-thread tool is present when conversation management is needed
+      try {
+        if (
+          analysis.needsConversationManagement ||
+          analysis.intents.includes('conversation-management') ||
+          (analysis.conversationActions && analysis.conversationActions.includes('thread'))
+        ) {
+          if (!analysis.requiredTools.includes('conversation-thread')) {
+            analysis.requiredTools.push('conversation-thread');
+          }
+        }
+      } catch {}
       
       // Enhanced analysis (if capabilities provided)
       if (userCapabilities) {
@@ -225,6 +269,18 @@ export class UnifiedMessageAnalysisService {
       this.analyzeIntelligenceServices(content, analysis);
       this.analyzeUrgencyAndExpertise(content, analysis);
       
+      // Force conversation thread tool when conversation management is detected even if not present in intents
+      try {
+        if (
+          analysis.needsConversationManagement ||
+          (analysis.conversationActions && analysis.conversationActions.includes('thread'))
+        ) {
+          if (!analysis.requiredTools.includes('conversation-thread')) {
+            analysis.requiredTools.push('conversation-thread');
+          }
+        }
+      } catch {}
+
       // Generate processing recommendations
       analysis.processingRecommendations = this.generateProcessingRecommendations(analysis);
       

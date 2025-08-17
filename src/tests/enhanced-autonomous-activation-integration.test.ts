@@ -417,3 +417,11 @@ export {
   testFallbackScenarios,
   generateTestReport
 };
+
+// Minimal smoke test to ensure this suite registers at least one test with Jest
+describe('Enhanced Autonomous Activation - smoke', () => {
+  it('should define exported test helpers', () => {
+    expect(typeof testComplexAnalyticalRequest).toBe('function');
+    expect(typeof testMultimodalContentAnalysis).toBe('function');
+  });
+});

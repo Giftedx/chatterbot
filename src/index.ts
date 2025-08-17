@@ -75,7 +75,7 @@ const allCommands: any[] = [];
 
 
 client.once('ready', async () => {
-  console.log(`✅ Logged in as ${client.user?.tag}`);
+  console.log(`✅ Logged in as ${client.user ? (client.user as any).tag || client.user.id : 'unknown'}`);
   console.log(`🤖 Core Intelligence Discord Bot v3.0 ready!`);
   console.log(`Features: Agentic(${enableAgenticFeatures}), Personalization(${enablePersonalization}), EnhancedMemory(${enableEnhancedMemory}), EnhancedUI(${enableEnhancedUI}), ResponseCache(${enableResponseCache})`);
 
@@ -173,20 +173,22 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       }
 
       // Handle privacy modal submissions
-      if (interaction.isModalSubmit()) {
-        if (interaction.customId.startsWith('forget_me_confirm') || interaction.customId.startsWith('privacy_')) {
-          await handlePrivacyModalSubmit(interaction);
+      if (typeof (interaction as any).isModalSubmit === 'function' && (interaction as any).isModalSubmit()) {
+        const cid = (interaction as any).customId as string | undefined;
+        if (cid && (cid.startsWith('forget_me_confirm') || cid.startsWith('privacy_'))) {
+          await handlePrivacyModalSubmit(interaction as any);
           return;
         }
       }
 
       // Handle privacy button interactions
-      if (interaction.isButton()) {
-        if (interaction.customId.startsWith('privacy_') || interaction.customId.startsWith('data_') || interaction.customId.startsWith('delete_')) {
+      if (typeof (interaction as any).isButton === 'function' && (interaction as any).isButton()) {
+        const cid = (interaction as any).customId as string | undefined;
+        if (cid && (cid.startsWith('privacy_') || cid.startsWith('data_') || cid.startsWith('delete_'))) {
           // Let core service own privacy buttons (consent agree/decline) to unify logic
           // Previously this returned early which prevented CoreIntelligenceService from seeing the button
           try {
-            await handlePrivacyButtonInteraction(interaction);
+            await handlePrivacyButtonInteraction(interaction as any);
           } catch (e) {
             logger.debug('Non-fatal privacy button handler error (will continue to core handler)', { error: String(e) });
           }
@@ -195,12 +197,12 @@ client.on('interactionCreate', async (interaction: Interaction) => {
       }
 
       // Handle MCP consent button interactions
-      if (interaction.isButton() && interaction.customId.startsWith('mcp_consent_')) {
+  if (typeof (interaction as any).isButton === 'function' && (interaction as any).isButton() && typeof (interaction as any).customId === 'string' && (interaction as any).customId.startsWith('mcp_consent_')) {
         try {
           if (mcpManagerInstance) {
             const { MCPIntegrationService } = await import('./services/mcp-integration.service.js');
             const mcpIntegration = new MCPIntegrationService(mcpManagerInstance);
-            await mcpIntegration.handleConsentInteraction(interaction);
+    await mcpIntegration.handleConsentInteraction(interaction as any);
           }
         } catch (error) {
           logger.error('Error handling MCP consent interaction', error as Error, { metadata: { traceId } });
@@ -211,7 +213,7 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
-      if (interaction.isCommand()) {
+  if (typeof (interaction as any).isCommand === 'function' && (interaction as any).isCommand()) {
         // This is a placeholder for command handling.
         // The actual implementation will be added in a future update.
         if (!interaction.replied) {
@@ -304,4 +306,4 @@ process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', err);
 });
 
-client.login(DISCORD_TOKEN);
+(client.login && client.login(DISCORD_TOKEN));

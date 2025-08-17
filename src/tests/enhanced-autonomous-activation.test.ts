@@ -3,22 +3,22 @@
  */
 
 import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
-import { Message, Attachment, User, Channel, Guild } from 'discord.js';
-import { EnhancedAutonomousActivationService } from '../enhanced-autonomous-activation.service.js';
-import { unifiedMessageAnalysisService } from '../core/message-analysis.service.js';
-import { smartContextManagerService } from '../smart-context-manager.service.js';
-import type { UnifiedMessageAnalysis } from '../core/message-analysis.service.js';
+import { Message, Attachment, User, Guild, Collection } from 'discord.js';
+import { EnhancedAutonomousActivationService } from '../services/enhanced-autonomous-activation.service.js';
+import { unifiedMessageAnalysisService } from '../services/core/message-analysis.service.js';
+import { smartContextManagerService } from '../services/smart-context-manager.service.js';
+import type { UnifiedMessageAnalysis } from '../services/core/message-analysis.service.js';
 
 // Mock the dependencies
-jest.mock('../core/message-analysis.service.js');
-jest.mock('../smart-context-manager.service.js');
-jest.mock('../../orchestration/autonomous-activation-engine.js');
-jest.mock('../../orchestration/autonomous-orchestration-integration.js');
-jest.mock('../../orchestration/autonomous-capability-registry.js');
+jest.mock('../services/core/message-analysis.service.js');
+jest.mock('../services/smart-context-manager.service.js');
+jest.mock('../orchestration/autonomous-activation-engine.js');
+jest.mock('../orchestration/autonomous-orchestration-integration.js');
+jest.mock('../orchestration/autonomous-capability-registry.js');
 
 describe('EnhancedAutonomousActivationService', () => {
   let service: EnhancedAutonomousActivationService;
-  let mockMessage: Partial<Message>;
+  let mockMessage: any;
   let mockMessageAnalysis: UnifiedMessageAnalysis;
 
   beforeEach(() => {
@@ -28,10 +28,11 @@ describe('EnhancedAutonomousActivationService', () => {
     mockMessage = {
       id: 'test-message-123',
       content: 'Can you analyze this complex problem and provide a detailed solution?',
-      author: { id: 'user-123' } as User,
-      channel: { id: 'channel-123' } as Channel,
-      guild: { id: 'guild-123' } as Guild,
-      attachments: new Map()
+      author: { id: 'user-123', bot: false } as any,
+      channel: { id: 'channel-123' } as any,
+      channelId: 'channel-123',
+      guildId: 'guild-123',
+      attachments: new Collection<string, Attachment>()
     };
 
     // Setup mock message analysis
@@ -79,8 +80,8 @@ describe('EnhancedAutonomousActivationService', () => {
     };
 
     // Setup mocks
-    (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
-    (smartContextManagerService.selectSmartContext as jest.Mock).mockResolvedValue({
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
+  ((smartContextManagerService.selectSmartContext as unknown) as any).mockResolvedValue({
       strategy: {
         strategy: 'focused',
         maxMessages: 20,
@@ -175,28 +176,28 @@ describe('EnhancedAutonomousActivationService', () => {
         contentType: 'image/jpeg' 
       } as Attachment;
       
-      mockMessage.attachments = new Map([['1', mockAttachment]]);
+  mockMessage.attachments = new Collection<string, Attachment>([['1', mockAttachment]]);
       
       mockMessageAnalysis.hasAttachments = true;
       mockMessageAnalysis.attachmentTypes = ['image'];
       mockMessageAnalysis.needsMultimodal = true;
       mockMessageAnalysis.modelCapabilities.needsMultimodal = true;
 
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
       // Should identify multimodal requirements
-      expect(result.activationDecisions.some(d => 
+  expect(result.activationDecisions.some((d: any) => 
         d.capabilityId === 'multimodal-analysis' || 
         d.intelligenceReasoning.includes('multimodal')
       )).toBe(true);
     });
 
     it('should create fallback result on error', async () => {
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockRejectedValue(
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockRejectedValue(
         new Error('Analysis failed')
       );
 
@@ -217,11 +218,11 @@ describe('EnhancedAutonomousActivationService', () => {
         mockMessage as Message
       );
 
-      const decisions = result.activationDecisions;
+  const decisions = result.activationDecisions;
       expect(decisions.length).toBeGreaterThan(0);
 
       // Each decision should have enhanced properties
-      decisions.forEach(decision => {
+  decisions.forEach((decision: any) => {
         expect(decision.capabilityId).toBeDefined();
         expect(decision.activationReason).toBeDefined();
         expect(decision.intelligenceReasoning).toEqual(expect.any(Array));
@@ -238,14 +239,14 @@ describe('EnhancedAutonomousActivationService', () => {
       // Test expert user
       mockMessageAnalysis.userExpertise = 'expert';
       mockMessageAnalysis.reasoningLevel = 'expert';
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
-      const advancedDecisions = result.activationDecisions.filter(d => 
-        d.intelligenceReasoning.some(reason => reason.includes('expert'))
+      const advancedDecisions = result.activationDecisions.filter((d: any) => 
+        d.intelligenceReasoning.some((reason: any) => reason.includes('expert'))
       );
       
       expect(advancedDecisions.length).toBeGreaterThan(0);
@@ -255,15 +256,15 @@ describe('EnhancedAutonomousActivationService', () => {
       // Test fast response requirement
       mockMessageAnalysis.responseSpeed = 'fast';
       mockMessageAnalysis.urgency = 'urgent';
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
       // Should have risk assessment for performance conflicts
-      const performanceRisks = result.activationDecisions.filter(d =>
-        d.riskAssessment.factors.some(factor => factor.includes('performance'))
+      const performanceRisks = result.activationDecisions.filter((d: any) =>
+        d.riskAssessment.factors.some((factor: any) => factor.includes('performance'))
       );
 
       expect(performanceRisks.length).toBeGreaterThanOrEqual(0);
@@ -290,7 +291,7 @@ describe('EnhancedAutonomousActivationService', () => {
       );
 
       // Should have context management capability if not minimal strategy
-      const contextCapabilities = result.activationDecisions.filter(d =>
+  const contextCapabilities = result.activationDecisions.filter((d: any) =>
         d.capabilityId.includes('context') || 
         d.contextStrategy !== 'minimal'
       );
@@ -301,15 +302,15 @@ describe('EnhancedAutonomousActivationService', () => {
     it('should adapt to different context requirements', async () => {
       mockMessageAnalysis.contextRequirement = 'extra-long';
       mockMessageAnalysis.complexity = 'advanced';
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
       // Should have appropriate context strategy for complex tasks
-      const decisions = result.activationDecisions;
-      const contextStrategies = decisions.map(d => d.contextStrategy);
+  const decisions = result.activationDecisions;
+  const contextStrategies = decisions.map((d: any) => d.contextStrategy);
       
       expect(contextStrategies).toContain('focused');
     });
@@ -321,7 +322,7 @@ describe('EnhancedAutonomousActivationService', () => {
         mockMessage as Message
       );
 
-      result.activationDecisions.forEach(decision => {
+  result.activationDecisions.forEach((decision: any) => {
         const perf = decision.performancePrediction;
         expect(perf.estimatedLatency).toBeGreaterThan(0);
         expect(perf.estimatedLatency).toBeLessThanOrEqual(30000); // Capped at 30s
@@ -335,20 +336,20 @@ describe('EnhancedAutonomousActivationService', () => {
     it('should account for routing intelligence in predictions', async () => {
       mockMessageAnalysis.reasoningLevel = 'expert';
       mockMessageAnalysis.responseSpeed = 'thorough';
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
       // Expert reasoning should increase latency but maintain high quality
-      const reasoningDecisions = result.activationDecisions.filter(d =>
+      const reasoningDecisions = result.activationDecisions.filter((d: any) =>
         d.capabilityId.includes('reasoning') || 
-        d.intelligenceReasoning.some(r => r.includes('expert'))
+        d.intelligenceReasoning.some((r: any) => r.includes('expert'))
       );
 
       expect(reasoningDecisions.length).toBeGreaterThan(0);
-      reasoningDecisions.forEach(decision => {
+  reasoningDecisions.forEach((decision: any) => {
         expect(decision.performancePrediction.estimatedLatency).toBeGreaterThan(1000);
       });
     });
@@ -402,7 +403,7 @@ describe('EnhancedAutonomousActivationService', () => {
         mockMessage as Message
       );
 
-      result.activationDecisions.forEach(decision => {
+  result.activationDecisions.forEach((decision: any) => {
         expect(decision.fallbackPlan.capabilities).toEqual(expect.any(Array));
         expect(decision.fallbackPlan.conditions).toEqual(expect.any(Array));
       });
@@ -413,13 +414,13 @@ describe('EnhancedAutonomousActivationService', () => {
     it('should identify smart context management needs', async () => {
       mockMessageAnalysis.contextRequirement = 'long';
       mockMessageAnalysis.complexity = 'complex';
-      (unifiedMessageAnalysisService.analyzeMessage as jest.Mock).mockResolvedValue(mockMessageAnalysis);
+  ((unifiedMessageAnalysisService.analyzeMessage as unknown) as any).mockResolvedValue(mockMessageAnalysis);
 
       const result = await service.activateCapabilitiesIntelligently(
         mockMessage as Message
       );
 
-      const contextDecisions = result.activationDecisions.filter(d =>
+  const contextDecisions = result.activationDecisions.filter((d: any) =>
         d.capabilityId.includes('context-management')
       );
 
@@ -435,7 +436,7 @@ describe('EnhancedAutonomousActivationService', () => {
         mockMessage as Message
       );
 
-      const intentDecisions = result.activationDecisions.filter(d =>
+  const intentDecisions = result.activationDecisions.filter((d: any) =>
         d.capabilityId.includes('intent-detection')
       );
 
@@ -458,7 +459,7 @@ describe('EnhancedAutonomousActivationService', () => {
         mockMessage as Message
       );
 
-      const routingDecisions = result.activationDecisions.filter(d =>
+  const routingDecisions = result.activationDecisions.filter((d: any) =>
         d.capabilityId.includes('routing-optimization')
       );
 

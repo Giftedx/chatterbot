@@ -100,7 +100,7 @@ export class MCPSecurityManager {
     const embed = new EmbedBuilder()
       .setTitle('🔐 MCP Tool Permission Request')
       .setDescription(`The AI wants to use the **${context.toolName}** tool from the **${context.serverName}** server.`)
-      .addFields([
+      .addFields(
         {
           name: '🛠️ Tool Details',
           value: `**Server:** ${context.serverName}\n**Tool:** ${context.toolName}`,
@@ -116,7 +116,7 @@ export class MCPSecurityManager {
           value: 'This tool may access external data or perform actions. Please review carefully.',
           inline: false
         }
-      ])
+      )
       .setColor('#FFA500')
       .setFooter({ text: 'Your privacy and security are important to us' });
 
