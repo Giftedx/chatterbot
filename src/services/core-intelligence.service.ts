@@ -26,6 +26,7 @@ import { performanceMonitor } from './performance-monitoring.service.js';
 
 // Reasoning and Service Selection
 import { ReasoningServiceSelector } from './reasoning-service-selector.service.js';
+import { ConfidenceEscalationService } from './confidence-escalation.service.js';
 
 // Agentic and Gemini
 import { GeminiService } from './gemini.service.js';
@@ -183,6 +184,10 @@ export class CoreIntelligenceService {
 
   // D1: Advanced reasoning service selection
   private reasoningServiceSelector = new ReasoningServiceSelector();
+  // D2: Confidence escalation service for automatic escalation of low-confidence results
+  private confidenceEscalationService = new ConfidenceEscalationService(
+    this.reasoningServiceSelector,
+  );
   private decisionEngineByGuild = new Map<string, DecisionEngine>();
   private guildDecisionOverrides: Record<string, Partial<DecisionEngineOptions>> = {};
   private guildDecisionDbLoaded = new Set<string>();
@@ -192,7 +197,7 @@ export class CoreIntelligenceService {
 
   private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
   private readonly analyticsService: UnifiedAnalyticsService;
-  private readonly agenticIntelligence: AgenticIntelligenceService;
+  // private readonly agenticIntelligence: AgenticIntelligenceService;
   private readonly geminiService: GeminiService;
   private readonly moderationService: ModerationService;
   private readonly permissionService: typeof intelligencePermissionService;
@@ -234,7 +239,7 @@ export class CoreIntelligenceService {
 
   constructor(config: CoreIntelligenceConfig) {
     this.config = config;
-    this.agenticIntelligence = AgenticIntelligenceService.getInstance();
+    // this.agenticIntelligence = AgenticIntelligenceService.getInstance();
 
     // Use dependency injection for testing, otherwise create new instances
     this.mcpOrchestrator =
@@ -3118,7 +3123,7 @@ export class CoreIntelligenceService {
     unifiedAnalysis: UnifiedMessageAnalysis,
     analyticsData: any,
     mode: ResponseStrategy,
-  ): Promise<{ agenticResponse: AgenticResponse; fullResponseText: string }> {
+  ): Promise<{ agenticResponse: any; fullResponseText: string }> {
     try {
       const lightweight = mode === 'quick-reply';
       const deep = mode === 'deep-reason';
@@ -3246,34 +3251,98 @@ export class CoreIntelligenceService {
         promptLength: groundedQuery.length,
       });
 
+      // Build simple personality context for reasoning service selection
+      const personalityContext = {
+        relationshipStrength: 0.5, // Default value - should be enhanced with actual relationship data
+        userMood: 'neutral' as const,
+        activePersona: undefined,
+        personalityCompatibility: 0.5,
+      };
+
       let reasoningService: any = null;
       let serviceParams: any = null;
 
       try {
-        const serviceSelection = await this.reasoningServiceSelector.selectReasoningService({
-          strategy: mode, // 'quick-reply' | 'deep-reason' | 'defer'
-          confidence: unifiedAnalysis.confidence || 0.7,
-          maxTokens: this._estimateTokens(groundedQuery),
-          context: {
-            userId,
-            guildId: guildId || undefined,
-            channelId,
-            hasAttachments: commonAttachments.length > 0,
-            complexity: unifiedAnalysis.complexity,
-            personalityType: await this._getPersonalityType(userId, guildId),
+        const serviceSelection = await this.reasoningServiceSelector.selectReasoningService(
+          {
+            shouldRespond: true,
+            strategy: mode, // 'quick-reply' | 'deep-reason' | 'defer'
+            reason: 'Processing request',
+            confidence: unifiedAnalysis.confidence || 0.7,
+            tokenEstimate: this._estimateTokens(groundedQuery),
           },
-        });
+          groundedQuery, // promptText
+          personalityContext,
+          0.5, // systemLoad - mock value
+        );
 
-        reasoningService = serviceSelection.service;
+        reasoningService = serviceSelection.serviceName;
         serviceParams = serviceSelection.parameters;
 
         logger.info('[CoreIntelSvc] D1: Reasoning service selected', {
-          serviceName: reasoningService?.name || 'unknown',
-          strategy: serviceSelection.strategy,
+          serviceName: serviceSelection.serviceName,
+          strategy: mode,
           confidence: serviceSelection.confidence,
-          score: serviceSelection.score?.toFixed(3),
-          systemLoad: serviceSelection.systemLoad?.toFixed(3),
+          reasoning: serviceSelection.reasoning,
         });
+
+        // === D2: CONFIDENCE-BASED ESCALATION INTEGRATION ===
+        // Evaluate if escalation is needed based on service selection confidence
+        if (serviceSelection.confidence < 0.8) {
+          // Only escalate if confidence is not already high
+          logger.debug('[CoreIntelSvc] D2: Evaluating confidence escalation', {
+            serviceConfidence: serviceSelection.confidence,
+            strategy: mode,
+          });
+
+          try {
+            const escalationResult = await this.confidenceEscalationService.evaluateAndEscalate(
+              serviceSelection, // originalResult
+              serviceSelection.confidence, // originalConfidence
+              {
+                shouldRespond: true,
+                strategy: mode,
+                reason: 'Processing request',
+                confidence: serviceSelection.confidence,
+                tokenEstimate: this._estimateTokens(groundedQuery),
+              },
+              groundedQuery,
+              personalityContext,
+              0.5, // systemLoad
+            );
+
+            if (escalationResult.triggered && escalationResult.bestResult) {
+              logger.info('[CoreIntelSvc] D2: Confidence escalation improved result', {
+                originalConfidence: escalationResult.originalConfidence,
+                finalConfidence: escalationResult.finalConfidence,
+                improvement: (
+                  escalationResult.finalConfidence - escalationResult.originalConfidence
+                ).toFixed(3),
+                totalAttempts: escalationResult.totalAttempts,
+                successfulAttempts: escalationResult.successfulAttempts,
+                recommendation: escalationResult.recommendNextAction,
+              });
+
+              // Update reasoning service and params based on escalation result if better
+              // In a full implementation, this would use the actual escalated service result
+            } else {
+              logger.debug('[CoreIntelSvc] D2: No escalation needed or no improvement achieved', {
+                triggered: escalationResult.triggered,
+                recommendation: escalationResult.recommendNextAction,
+              });
+            }
+          } catch (escalationError) {
+            logger.warn(
+              '[CoreIntelSvc] D2: Confidence escalation failed, continuing with original service',
+              {
+                error:
+                  escalationError instanceof Error
+                    ? escalationError.message
+                    : String(escalationError),
+              },
+            );
+          }
+        }
       } catch (error) {
         logger.warn('[CoreIntelSvc] D1: Reasoning service selection failed, using fallback', {
           error: error instanceof Error ? error.message : String(error),
