@@ -100,8 +100,19 @@ import { urlToGenerativePart } from '../utils/image-helper.js';
 import { prisma } from '../db/prisma.js';
 import { sendStream } from '../ui/stream-utils.js';
 import { intelligenceAnalysisService } from './intelligence/analysis.service.js';
-import { DecisionEngine, type ResponseStrategy, type DecisionEngineOptions } from './decision-engine.service.js';
-import { fetchGuildDecisionOverrides, updateGuildDecisionOverridesPartial, deleteGuildDecisionOverrides } from './decision-overrides-db.service.js';
+import {
+  DecisionEngine,
+  type ResponseStrategy,
+  type DecisionEngineOptions,
+} from './decision-engine.service.js';
+import {
+  fetchGuildDecisionOverrides,
+  updateGuildDecisionOverridesPartial,
+  deleteGuildDecisionOverrides,
+} from './decision-overrides-db.service.js';
+
+// Autonomous Capability System Integration
+import { IntelligenceIntegrationWrapper } from './intelligence/integration-wrapper.js';
 
 // AI Enhancement Services
 import { EnhancedLangfuseService } from './enhanced-langfuse.service.js';
@@ -218,6 +229,9 @@ export class CoreIntelligenceService {
   private crawl4aiWebService?: Crawl4AIWebService;
   private aiEvaluationTestingService?: AIEvaluationTestingService;
 
+  // Autonomous Capability System Integration
+  private intelligenceIntegration: IntelligenceIntegrationWrapper;
+
   constructor(config: CoreIntelligenceConfig) {
     this.config = config;
     this.agenticIntelligence = AgenticIntelligenceService.getInstance();
@@ -318,6 +332,9 @@ export class CoreIntelligenceService {
     // Initialize AI Enhancement Services with feature flag controls
     this.initializeAIEnhancementServices();
 
+    // Initialize Autonomous Capability System Integration
+    this.intelligenceIntegration = new IntelligenceIntegrationWrapper();
+
     this.loadOptedInUsers().catch((err) => logger.error('Failed to load opted-in users', err));
 
     // Initialize MCP Orchestrator with comprehensive null safety
@@ -344,7 +361,9 @@ export class CoreIntelligenceService {
         this.overridesRefreshTimer = setInterval(() => {
           this.refreshGuildDecisionEngines().catch(() => {});
         }, this.overridesRefreshIntervalMs);
-        try { (this.overridesRefreshTimer as any)?.unref?.(); } catch {}
+        try {
+          (this.overridesRefreshTimer as any)?.unref?.();
+        } catch {}
       }
     } catch {}
   }
@@ -356,59 +375,59 @@ export class CoreIntelligenceService {
     try {
       // Import feature flags from config/feature-flags.ts
       const { featureFlags } = require('../config/feature-flags.js');
-      
+
       // Phase 1: Core Infrastructure
       if (featureFlags.enhancedLangfuse) {
         this.enhancedLangfuseService = new EnhancedLangfuseService();
         logger.info('Enhanced Langfuse Service initialized');
       }
-      
+
       if (featureFlags.multiProviderTokenization) {
         this.multiProviderTokenizationService = new MultiProviderTokenizationService();
         logger.info('Multi-Provider Tokenization Service initialized');
       }
-      
+
       if (featureFlags.semanticCacheEnhanced) {
         this.enhancedSemanticCacheService = new EnhancedSemanticCacheService();
         logger.info('Enhanced Semantic Cache Service initialized');
       }
-      
+
       // Phase 2: Vector Database
       if (featureFlags.qdrantVectorDB) {
         this.qdrantVectorService = new QdrantVectorService();
         logger.info('Qdrant Vector Service initialized');
       }
-      
+
       // Phase 3: Web Intelligence
       if (featureFlags.crawl4aiWebAccess) {
         this.crawl4aiWebService = new Crawl4AIWebService();
         logger.info('Crawl4AI Web Service initialized');
       }
-      
+
       // Phase 4: Multimodal
       if (featureFlags.qwen25vlMultimodal) {
         this.qwenVLMultimodalService = new QwenVLMultimodalService();
         logger.info('Qwen VL Multimodal Service initialized');
       }
-      
+
       // Phase 5: Knowledge Graphs
       if (featureFlags.knowledgeGraphs) {
         this.neo4jKnowledgeGraphService = new Neo4jKnowledgeGraphService();
         logger.info('Neo4j Knowledge Graph Service initialized');
       }
-      
+
       // Phase 6: RAG Optimization
       if (featureFlags.dspyOptimization) {
         this.dspyRAGOptimizationService = new DSPyRAGOptimizationService();
         logger.info('DSPy RAG Optimization Service initialized');
       }
-      
+
       // Phase 7: Evaluation & Testing
       if (featureFlags.aiEvaluationFramework) {
         this.aiEvaluationTestingService = new AIEvaluationTestingService();
         logger.info('AI Evaluation Testing Service initialized');
       }
-      
+
       logger.info('AI Enhancement Services initialization completed', {
         services: {
           langfuse: !!this.enhancedLangfuseService,
@@ -419,8 +438,8 @@ export class CoreIntelligenceService {
           multimodal: !!this.qwenVLMultimodalService,
           knowledge: !!this.neo4jKnowledgeGraphService,
           rag: !!this.dspyRAGOptimizationService,
-          evaluation: !!this.aiEvaluationTestingService
-        }
+          evaluation: !!this.aiEvaluationTestingService,
+        },
       });
     } catch (error) {
       logger.warn('AI Enhancement Services initialization failed', { error });
@@ -435,24 +454,24 @@ export class CoreIntelligenceService {
       try {
         const text = message.content || '';
         const attachmentCount = message.attachments?.size || 0;
-        
+
         // Use multi-provider tokenization for accurate count
         const result = await this.multiProviderTokenizationService.countTokens({
           text,
           provider: 'openai', // Default provider
           model: 'gpt-4o',
-          includeSpecialTokens: true
+          includeSpecialTokens: true,
         });
-        
+
         // Add attachment budget
         const attachmentTokens = attachmentCount * 256;
-        
+
         return result.tokens + attachmentTokens;
       } catch (error) {
         logger.debug('Multi-provider tokenization failed, using fallback', { error });
       }
     }
-    
+
     // Fallback to original provider-aware estimate
     return providerAwareTokenEstimate(message);
   }
@@ -463,7 +482,7 @@ export class CoreIntelligenceService {
   private getEnhancedTokenEstimateSync(message: Message): number {
     // For synchronous calls (decision engine), use cached or fallback
     const cacheKey = `${message.id}-${message.content?.slice(0, 50)}`;
-    
+
     // Use fallback for now in synchronous context
     return providerAwareTokenEstimate(message);
   }
@@ -522,17 +541,29 @@ export class CoreIntelligenceService {
   ): DecisionEngineOptions {
     return {
       cooldownMs:
-        dbOverrides?.cooldownMs ?? envOverrides.cooldownMs ?? getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
+        dbOverrides?.cooldownMs ??
+        envOverrides.cooldownMs ??
+        getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
       defaultModelTokenLimit:
-        dbOverrides?.defaultModelTokenLimit ?? envOverrides.defaultModelTokenLimit ?? getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
+        dbOverrides?.defaultModelTokenLimit ??
+        envOverrides.defaultModelTokenLimit ??
+        getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
       maxMentionsAllowed:
-        dbOverrides?.maxMentionsAllowed ?? envOverrides.maxMentionsAllowed ?? getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
+        dbOverrides?.maxMentionsAllowed ??
+        envOverrides.maxMentionsAllowed ??
+        getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
       ambientThreshold:
-        dbOverrides?.ambientThreshold ?? envOverrides.ambientThreshold ?? getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
+        dbOverrides?.ambientThreshold ??
+        envOverrides.ambientThreshold ??
+        getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
       burstCountThreshold:
-        dbOverrides?.burstCountThreshold ?? envOverrides.burstCountThreshold ?? getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
+        dbOverrides?.burstCountThreshold ??
+        envOverrides.burstCountThreshold ??
+        getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
       shortMessageMinLen:
-        dbOverrides?.shortMessageMinLen ?? envOverrides.shortMessageMinLen ?? getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
+        dbOverrides?.shortMessageMinLen ??
+        envOverrides.shortMessageMinLen ??
+        getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
     };
   }
 
@@ -558,7 +589,9 @@ export class CoreIntelligenceService {
             });
             this.decisionEngineByGuild.set(guildId, engine);
             this.guildDecisionLastApplied.set(guildId, nextStr);
-            logger.info('[CoreIntelSvc] Refreshed decision engine overrides for guild', { guildId });
+            logger.info('[CoreIntelSvc] Refreshed decision engine overrides for guild', {
+              guildId,
+            });
           }
         } catch {
           // logged in fetch service
@@ -599,7 +632,7 @@ export class CoreIntelligenceService {
     const commands: SlashCommandBuilder[] = [];
     const chatCommand = new SlashCommandBuilder()
       .setName('chat')
-  .setDescription('Opt in to start chatting (initial setup only).');
+      .setDescription('Opt in to start chatting (initial setup only).');
     commands.push(chatCommand as SlashCommandBuilder);
     return commands;
   }
@@ -822,9 +855,9 @@ export class CoreIntelligenceService {
       });
     }
 
-  // This command is now opt-in only; do not process prompts or attachments.
-  // After acknowledging and setting up routing above, simply return.
-  return;
+    // This command is now opt-in only; do not process prompts or attachments.
+    // After acknowledging and setting up routing above, simply return.
+    return;
   }
 
   private async loadOptedInUsers(): Promise<void> {
@@ -932,7 +965,7 @@ export class CoreIntelligenceService {
       this.recentChannelMessages.set(message.channelId, [...cpruned, now]);
     } catch {}
 
-  const result = this.getDecisionEngineForGuild(message.guildId ?? undefined).analyze(message, {
+    const result = this.getDecisionEngineForGuild(message.guildId ?? undefined).analyze(message, {
       optedIn,
       isDM,
       isPersonalThread,
@@ -952,17 +985,34 @@ export class CoreIntelligenceService {
   }
 
   private classifyControlIntent(content: string): {
-  intent: 'NONE' | 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD' | 'PERSONA_LIST' | 'PERSONA_SET' | 'OVERRIDES_SHOW' | 'OVERRIDES_SET' | 'OVERRIDES_CLEAR';
+    intent:
+      | 'NONE'
+      | 'PAUSE'
+      | 'RESUME'
+      | 'EXPORT'
+      | 'DELETE'
+      | 'MOVE_DM'
+      | 'MOVE_THREAD'
+      | 'PERSONA_LIST'
+      | 'PERSONA_SET'
+      | 'OVERRIDES_SHOW'
+      | 'OVERRIDES_SET'
+      | 'OVERRIDES_CLEAR';
     payload?: any;
   } {
     const text = content.toLowerCase();
     // Persona controls (DM-only, admin-gated at handling)
     // List personas: "list personas", "show personas", "what personas are available"
-    if (/\b(list|show)\s+(personas|persona\s+list|available\s+personas)\b/.test(text) || /\bwhat\s+(personas|persona\s+profiles)\b/.test(text)) {
+    if (
+      /\b(list|show)\s+(personas|persona\s+list|available\s+personas)\b/.test(text) ||
+      /\bwhat\s+(personas|persona\s+profiles)\b/.test(text)
+    ) {
       return { intent: 'PERSONA_LIST' };
     }
     // Set persona: "persona set <name>", "use persona <name>", "switch persona to <name>", "become <name> persona"
-    const setMatch = text.match(/\b(?:persona\s+set|use\s+persona|switch\s+persona\s*(?:to)?|become)\s+([\w\- ]{2,})/i);
+    const setMatch = text.match(
+      /\b(?:persona\s+set|use\s+persona|switch\s+persona\s*(?:to)?|become)\s+([\w\- ]{2,})/i,
+    );
     if (setMatch && setMatch[1]) {
       const raw = setMatch[1].trim().replace(/^"|^'|"$|'$/g, '');
       return { intent: 'PERSONA_SET', payload: { name: raw } };
@@ -1007,7 +1057,18 @@ export class CoreIntelligenceService {
   }
 
   private async handleControlIntent(
-  intent: 'PAUSE' | 'RESUME' | 'EXPORT' | 'DELETE' | 'MOVE_DM' | 'MOVE_THREAD' | 'PERSONA_LIST' | 'PERSONA_SET' | 'OVERRIDES_SHOW' | 'OVERRIDES_SET' | 'OVERRIDES_CLEAR',
+    intent:
+      | 'PAUSE'
+      | 'RESUME'
+      | 'EXPORT'
+      | 'DELETE'
+      | 'MOVE_DM'
+      | 'MOVE_THREAD'
+      | 'PERSONA_LIST'
+      | 'PERSONA_SET'
+      | 'OVERRIDES_SHOW'
+      | 'OVERRIDES_SET'
+      | 'OVERRIDES_CLEAR',
     payload: any,
     message: Message,
   ): Promise<boolean> {
@@ -1140,24 +1201,36 @@ export class CoreIntelligenceService {
         const scopeId = message.guildId || 'default';
         try {
           setActivePersona(scopeId, name);
-          await message.reply(`✅ Active persona set to “${name}” for ${message.guildId ? 'this server' : 'DM/default'}.`);
+          await message.reply(
+            `✅ Active persona set to “${name}” for ${message.guildId ? 'this server' : 'DM/default'}.`,
+          );
         } catch (e: any) {
           await message.reply(`❌ ${e?.message || 'Failed to set persona.'}`);
         }
         return true;
       }
       // Decision overrides via natural language (admin-only)
-      if (intent === 'OVERRIDES_SHOW' || intent === 'OVERRIDES_SET' || intent === 'OVERRIDES_CLEAR') {
+      if (
+        intent === 'OVERRIDES_SHOW' ||
+        intent === 'OVERRIDES_SET' ||
+        intent === 'OVERRIDES_CLEAR'
+      ) {
         const guildId = message.guildId;
         if (!guildId) {
-          await message.reply('❌ Decision overrides are server-specific. Use this in a server channel.');
+          await message.reply(
+            '❌ Decision overrides are server-specific. Use this in a server channel.',
+          );
           return true;
         }
-        const isAdmin = await this.permissionService.hasAdminCommandPermission(message.author.id, 'overrides', {
-          guildId,
-          channelId: message.channelId,
-          userId: message.author.id,
-        });
+        const isAdmin = await this.permissionService.hasAdminCommandPermission(
+          message.author.id,
+          'overrides',
+          {
+            guildId,
+            channelId: message.channelId,
+            userId: message.author.id,
+          },
+        );
         if (!isAdmin) {
           await message.reply('❌ Only server admins can view or change decision overrides.');
           return true;
@@ -1180,8 +1253,8 @@ export class CoreIntelligenceService {
               dbOverrides && Object.keys(dbOverrides).length > 0
                 ? 'Source: DB overrides take precedence over environment JSON.'
                 : Object.keys(envOverrides).length > 0
-                ? 'Source: Environment JSON overrides active (no DB overrides).'
-                : 'Source: Defaults (no env or DB overrides).',
+                  ? 'Source: Environment JSON overrides active (no DB overrides).'
+                  : 'Source: Defaults (no env or DB overrides).',
             ];
             await message.reply(lines.join('\n'));
           } catch (e) {
@@ -1226,7 +1299,9 @@ export class CoreIntelligenceService {
               return true;
             }
             if (!key) {
-              await message.reply('❌ Specify which override to clear, e.g., "clear override ambientThreshold" or say "clear all overrides".');
+              await message.reply(
+                '❌ Specify which override to clear, e.g., "clear override ambientThreshold" or say "clear all overrides".',
+              );
               return true;
             }
             await updateGuildDecisionOverridesPartial(guildId, { [key]: null } as any);
@@ -1377,15 +1452,16 @@ export class CoreIntelligenceService {
     strategy?: ResponseStrategy,
   ): Promise<any> {
     const startTime = Date.now();
-    
+
     // Performance Monitoring - Start overall processing operation
-    const processingOperationId = process.env.ENABLE_PERFORMANCE_MONITORING === 'true' 
-      ? performanceMonitor.startOperation(
-          'core_intelligence_service',
-          'process_prompt_and_generate_response'
-        )
-      : 'disabled';
-    
+    const processingOperationId =
+      process.env.ENABLE_PERFORMANCE_MONITORING === 'true'
+        ? performanceMonitor.startOperation(
+            'core_intelligence_service',
+            'process_prompt_and_generate_response',
+          )
+        : 'disabled';
+
     // Enhanced Observability - Start conversation trace
     let conversationTrace: any = null;
     if (this.enhancedLangfuseService) {
@@ -1400,8 +1476,8 @@ export class CoreIntelligenceService {
             attachments: commonAttachments.length,
             strategy: strategy || 'quick-reply',
             channelId,
-            guildId
-          }
+            guildId,
+          },
         });
         conversationTrace = { id: traceId, conversationId };
         logger.debug('Enhanced Langfuse conversation trace started', { traceId });
@@ -1409,7 +1485,7 @@ export class CoreIntelligenceService {
         logger.warn('Failed to start Langfuse trace', { error });
       }
     }
-    
+
     const analyticsData = {
       guildId: guildId || undefined,
       userId,
@@ -1420,6 +1496,155 @@ export class CoreIntelligenceService {
       startTime,
       conversationTrace,
     };
+
+    // ===== AUTONOMOUS CAPABILITY SYSTEM INTEGRATION =====
+    // Process message through autonomous orchestration first to get enhanced context and response
+    let autonomousResponse: any = null;
+    let autonomousEnhancedContext: any = null;
+
+    try {
+      logger.info('🧠 Activating Autonomous Capability System', {
+        userId,
+        messageId: uiContext.id,
+        promptLength: promptText.length,
+      });
+
+      // Create message object for autonomous processing if needed
+      let messageForAutonomous: Message;
+      if (uiContext instanceof Message) {
+        messageForAutonomous = uiContext;
+      } else {
+        // Create a mock message object for slash commands
+        messageForAutonomous = this._createMessageForPipeline(
+          uiContext,
+          promptText,
+          userId,
+          commonAttachments,
+        );
+      }
+
+      // Process through autonomous capability system
+      autonomousResponse = await this.intelligenceIntegration.processMessage(messageForAutonomous);
+
+      logger.info('✅ Autonomous processing completed', {
+        userId,
+        hasResponse: !!autonomousResponse?.response,
+        capabilitiesActivated: autonomousResponse?.capabilitiesActivated?.length || 0,
+        enhancementApplied: !!autonomousResponse?.enhancementApplied,
+        qualityScore: autonomousResponse?.qualityScore || 0,
+      });
+
+      // If autonomous system provided a high-quality response, use it
+      if (
+        autonomousResponse?.response &&
+        autonomousResponse?.qualityScore >= 0.8 &&
+        !autonomousResponse?.requiresFallback
+      ) {
+        logger.info('🎯 Using autonomous system response', {
+          userId,
+          qualityScore: autonomousResponse.qualityScore,
+          capabilitiesUsed: autonomousResponse.capabilitiesActivated,
+        });
+
+        // Track autonomous system usage in Langfuse if available
+        if (conversationTrace && this.enhancedLangfuseService) {
+          await this.enhancedLangfuseService.trackGeneration({
+            traceId: conversationTrace.id,
+            name: 'autonomous_capability_system',
+            input: promptText,
+            output: autonomousResponse.response,
+            model: 'autonomous_orchestrator',
+            startTime: new Date(startTime),
+            endTime: new Date(),
+            usage: {
+              input: promptText.length,
+              output: autonomousResponse.response.length,
+              total: promptText.length + autonomousResponse.response.length,
+            },
+            metadata: {
+              operation: 'autonomous_processing',
+              capabilitiesActivated: autonomousResponse.capabilitiesActivated,
+              qualityScore: autonomousResponse.qualityScore,
+              enhancementApplied: autonomousResponse.enhancementApplied,
+              processingTimeMs: Date.now() - startTime,
+            },
+          });
+        }
+
+        // End overall processing operation with autonomous success
+        performanceMonitor.endOperation(
+          processingOperationId,
+          'core_intelligence_service',
+          'process_prompt_and_generate_response',
+          true,
+          undefined,
+          {
+            autonomousSystemUsed: true,
+            totalProcessingTime: Date.now() - startTime,
+            responseLength: autonomousResponse.response.length,
+            qualityScore: autonomousResponse.qualityScore,
+          },
+        );
+
+        // Return autonomous response with any additional components
+        const responsePayload: any = {
+          content: autonomousResponse.response,
+        };
+
+        // Add any files or embeds from autonomous processing
+        if (autonomousResponse.files?.length > 0) {
+          responsePayload.files = autonomousResponse.files;
+        }
+        if (autonomousResponse.embeds?.length > 0) {
+          responsePayload.embeds = autonomousResponse.embeds;
+        }
+
+        return responsePayload;
+      }
+
+      // Store autonomous context for enhancement of standard pipeline
+      if (autonomousResponse?.analysisData || autonomousResponse?.enhancedContext) {
+        autonomousEnhancedContext = {
+          analysis: autonomousResponse.analysisData,
+          enhancedContext: autonomousResponse.enhancedContext,
+          recommendations: autonomousResponse.recommendations,
+          capabilitiesConsidered: autonomousResponse.capabilitiesConsidered,
+        };
+
+        logger.info('📊 Autonomous context available for pipeline enhancement', {
+          userId,
+          hasAnalysis: !!autonomousEnhancedContext.analysis,
+          hasEnhancedContext: !!autonomousEnhancedContext.enhancedContext,
+          recommendationsCount: autonomousEnhancedContext.recommendations?.length || 0,
+        });
+      }
+    } catch (error) {
+      logger.warn('🔄 Autonomous system error, falling back to standard pipeline', {
+        error: error instanceof Error ? error.message : String(error),
+        userId,
+      });
+
+      // Track autonomous system fallback in Langfuse if available
+      if (conversationTrace && this.enhancedLangfuseService) {
+        await this.enhancedLangfuseService.trackGeneration({
+          traceId: conversationTrace.id,
+          name: 'autonomous_system_fallback',
+          input: promptText,
+          output: 'Fallback to standard pipeline due to autonomous system error',
+          model: 'standard_pipeline_fallback',
+          startTime: new Date(),
+          endTime: new Date(),
+          usage: { input: 0, output: 0, total: 0 },
+          metadata: {
+            operation: 'autonomous_fallback',
+            errorMessage: error instanceof Error ? error.message : String(error),
+            fallbackReason: 'autonomous_system_error',
+          },
+        });
+      }
+    }
+
+    // ===== CONTINUE WITH ENHANCED STANDARD PIPELINE =====
 
     let mode: ResponseStrategy = strategy || 'quick-reply';
     // In tests, force a deeper path to ensure MCP orchestration/capabilities are exercised
@@ -1433,24 +1658,25 @@ export class CoreIntelligenceService {
     if (this.enhancedSemanticCacheService && !lightweight) {
       const cacheOperationId = performanceMonitor.startOperation(
         'enhanced_semantic_cache_service',
-        'cache_lookup'
+        'cache_lookup',
       );
       try {
         const cachedResponse = await this.enhancedSemanticCacheService.get(promptText);
-        if (cachedResponse && cachedResponse.similarity > 0.85) { // High similarity threshold
-          logger.debug('Returning cached response from enhanced semantic cache', { 
-            similarity: cachedResponse.similarity 
+        if (cachedResponse && cachedResponse.similarity > 0.85) {
+          // High similarity threshold
+          logger.debug('Returning cached response from enhanced semantic cache', {
+            similarity: cachedResponse.similarity,
           });
-          
+
           performanceMonitor.endOperation(
             cacheOperationId,
             'enhanced_semantic_cache_service',
             'cache_lookup',
             true,
             undefined,
-            { cacheHit: true, similarity: cachedResponse.similarity }
+            { cacheHit: true, similarity: cachedResponse.similarity },
           );
-          
+
           // Track cache hit in Langfuse if available
           if (conversationTrace && this.enhancedLangfuseService) {
             await this.enhancedLangfuseService.trackGeneration({
@@ -1462,10 +1688,10 @@ export class CoreIntelligenceService {
               startTime: new Date(startTime),
               endTime: new Date(),
               usage: { input: 0, output: 0, total: 0 },
-              metadata: { cacheHit: true, similarity: cachedResponse.similarity }
+              metadata: { cacheHit: true, similarity: cachedResponse.similarity },
             });
           }
-          
+
           // End overall processing operation with cache hit
           performanceMonitor.endOperation(
             processingOperationId,
@@ -1473,9 +1699,9 @@ export class CoreIntelligenceService {
             'process_prompt_and_generate_response',
             true,
             undefined,
-            { cacheHit: true, totalProcessingTime: Date.now() - startTime }
+            { cacheHit: true, totalProcessingTime: Date.now() - startTime },
           );
-          
+
           return { content: cachedResponse.entry.content };
         } else {
           performanceMonitor.endOperation(
@@ -1484,7 +1710,7 @@ export class CoreIntelligenceService {
             'cache_lookup',
             true,
             undefined,
-            { cacheHit: false, similarity: cachedResponse?.similarity || 0 }
+            { cacheHit: false, similarity: cachedResponse?.similarity || 0 },
           );
         }
       } catch (error) {
@@ -1494,7 +1720,7 @@ export class CoreIntelligenceService {
           'cache_lookup',
           false,
           String(error),
-          { cacheHit: false }
+          { cacheHit: false },
         );
         logger.warn('Semantic cache check failed, continuing with generation', { error });
       }
@@ -1594,18 +1820,18 @@ export class CoreIntelligenceService {
         guildId,
         analyticsData,
       );
-      
+
       // Qwen VL Multimodal Analysis - Analyze image attachments for enhanced understanding
       let multimodalAnalysis: any = null;
       if (this.qwenVLMultimodalService && !lightweight && commonAttachments.length > 0) {
         const multimodalOperationId = performanceMonitor.startOperation(
           'qwen_vl_multimodal_service',
-          'image_analysis'
+          'image_analysis',
         );
         try {
           // Filter for image attachments
-          const imageAttachments = commonAttachments.filter(att => 
-            att.contentType && att.contentType.startsWith('image/')
+          const imageAttachments = commonAttachments.filter(
+            (att) => att.contentType && att.contentType.startsWith('image/'),
           );
 
           if (imageAttachments.length > 0) {
@@ -1613,7 +1839,7 @@ export class CoreIntelligenceService {
               const imageInput = {
                 type: 'url' as const,
                 data: attachment.url,
-                mimeType: attachment.contentType || undefined
+                mimeType: attachment.contentType || undefined,
               };
 
               return await this.qwenVLMultimodalService!.analyzeImage(imageInput, {
@@ -1624,31 +1850,34 @@ export class CoreIntelligenceService {
                 analyzeMood: true,
                 describeScene: true,
                 includeConfidence: true,
-                maxTokens: 1000
+                maxTokens: 1000,
               });
             });
 
             const imageAnalyses = await Promise.all(imageAnalysisPromises);
-            const successfulAnalyses = imageAnalyses.filter(analysis => analysis.success);
-            
+            const successfulAnalyses = imageAnalyses.filter((analysis) => analysis.success);
+
             if (successfulAnalyses.length > 0) {
               multimodalAnalysis = {
                 imageCount: successfulAnalyses.length,
-                descriptions: successfulAnalyses.map(analysis => analysis.analysis.description),
+                descriptions: successfulAnalyses.map((analysis) => analysis.analysis.description),
                 extractedText: successfulAnalyses
-                  .filter(analysis => analysis.analysis.extractedText)
-                  .map(analysis => analysis.analysis.extractedText)
+                  .filter((analysis) => analysis.analysis.extractedText)
+                  .map((analysis) => analysis.analysis.extractedText)
                   .join(' '),
                 identifiedObjects: successfulAnalyses
-                  .flatMap(analysis => analysis.analysis.identifiedObjects || [])
-                  .map(obj => obj.name),
+                  .flatMap((analysis) => analysis.analysis.identifiedObjects || [])
+                  .map((obj) => obj.name),
                 overallMood: successfulAnalyses
-                  .filter(analysis => analysis.analysis.moodAnalysis)
-                  .map(analysis => analysis.analysis.moodAnalysis?.overallMood)
+                  .filter((analysis) => analysis.analysis.moodAnalysis)
+                  .map((analysis) => analysis.analysis.moodAnalysis?.overallMood)
                   .filter(Boolean)[0],
                 visualContext: successfulAnalyses
-                  .map(analysis => analysis.analysis.detailedDescription || analysis.analysis.description)
-                  .join('. ')
+                  .map(
+                    (analysis) =>
+                      analysis.analysis.detailedDescription || analysis.analysis.description,
+                  )
+                  .join('. '),
               };
 
               logger.debug('Multimodal image analysis completed', {
@@ -1656,7 +1885,7 @@ export class CoreIntelligenceService {
                 imagesAnalyzed: successfulAnalyses.length,
                 totalObjects: multimodalAnalysis.identifiedObjects.length,
                 hasExtractedText: !!multimodalAnalysis.extractedText,
-                mood: multimodalAnalysis.overallMood
+                mood: multimodalAnalysis.overallMood,
               });
 
               // Track multimodal analysis in Langfuse if available
@@ -1669,22 +1898,28 @@ export class CoreIntelligenceService {
                   model: 'qwen_vl_multimodal',
                   startTime: new Date(),
                   endTime: new Date(),
-                  usage: { 
-                    input: 0, 
-                    output: successfulAnalyses.reduce((sum, analysis) => sum + analysis.metadata.tokensUsed, 0), 
-                    total: successfulAnalyses.reduce((sum, analysis) => sum + analysis.metadata.tokensUsed, 0)
+                  usage: {
+                    input: 0,
+                    output: successfulAnalyses.reduce(
+                      (sum, analysis) => sum + analysis.metadata.tokensUsed,
+                      0,
+                    ),
+                    total: successfulAnalyses.reduce(
+                      (sum, analysis) => sum + analysis.metadata.tokensUsed,
+                      0,
+                    ),
                   },
                   metadata: {
                     operation: 'image_analysis',
                     imageCount: successfulAnalyses.length,
                     objectsIdentified: multimodalAnalysis.identifiedObjects.length,
                     textExtracted: !!multimodalAnalysis.extractedText,
-                    moodDetected: !!multimodalAnalysis.overallMood
-                  }
+                    moodDetected: !!multimodalAnalysis.overallMood,
+                  },
                 });
               }
             }
-            
+
             performanceMonitor.endOperation(
               multimodalOperationId,
               'qwen_vl_multimodal_service',
@@ -1695,8 +1930,8 @@ export class CoreIntelligenceService {
                 imagesAnalyzed: successfulAnalyses.length,
                 objectsIdentified: multimodalAnalysis?.identifiedObjects?.length || 0,
                 textExtracted: !!multimodalAnalysis?.extractedText,
-                processingSuccess: true
-              }
+                processingSuccess: true,
+              },
             );
           } else {
             performanceMonitor.endOperation(
@@ -1705,7 +1940,7 @@ export class CoreIntelligenceService {
               'image_analysis',
               true,
               undefined,
-              { imagesAnalyzed: 0, reason: 'no_image_attachments' }
+              { imagesAnalyzed: 0, reason: 'no_image_attachments' },
             );
           }
         } catch (error) {
@@ -1715,16 +1950,17 @@ export class CoreIntelligenceService {
             'image_analysis',
             false,
             String(error),
-            { imagesAnalyzed: 0, processingSuccess: false }
+            { imagesAnalyzed: 0, processingSuccess: false },
           );
           logger.warn('Multimodal image analysis failed, continuing without visual enhancement', {
             error,
             userId,
-            imageCount: commonAttachments.filter(att => att.contentType?.startsWith('image/')).length
+            imageCount: commonAttachments.filter((att) => att.contentType?.startsWith('image/'))
+              .length,
           });
         }
       }
-      
+
       // Crawl4AI Web Analysis - Extract and analyze web content from URLs
       let webAnalysis: any = null;
       if (this.crawl4aiWebService && !lightweight) {
@@ -1732,11 +1968,11 @@ export class CoreIntelligenceService {
           // Extract URLs from the prompt text
           const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
           const urlMatches = promptText.match(urlRegex);
-          
+
           if (urlMatches && urlMatches.length > 0) {
             // Limit to first 2 URLs to avoid excessive processing
             const urlsToProcess = urlMatches.slice(0, 2);
-            
+
             const webAnalysisPromises = urlsToProcess.map(async (url) => {
               return await this.crawl4aiWebService!.crawlUrl({
                 url: url.trim(),
@@ -1747,39 +1983,44 @@ export class CoreIntelligenceService {
                 removeUnwantedLines: true,
                 wordCountThreshold: 50,
                 timeout: 10000, // 10 second timeout
-                excludeTags: ['script', 'style', 'nav', 'footer', 'aside']
+                excludeTags: ['script', 'style', 'nav', 'footer', 'aside'],
               });
             });
 
             const webResults = await Promise.all(webAnalysisPromises);
-            const successfulResults = webResults.filter(result => result.success && result.markdown);
-            
+            const successfulResults = webResults.filter(
+              (result) => result.success && result.markdown,
+            );
+
             if (successfulResults.length > 0) {
               webAnalysis = {
                 urlCount: successfulResults.length,
-                titles: successfulResults.map(result => result.title).filter(Boolean),
+                titles: successfulResults.map((result) => result.title).filter(Boolean),
                 content: successfulResults
-                  .map(result => {
+                  .map((result) => {
                     const content = result.markdown || result.cleanedHtml || '';
                     return content.substring(0, 1500); // Limit content size
                   })
                   .join('\n\n---\n\n'),
-                metadata: successfulResults.map(result => ({
+                metadata: successfulResults.map((result) => ({
                   url: result.url,
                   title: result.title,
                   wordCount: result.metadata?.wordCount || 0,
-                  description: result.metadata?.description
+                  description: result.metadata?.description,
                 })),
                 summaryContext: successfulResults
-                  .map(result => `${result.title}: ${result.metadata?.description || 'Web content extracted'}`)
-                  .join('; ')
+                  .map(
+                    (result) =>
+                      `${result.title}: ${result.metadata?.description || 'Web content extracted'}`,
+                  )
+                  .join('; '),
               };
 
               logger.debug('Web content analysis completed', {
                 userId,
                 urlsProcessed: successfulResults.length,
                 totalContent: webAnalysis.content.length,
-                titles: webAnalysis.titles
+                titles: webAnalysis.titles,
               });
 
               // Track web analysis in Langfuse if available
@@ -1792,17 +2033,17 @@ export class CoreIntelligenceService {
                   model: 'crawl4ai_web_scraper',
                   startTime: new Date(),
                   endTime: new Date(),
-                  usage: { 
-                    input: urlsToProcess.length, 
-                    output: webAnalysis.content.length, 
-                    total: urlsToProcess.length + webAnalysis.content.length
+                  usage: {
+                    input: urlsToProcess.length,
+                    output: webAnalysis.content.length,
+                    total: urlsToProcess.length + webAnalysis.content.length,
                   },
                   metadata: {
                     operation: 'web_content_extraction',
                     urlCount: successfulResults.length,
                     contentLength: webAnalysis.content.length,
-                    titles: webAnalysis.titles
-                  }
+                    titles: webAnalysis.titles,
+                  },
                 });
               }
             }
@@ -1810,11 +2051,11 @@ export class CoreIntelligenceService {
         } catch (error) {
           logger.warn('Web content analysis failed, continuing without web enhancement', {
             error,
-            userId
+            userId,
           });
         }
       }
-      
+
       // DSPy RAG Optimization - Enhance retrieval and query processing
       let ragOptimization: any = null;
       if (this.dspyRAGOptimizationService && !lightweight) {
@@ -1825,7 +2066,7 @@ export class CoreIntelligenceService {
             hasWebContext: !!webAnalysis,
             userId,
             channelId,
-            guildId
+            guildId,
           });
 
           // Perform adaptive retrieval for enhanced context
@@ -1836,14 +2077,14 @@ export class CoreIntelligenceService {
               retriever: {
                 type: 'hybrid',
                 topK: 5,
-                similarityThreshold: 0.7
+                similarityThreshold: 0.7,
               },
               generator: {
                 model: 'gpt-4',
                 temperature: 0.3,
-                maxTokens: 1000
-              }
-            }
+                maxTokens: 1000,
+              },
+            },
           );
 
           if (retrievalResult.documents.length > 0) {
@@ -1852,12 +2093,12 @@ export class CoreIntelligenceService {
               queryAnalysis: retrievalResult.queryAnalysis,
               retrievalStrategy: retrievalResult.retrievalStrategy,
               relevantContent: retrievalResult.documents
-                .filter(doc => doc.relevance === 'high')
-                .map(doc => `${doc.source}: ${doc.content.substring(0, 300)}`)
+                .filter((doc) => doc.relevance === 'high')
+                .map((doc) => `${doc.source}: ${doc.content.substring(0, 300)}`)
                 .join('\n\n'),
               topicInsights: retrievalResult.queryAnalysis.topics,
               intentClassification: retrievalResult.queryAnalysis.intent,
-              complexityLevel: retrievalResult.queryAnalysis.complexity
+              complexityLevel: retrievalResult.queryAnalysis.complexity,
             };
 
             logger.debug('DSPy RAG optimization completed', {
@@ -1865,7 +2106,7 @@ export class CoreIntelligenceService {
               documentsFound: retrievalResult.documents.length,
               queryIntent: retrievalResult.queryAnalysis.intent,
               complexity: retrievalResult.queryAnalysis.complexity,
-              retrievalTime: retrievalResult.retrievalTime
+              retrievalTime: retrievalResult.retrievalTime,
             });
 
             // Track RAG optimization in Langfuse if available
@@ -1878,29 +2119,29 @@ export class CoreIntelligenceService {
                 model: 'dspy_rag_optimizer',
                 startTime: new Date(),
                 endTime: new Date(),
-                usage: { 
-                  input: promptText.length, 
-                  output: ragOptimization.relevantContent.length, 
-                  total: promptText.length + ragOptimization.relevantContent.length
+                usage: {
+                  input: promptText.length,
+                  output: ragOptimization.relevantContent.length,
+                  total: promptText.length + ragOptimization.relevantContent.length,
                 },
                 metadata: {
                   operation: 'adaptive_retrieval',
                   documentsRetrieved: retrievalResult.documents.length,
                   queryIntent: retrievalResult.queryAnalysis.intent,
                   complexity: retrievalResult.queryAnalysis.complexity,
-                  retrievalTime: retrievalResult.retrievalTime
-                }
+                  retrievalTime: retrievalResult.retrievalTime,
+                },
               });
             }
           }
         } catch (error) {
           logger.warn('DSPy RAG optimization failed, continuing with standard processing', {
             error,
-            userId
+            userId,
           });
         }
       }
-      
+
       const unifiedAnalysis = await this._analyzeInput(
         messageForPipeline,
         commonAttachments,
@@ -2029,25 +2270,25 @@ export class CoreIntelligenceService {
       const history = await getHistory(channelId);
 
       // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
-      let vectorContext = '';
+      const vectorContext = '';
       if (this.qdrantVectorService && !lightweight) {
         try {
           // Placeholder for vector context retrieval - requires embedding generation
           // The Qdrant service is initialized but needs embedding integration
           logger.debug('Qdrant vector service available but embeddings not integrated yet', {
             hasService: !!this.qdrantVectorService,
-            userId
+            userId,
           });
-          
+
           // TODO: Integrate embedding generation for vector search
-          // 1. Generate embeddings for promptText 
+          // 1. Generate embeddings for promptText
           // 2. Search similar conversation contexts
           // 3. Provide relevant context snippets
         } catch (error) {
-          logger.warn('Qdrant vector search preparation failed', { 
+          logger.warn('Qdrant vector search preparation failed', {
             error,
             userId,
-            guildId: guildId || undefined
+            guildId: guildId || undefined,
           });
         }
       }
@@ -2078,7 +2319,8 @@ export class CoreIntelligenceService {
         analyticsData,
         multimodalAnalysis,
         webAnalysis,
-        ragOptimization
+        ragOptimization,
+        autonomousEnhancedContext, // Pass autonomous context for enhancement
       );
 
       let { fullResponseText } = await this._generateAgenticResponse(
@@ -2154,16 +2396,16 @@ export class CoreIntelligenceService {
       if (this.neo4jKnowledgeGraphService && !lightweight && fullResponseText) {
         try {
           const conversationId = `${userId}-${channelId}-${Date.now()}`;
-          
+
           // Extract entities from both prompt and response for comprehensive knowledge capture
           const promptEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
             promptText,
-            conversationId
+            conversationId,
           );
-          
+
           const responseEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
             fullResponseText,
-            conversationId
+            conversationId,
           );
 
           // Add entities to conversation graph
@@ -2173,7 +2415,7 @@ export class CoreIntelligenceService {
               await this.neo4jKnowledgeGraphService.addToConversationGraph(
                 conversationId,
                 entity,
-                'MENTIONED_IN'
+                'MENTIONED_IN',
               );
             }
 
@@ -2182,7 +2424,7 @@ export class CoreIntelligenceService {
               promptEntitiesCount: promptEntities.length,
               responseEntitiesCount: responseEntities.length,
               totalEntities: allEntities.length,
-              userId
+              userId,
             });
 
             // Track knowledge graph operation in Langfuse if available
@@ -2200,8 +2442,10 @@ export class CoreIntelligenceService {
                   operation: 'entity_extraction_and_graph_update',
                   conversationId,
                   entitiesCount: allEntities.length,
-                  entityTypes: allEntities.map(e => e.labels[0]).filter((v, i, a) => a.indexOf(v) === i)
-                }
+                  entityTypes: allEntities
+                    .map((e) => e.labels[0])
+                    .filter((v, i, a) => a.indexOf(v) === i),
+                },
               });
             }
           }
@@ -2209,7 +2453,7 @@ export class CoreIntelligenceService {
           logger.warn('Knowledge graph update failed, continuing without graph updates', {
             error,
             userId,
-            guildId: guildId || undefined
+            guildId: guildId || undefined,
           });
         }
       }
@@ -2286,7 +2530,7 @@ export class CoreIntelligenceService {
       const responsePayload: any = { content: fullResponseText, components: finalComponents };
       if (embeds.length > 0) responsePayload.embeds = embeds;
       if (files.length > 0) responsePayload.files = files;
-      
+
       // Enhanced Semantic Caching - Store response after generation (for non-lightweight responses)
       if (this.enhancedSemanticCacheService && !lightweight && fullResponseText) {
         try {
@@ -2300,14 +2544,14 @@ export class CoreIntelligenceService {
               guildId,
               strategy: mode,
               timestamp: new Date().toISOString(),
-              responseLength: fullResponseText.length
-            }
+              responseLength: fullResponseText.length,
+            },
           });
-          logger.debug('Stored response in enhanced semantic cache', { 
+          logger.debug('Stored response in enhanced semantic cache', {
             promptLength: promptText.length,
-            responseLength: fullResponseText.length 
+            responseLength: fullResponseText.length,
           });
-          
+
           // Track cache store via generation tracking in Langfuse if available
           if (conversationTrace && this.enhancedLangfuseService) {
             await this.enhancedLangfuseService.trackGeneration({
@@ -2319,19 +2563,19 @@ export class CoreIntelligenceService {
               startTime: new Date(),
               endTime: new Date(),
               usage: { input: 0, output: 0, total: 0 },
-              metadata: { 
+              metadata: {
                 operation: 'cache_store',
-                promptLength: promptText.length, 
+                promptLength: promptText.length,
                 responseLength: fullResponseText.length,
-                strategy: mode
-              }
+                strategy: mode,
+              },
             });
           }
         } catch (error) {
           logger.warn('Failed to store response in semantic cache', { error });
         }
       }
-      
+
       // AI Evaluation Testing Service - Post-processing evaluation and testing
       if (this.aiEvaluationTestingService && process.env.ENABLE_AI_EVALUATION_TESTING === 'true') {
         try {
@@ -2349,20 +2593,20 @@ export class CoreIntelligenceService {
                   webAnalysis: !!webAnalysis,
                   ragOptimization: !!ragOptimization,
                   semanticCaching: !!this.enhancedSemanticCacheService,
-                  knowledgeGraph: !!this.neo4jKnowledgeGraphService
-                }
+                  knowledgeGraph: !!this.neo4jKnowledgeGraphService,
+                },
               },
               duration: Date.now() - startTime,
-              cost: 0 // Could be calculated based on token usage
+              cost: 0, // Could be calculated based on token usage
             };
           };
 
           // Run background benchmark evaluation of the conversation processing
           const evaluationMetrics = await this.aiEvaluationTestingService.runBenchmark(
             'conversation_processing_pipeline',
-            conversationTestFunction
+            conversationTestFunction,
           );
-          
+
           // Track evaluation in Langfuse if available
           if (conversationTrace && this.enhancedLangfuseService) {
             await this.enhancedLangfuseService.trackGeneration({
@@ -2385,26 +2629,26 @@ export class CoreIntelligenceService {
                   webAnalysis: !!webAnalysis,
                   ragOptimization: !!ragOptimization,
                   semanticCaching: !!this.enhancedSemanticCacheService,
-                  knowledgeGraph: !!this.neo4jKnowledgeGraphService
-                }
-              }
+                  knowledgeGraph: !!this.neo4jKnowledgeGraphService,
+                },
+              },
             });
           }
-          
+
           logger.debug('AI Evaluation Testing completed', {
             benchmarkName: evaluationMetrics.benchmarkName,
             ranking: evaluationMetrics.ranking,
-            processingTimeMs: Date.now() - startTime
+            processingTimeMs: Date.now() - startTime,
           });
         } catch (error) {
           logger.warn('AI Evaluation Testing failed, continuing without evaluation', {
             error,
             userId,
-            guildId: guildId || undefined
+            guildId: guildId || undefined,
           });
         }
       }
-      
+
       // End overall processing operation successfully
       performanceMonitor.endOperation(
         processingOperationId,
@@ -2414,7 +2658,8 @@ export class CoreIntelligenceService {
         undefined,
         {
           totalProcessingTime: Date.now() - startTime,
-          responseLength: typeof responsePayload.content === 'string' ? responsePayload.content.length : 0,
+          responseLength:
+            typeof responsePayload.content === 'string' ? responsePayload.content.length : 0,
           hasEmbeds: responsePayload.embeds ? responsePayload.embeds.length > 0 : false,
           hasFiles: responsePayload.files ? responsePayload.files.length > 0 : false,
           servicesUsed: {
@@ -2424,11 +2669,11 @@ export class CoreIntelligenceService {
             webAnalysis: !!webAnalysis,
             knowledgeGraph: !!this.neo4jKnowledgeGraphService,
             ragOptimization: !!ragOptimization,
-            aiEvaluation: !!this.aiEvaluationTestingService
-          }
-        }
+            aiEvaluation: !!this.aiEvaluationTestingService,
+          },
+        },
       );
-      
+
       return responsePayload;
     } catch (error: any) {
       // End overall processing operation with error
@@ -2441,10 +2686,10 @@ export class CoreIntelligenceService {
         {
           totalProcessingTime: Date.now() - startTime,
           errorType: error.constructor.name,
-          errorStep: 'processing_pipeline'
-        }
+          errorStep: 'processing_pipeline',
+        },
       );
-      
+
       logger.error(
         `[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`,
         { error, stack: error.stack, ...analyticsData },
@@ -2733,7 +2978,8 @@ export class CoreIntelligenceService {
     analyticsData: any,
     multimodalAnalysis?: any,
     webAnalysis?: any,
-    ragOptimization?: any
+    ragOptimization?: any,
+    autonomousEnhancedContext?: any,
   ): Promise<EnhancedContext> {
     logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, {
       userId: messageForAnalysis.author.id,
@@ -2746,11 +2992,11 @@ export class CoreIntelligenceService {
         capabilities,
         mcpOrchestrationResult,
       );
-      
+
       // Enhance context with multimodal and web analysis
       if (multimodalAnalysis || webAnalysis || ragOptimization) {
         let enhancedSystemPrompt = agenticContextData.systemPrompt || '';
-        
+
         if (multimodalAnalysis) {
           enhancedSystemPrompt += '\n\n## Visual Context\n';
           if (multimodalAnalysis.visualContext) {
@@ -2766,7 +3012,7 @@ export class CoreIntelligenceService {
             enhancedSystemPrompt += `Visual mood detected: ${multimodalAnalysis.overallMood}\n`;
           }
         }
-        
+
         if (webAnalysis) {
           enhancedSystemPrompt += '\n\n## Web Content Context\n';
           enhancedSystemPrompt += `Web content summary: ${webAnalysis.summaryContext}\n`;
@@ -2774,7 +3020,7 @@ export class CoreIntelligenceService {
             enhancedSystemPrompt += `\n### Extracted Web Content:\n${webAnalysis.content}\n`;
           }
         }
-        
+
         if (ragOptimization) {
           enhancedSystemPrompt += '\n\n## RAG-Optimized Context\n';
           enhancedSystemPrompt += `Query Intent: ${ragOptimization.intentClassification}\n`;
@@ -2786,25 +3032,54 @@ export class CoreIntelligenceService {
             enhancedSystemPrompt += `\n### Retrieved Context:\n${ragOptimization.relevantContent}\n`;
           }
         }
-        
+
         // Update the system prompt with enhanced context
         agenticContextData.systemPrompt = enhancedSystemPrompt;
-        
+
+        // Add autonomous insights if available
+        if (autonomousEnhancedContext) {
+          let autonomousInsights = '\n\n## Autonomous System Insights\n';
+
+          if (autonomousEnhancedContext.analysis) {
+            autonomousInsights += `Analysis: ${JSON.stringify(autonomousEnhancedContext.analysis)}\n`;
+          }
+
+          if (autonomousEnhancedContext.recommendations?.length > 0) {
+            autonomousInsights += `Recommendations: ${autonomousEnhancedContext.recommendations.join(', ')}\n`;
+          }
+
+          if (autonomousEnhancedContext.capabilitiesConsidered?.length > 0) {
+            autonomousInsights += `Capabilities Considered: ${autonomousEnhancedContext.capabilitiesConsidered.join(', ')}\n`;
+          }
+
+          agenticContextData.systemPrompt += autonomousInsights;
+
+          logger.debug('Enhanced context with autonomous insights', {
+            userId: messageForAnalysis.author.id,
+            hasAnalysis: !!autonomousEnhancedContext.analysis,
+            recommendationsCount: autonomousEnhancedContext.recommendations?.length || 0,
+            capabilitiesCount: autonomousEnhancedContext.capabilitiesConsidered?.length || 0,
+          });
+        }
+
         // Add to additional context if available
         if ((agenticContextData as any).additionalContext) {
           (agenticContextData as any).additionalContext += `\n## Enhanced Analysis\n`;
           if (multimodalAnalysis) {
-            (agenticContextData as any).additionalContext += `- Analyzed ${multimodalAnalysis.imageCount} images\n`;
+            (agenticContextData as any).additionalContext +=
+              `- Analyzed ${multimodalAnalysis.imageCount} images\n`;
           }
           if (webAnalysis) {
-            (agenticContextData as any).additionalContext += `- Processed ${webAnalysis.urlCount} web URLs\n`;
+            (agenticContextData as any).additionalContext +=
+              `- Processed ${webAnalysis.urlCount} web URLs\n`;
           }
           if (ragOptimization) {
-            (agenticContextData as any).additionalContext += `- Retrieved ${ragOptimization.documentsRetrieved} optimized context documents\n`;
+            (agenticContextData as any).additionalContext +=
+              `- Retrieved ${ragOptimization.documentsRetrieved} optimized context documents\n`;
           }
         }
       }
-      
+
       this.recordAnalyticsInteraction({
         ...analyticsData,
         step: 'context_aggregated',
@@ -2925,7 +3200,7 @@ export class CoreIntelligenceService {
       } catch (e) {
         logger.debug('[CoreIntelSvc] Persona injection skipped', { error: String(e) });
       }
-  if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
+      if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
         try {
           const sessionId = (uiContext as any)?.channel?.isThread?.()
             ? (uiContext as any).channel.id
@@ -2939,8 +3214,8 @@ export class CoreIntelligenceService {
             },
           });
           if (state && (state as any).intent) {
-    const intentPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
-    systemPrompt = systemPrompt ? `${systemPrompt}\n${intentPrompt}` : intentPrompt;
+            const intentPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
+            systemPrompt = systemPrompt ? `${systemPrompt}\n${intentPrompt}` : intentPrompt;
           }
         } catch (e) {
           logger.debug('[CoreIntelSvc] LangGraph execute skipped or failed', { error: String(e) });
@@ -3385,7 +3660,6 @@ export class CoreIntelligenceService {
     if (tokens > limit * 0.5) return 'deep-reason';
     return 'quick-reply';
   }
-
 }
 
 function stableStringifyOptions(obj: unknown): string {
@@ -3393,9 +3667,12 @@ function stableStringifyOptions(obj: unknown): string {
     return JSON.stringify(obj, Object.keys(obj as Record<string, unknown>).sort());
   } catch {
     // Fallback non-stable
-    try { return JSON.stringify(obj); } catch { return String(obj); }
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return String(obj);
+    }
   }
-
 }
 
 // --- Helper: provider-aware token estimation for DecisionEngine ---
@@ -3414,7 +3691,9 @@ function providerAwareTokenEstimate(message: Message): number {
       return Math.ceil(text.length / 4);
     })();
     // Attachment budget
-    try { tokens += (message.attachments?.size || 0) * 256; } catch {}
+    try {
+      tokens += (message.attachments?.size || 0) * 256;
+    } catch {}
 
     // Provider hint: use env/default provider when available to scale thresholds
     // We avoid importing router here to keep this lightweight and side-effect free.
@@ -3426,7 +3705,7 @@ function providerAwareTokenEstimate(message: Message): number {
         break;
       case 'anthropic':
         // Claude tokenization often yields slightly fewer tokens for same text
-  tokens = Math.ceil(tokens * 0.95);
+        tokens = Math.ceil(tokens * 0.95);
         break;
       case 'groq':
       case 'mistral':
