@@ -49,9 +49,71 @@ services:
       - qdrant-data:/qdrant/storage
     ports:
       - "6333:6333"
-    profiles: ["qdrant"]
+    profiles: ["services"]
+
+  neo4j:
+    image: neo4j:5.19-community
+    container_name: chatterbot-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/password123
+      NEO4J_server_memory_heap_maxSize: 512M
+      NEO4J_server_memory_pagecache_size: 256M
+    volumes:
+      - neo4j-data:/data
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    profiles: ["services"]
+
+  temporal:
+    image: temporalio/auto-setup:1.21
+    container_name: chatterbot-temporal
+    restart: unless-stopped
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgres
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+    profiles: ["services"]
+    depends_on:
+      - temporal-postgres
+
+  temporal-postgres:
+    image: postgres:14-alpine
+    container_name: chatterbot-temporal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal-pg-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    profiles: ["services"]
+
+  temporal-ui:
+    image: temporalio/ui:2.21.3
+    container_name: chatterbot-temporal-ui
+    restart: unless-stopped
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    ports:
+      - "8080:8080"
+    profiles: ["services"]
+    depends_on:
+      - temporal
 
 volumes:
   bot-data:
   pg-data:
   qdrant-data:
+  neo4j-data:
+  temporal-pg-data:

@@ -10,19 +10,19 @@ export interface FeatureFlags {
   temporal: boolean;
   vercelAI: boolean;
   pgvector: boolean;
-  
+
   // Phase 4: Advanced Intelligence Features
   langgraph: boolean;
   longTermMemory: boolean;
   gpt4oMultimodal: boolean;
   crewaiSpecialists: boolean;
   realTimeStreaming: boolean;
-  
+
   // Phase 5: Production & Optimization
   hardenedAudio: boolean;
   mlopsLifecycle: boolean;
   edgeDeployment: boolean;
-  
+
   // Additional capabilities
   distributedTracing: boolean;
   advancedAnalytics: boolean;
@@ -42,7 +42,7 @@ export interface FeatureFlags {
   vectorMigrationUtils: boolean;
   advancedFiltering: boolean;
 
-  // Enhanced Research Features - Phase 3: Web & Accessibility  
+  // Enhanced Research Features - Phase 3: Web & Accessibility
   crawl4aiWebAccess: boolean;
   webContentExtraction: boolean;
   urlProcessingService: boolean;
@@ -77,19 +77,19 @@ export const features: FeatureFlags = {
   temporal: getEnvAsBoolean('FEATURE_TEMPORAL', true),
   vercelAI: getEnvAsBoolean('FEATURE_VERCEL_AI', true),
   pgvector: getEnvAsBoolean('FEATURE_PGVECTOR', true),
-  
-  // Phase 4: Advanced Intelligence Features  
+
+  // Phase 4: Advanced Intelligence Features
   langgraph: getEnvAsBoolean('FEATURE_LANGGRAPH', true),
   longTermMemory: getEnvAsBoolean('FEATURE_LONG_TERM_MEMORY', true),
   gpt4oMultimodal: getEnvAsBoolean('FEATURE_GPT4O_MULTIMODAL', true),
   crewaiSpecialists: getEnvAsBoolean('FEATURE_CREWAI_SPECIALISTS', true),
   realTimeStreaming: getEnvAsBoolean('FEATURE_REAL_TIME_STREAMING', true),
-  
+
   // Phase 5: Production & Optimization
   hardenedAudio: getEnvAsBoolean('FEATURE_HARDENED_AUDIO', true),
   mlopsLifecycle: getEnvAsBoolean('FEATURE_MLOPS_LIFECYCLE', true),
   edgeDeployment: getEnvAsBoolean('FEATURE_EDGE_DEPLOYMENT', true),
-  
+
   // Additional capabilities
   distributedTracing: getEnvAsBoolean('FEATURE_DISTRIBUTED_TRACING', true),
   advancedAnalytics: getEnvAsBoolean('FEATURE_ADVANCED_ANALYTICS', true),
@@ -109,7 +109,7 @@ export const features: FeatureFlags = {
   vectorMigrationUtils: getEnvAsBoolean('FEATURE_VECTOR_MIGRATION_UTILS', true),
   advancedFiltering: getEnvAsBoolean('FEATURE_ADVANCED_FILTERING', true),
 
-  // Enhanced Research Features - Phase 3: Web & Accessibility  
+  // Enhanced Research Features - Phase 3: Web & Accessibility
   crawl4aiWebAccess: getEnvAsBoolean('FEATURE_CRAWL4AI_WEB_ACCESS', true),
   webContentExtraction: getEnvAsBoolean('FEATURE_WEB_CONTENT_EXTRACTION', true),
   urlProcessingService: getEnvAsBoolean('FEATURE_URL_PROCESSING_SERVICE', true),
@@ -144,9 +144,12 @@ export function getFeatureFlag(featureName: string): boolean {
 }
 
 export function anyFeatureEnabled(featureNames: string[]): boolean {
-  return featureNames.some(name => (features as any)[name]);
+  return featureNames.some((name) => (features as any)[name]);
 }
 
 export function allFeaturesEnabled(featureNames: string[]): boolean {
-  return featureNames.every(name => (features as any)[name]);
+  return featureNames.every((name) => (features as any)[name]);
 }
+
+// Alias for backward compatibility
+export const featureFlags = features;

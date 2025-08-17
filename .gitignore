@@ -40,6 +40,14 @@ prisma/**/dev.db
 # Copilot processing scratch file (not for commit)
 Copilot-Processing.md
 
+# Python virtual environments
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 # Agent-specific directories and files
 .agent-metrics/
 agent-environment-summary.md
@@ -50,3 +58,7 @@ copilot-*.log
 temp-agent-*
 .agent-temp/
 agent-debug-*
+
+# Processing and status files (temporary)
+Copilot-Processing-Summary.md
+SERVICE_INTEGRATION_STATUS.md
