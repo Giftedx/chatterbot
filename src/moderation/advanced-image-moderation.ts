@@ -3,12 +3,8 @@
  * Implements ML-based image safety checking with Google Cloud Vision integration
  */
 
-import { logger } from '../utils/logger';
-import {
-  SafetyVerdict,
-  ImageModerationOptions,
-  CloudVisionSafeSearchResponse
-} from './types.js';
+import { logger } from '../utils/logger.js';
+import { SafetyVerdict, ImageModerationOptions, CloudVisionSafeSearchResponse } from './types.js';
 
 /**
  * Advanced image safety checker with Cloud Vision integration
@@ -21,7 +17,7 @@ export class AdvancedImageModeration {
   constructor() {
     this.cloudVisionApiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
     this.useCloudVision = Boolean(this.cloudVisionApiKey);
-    
+
     if (!this.useCloudVision) {
       logger.warn('Google Cloud Vision API key not found, using basic image moderation');
     }
@@ -33,13 +29,13 @@ export class AdvancedImageModeration {
   async checkImageSafety(
     imageUrl: string,
     contentType: string,
-    options: ImageModerationOptions = {}
+    options: ImageModerationOptions = {},
   ): Promise<SafetyVerdict> {
     try {
       const {
         useCloudVision = this.useCloudVision,
         safeSearchLevel = 'LIKELY',
-        checkNSFW = true
+        checkNSFW = true,
       } = options;
 
       // Basic format validation
@@ -47,7 +43,7 @@ export class AdvancedImageModeration {
         return {
           safe: false,
           reason: 'Unsupported image format',
-          severity: 'low'
+          severity: 'low',
         };
       }
 
@@ -57,11 +53,11 @@ export class AdvancedImageModeration {
         if (!cloudResult.safe) {
           logger.info('Image blocked by Cloud Vision', {
             operation: 'image-moderation',
-            metadata: { 
+            metadata: {
               reason: cloudResult.reason,
               confidence: cloudResult.confidence,
-              severity: cloudResult.severity
-            }
+              severity: cloudResult.severity,
+            },
           });
           return cloudResult;
         }
@@ -76,8 +72,8 @@ export class AdvancedImageModeration {
             metadata: {
               reason: nsfwResult.reason,
               confidence: nsfwResult.confidence,
-              severity: nsfwResult.severity
-            }
+              severity: nsfwResult.severity,
+            },
           });
           return nsfwResult;
         }
@@ -85,14 +81,13 @@ export class AdvancedImageModeration {
 
       // Image appears safe
       return { safe: true, confidence: 0.9 };
-
     } catch (error) {
       logger.error('Image moderation error', {
         operation: 'image-moderation',
         metadata: {
           imageUrl: imageUrl.substring(0, 50) + '...',
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
-        }
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
 
       // Fail safe - block on error for images
@@ -100,7 +95,7 @@ export class AdvancedImageModeration {
         safe: false,
         reason: 'Image moderation service unavailable',
         confidence: 0.1,
-        severity: 'medium'
+        severity: 'medium',
       };
     }
   }
@@ -108,19 +103,18 @@ export class AdvancedImageModeration {
   /**
    * Google Cloud Vision SafeSearch API
    */
-  private async checkWithCloudVision(
-    imageUrl: string,
-    threshold: string
-  ): Promise<SafetyVerdict> {
+  private async checkWithCloudVision(imageUrl: string, threshold: string): Promise<SafetyVerdict> {
     if (!this.cloudVisionApiKey) {
       throw new Error('Google Cloud Vision API key not configured');
     }
 
     const requestBody = {
-      requests: [{
-        image: { source: { imageUri: imageUrl } },
-        features: [{ type: 'SAFE_SEARCH_DETECTION', maxResults: 1 }]
-      }]
+      requests: [
+        {
+          image: { source: { imageUri: imageUrl } },
+          features: [{ type: 'SAFE_SEARCH_DETECTION', maxResults: 1 }],
+        },
+      ],
     };
 
     const response = await fetch(
@@ -128,15 +122,15 @@ export class AdvancedImageModeration {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
+        body: JSON.stringify(requestBody),
+      },
     );
 
     if (!response.ok) {
       throw new Error(`Cloud Vision API error: ${response.status}`);
     }
 
-    const data = await response.json() as CloudVisionSafeSearchResponse;
+    const data = (await response.json()) as CloudVisionSafeSearchResponse;
     const safeSearch = data.safeSearchAnnotation;
 
     // Check each category against threshold
@@ -147,7 +141,7 @@ export class AdvancedImageModeration {
     for (const category of categories) {
       const likelihood = safeSearch[category];
       const score = this.likelihoodToScore(likelihood);
-      
+
       if (this.isAboveThreshold(likelihood, threshold)) {
         flaggedCategories.push(category);
         maxLikelihood = Math.max(maxLikelihood, score);
@@ -160,7 +154,7 @@ export class AdvancedImageModeration {
         reason: `Detected unsafe content: ${flaggedCategories.join(', ')}`,
         confidence: maxLikelihood,
         severity: this.scoreToSeverity(maxLikelihood),
-        categories: flaggedCategories
+        categories: flaggedCategories,
       };
     }
 
@@ -182,15 +176,14 @@ export class AdvancedImageModeration {
 
       // Placeholder for actual NSFW.js integration
       // const result = await this.nsfwjsModel.classify(imageUrl) as NSFWResult;
-      
-      return { safe: true, confidence: 0.5 };
 
+      return { safe: true, confidence: 0.5 };
     } catch (error) {
       logger.warn('NSFW.js check failed', {
         operation: 'image-moderation',
         metadata: {
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
-        }
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        },
       });
       return { safe: true, confidence: 0.3 };
     }
@@ -201,8 +194,12 @@ export class AdvancedImageModeration {
    */
   private isValidImageType(contentType: string): boolean {
     const validTypes = [
-      'image/jpeg', 'image/jpg', 'image/png', 
-      'image/gif', 'image/webp', 'image/bmp'
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/bmp',
     ];
     return validTypes.includes(contentType.toLowerCase());
   }
@@ -212,12 +209,18 @@ export class AdvancedImageModeration {
    */
   private likelihoodToScore(likelihood: string): number {
     switch (likelihood) {
-      case 'VERY_UNLIKELY': return 0.1;
-      case 'UNLIKELY': return 0.3;
-      case 'POSSIBLE': return 0.5;
-      case 'LIKELY': return 0.7;
-      case 'VERY_LIKELY': return 0.9;
-      default: return 0.0;
+      case 'VERY_UNLIKELY':
+        return 0.1;
+      case 'UNLIKELY':
+        return 0.3;
+      case 'POSSIBLE':
+        return 0.5;
+      case 'LIKELY':
+        return 0.7;
+      case 'VERY_LIKELY':
+        return 0.9;
+      default:
+        return 0.0;
     }
   }
 
@@ -248,7 +251,7 @@ export const advancedImageModeration = new AdvancedImageModeration();
 export async function checkImageSafety(
   imageUrl: string,
   contentType: string,
-  options?: ImageModerationOptions
+  options?: ImageModerationOptions,
 ): Promise<SafetyVerdict> {
   return advancedImageModeration.checkImageSafety(imageUrl, contentType, options);
 }

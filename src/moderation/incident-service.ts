@@ -3,8 +3,8 @@
  * Manages logging and tracking of moderation events
  */
 
-import { prisma } from '../db/prisma';
-import { logger } from '../utils/logger';
+import { prisma } from '../db/prisma.js';
+import { logger } from '../utils/logger.js';
 import { ModerationIncident } from './types.js';
 
 export interface ModerationStats {
@@ -20,11 +20,12 @@ export interface ModerationStats {
  * Service for logging and managing moderation incidents
  */
 export class ModerationIncidentService {
-
   /**
    * Log a moderation incident
    */
-  async logIncident(incident: Omit<ModerationIncident, 'id' | 'createdAt'>): Promise<ModerationIncident> {
+  async logIncident(
+    incident: Omit<ModerationIncident, 'id' | 'createdAt'>,
+  ): Promise<ModerationIncident> {
     try {
       const dbIncident = await prisma.moderationIncident.create({
         data: {
@@ -35,8 +36,8 @@ export class ModerationIncidentService {
           action: incident.action,
           reason: incident.reason,
           contentHash: incident.contentHash,
-          metadata: incident.metadata ? JSON.stringify(incident.metadata) : null
-        }
+          metadata: incident.metadata ? JSON.stringify(incident.metadata) : null,
+        },
       });
 
       const savedIncident: ModerationIncident = {
@@ -49,7 +50,7 @@ export class ModerationIncidentService {
         reason: dbIncident.reason || undefined,
         contentHash: dbIncident.contentHash || undefined,
         metadata: dbIncident.metadata ? JSON.parse(dbIncident.metadata) : undefined,
-        createdAt: dbIncident.createdAt
+        createdAt: dbIncident.createdAt,
       };
 
       logger.info('Moderation incident logged', {
@@ -60,18 +61,17 @@ export class ModerationIncidentService {
           type: incident.type,
           severity: incident.severity,
           action: incident.action,
-          reason: incident.reason
-        }
+          reason: incident.reason,
+        },
       });
 
       return savedIncident;
-
     } catch (error) {
       logger.error('Failed to log moderation incident', {
         operation: 'moderation-incident-log',
         guildId: incident.guildId,
         userId: incident.userId,
-        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
       });
       throw error;
     }
@@ -92,36 +92,39 @@ export class ModerationIncidentService {
       const incidents = await prisma.moderationIncident.findMany({
         where: {
           guildId,
-          createdAt: { gte: since }
+          createdAt: { gte: since },
         },
         orderBy: { createdAt: 'desc' },
-        take: 100 // Limit for performance
+        take: 100, // Limit for performance
       });
 
       // Calculate statistics
       const totalIncidents = incidents.length;
       const incidentsToday = incidents.filter((i: any) => i.createdAt >= today).length;
 
+      const incidentsByType = incidents.reduce(
+        (acc: Record<string, number>, incident: any) => {
+          acc[incident.type] = (acc[incident.type] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-      const incidentsByType = incidents.reduce((acc: Record<string, number>, incident: any) => {
+      const incidentsBySeverity = incidents.reduce(
+        (acc: Record<string, number>, incident: any) => {
+          acc[incident.severity] = (acc[incident.severity] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
-        acc[incident.type] = (acc[incident.type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-
-      const incidentsBySeverity = incidents.reduce((acc: Record<string, number>, incident: any) => {
-
-        acc[incident.severity] = (acc[incident.severity] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-
-
-      const userCounts = incidents.reduce((acc: Record<string, number>, incident: any) => {
-
-        acc[incident.userId] = (acc[incident.userId] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const userCounts = incidents.reduce(
+        (acc: Record<string, number>, incident: any) => {
+          acc[incident.userId] = (acc[incident.userId] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       const topUsers = Object.entries(userCounts)
         .sort(([, a], [, b]) => (b as number) - (a as number))
@@ -138,7 +141,7 @@ export class ModerationIncidentService {
         reason: incident.reason || undefined,
         contentHash: incident.contentHash || undefined,
         metadata: incident.metadata ? JSON.parse(incident.metadata) : undefined,
-        createdAt: incident.createdAt
+        createdAt: incident.createdAt,
       }));
 
       return {
@@ -147,14 +150,13 @@ export class ModerationIncidentService {
         incidentsByType,
         incidentsBySeverity,
         topUsers,
-        recentIncidents
+        recentIncidents,
       };
-
     } catch (error) {
       logger.error('Failed to get moderation stats', {
         operation: 'moderation-stats-get',
         guildId,
-        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
       });
       throw error;
     }
@@ -163,12 +165,16 @@ export class ModerationIncidentService {
   /**
    * Get incidents for a specific user
    */
-  async getUserIncidents(guildId: string, userId: string, limit = 20): Promise<ModerationIncident[]> {
+  async getUserIncidents(
+    guildId: string,
+    userId: string,
+    limit = 20,
+  ): Promise<ModerationIncident[]> {
     try {
       const dbIncidents = await prisma.moderationIncident.findMany({
         where: { guildId, userId },
         orderBy: { createdAt: 'desc' },
-        take: limit
+        take: limit,
       });
 
       const incidents = dbIncidents.map((incident: any) => ({
@@ -181,17 +187,16 @@ export class ModerationIncidentService {
         reason: incident.reason || undefined,
         contentHash: incident.contentHash || undefined,
         metadata: incident.metadata ? JSON.parse(incident.metadata) : undefined,
-        createdAt: incident.createdAt
+        createdAt: incident.createdAt,
       }));
 
       return incidents;
-
     } catch (error) {
       logger.error('Failed to get user incidents', {
         operation: 'moderation-user-incidents-get',
         guildId,
         userId,
-        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
       });
       throw error;
     }
@@ -207,21 +212,20 @@ export class ModerationIncidentService {
 
       const result = await prisma.moderationIncident.deleteMany({
         where: {
-          createdAt: { lt: cutoffDate }
-        }
+          createdAt: { lt: cutoffDate },
+        },
       });
 
       logger.info('Cleaned up old moderation incidents', {
         operation: 'moderation-cleanup',
-        metadata: { deletedCount: result.count, daysOld }
+        metadata: { deletedCount: result.count, daysOld },
       });
 
       return result.count;
-
     } catch (error) {
       logger.error('Failed to cleanup old incidents', {
         operation: 'moderation-cleanup',
-        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
       });
       throw error;
     }
@@ -238,9 +242,9 @@ export class ModerationIncidentService {
       const dbIncidents = await prisma.moderationIncident.findMany({
         where: {
           guildId,
-          createdAt: { gte: since }
+          createdAt: { gte: since },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
       });
 
       const incidents = dbIncidents.map((incident: any) => ({
@@ -253,16 +257,15 @@ export class ModerationIncidentService {
         reason: incident.reason || undefined,
         contentHash: incident.contentHash || undefined,
         metadata: incident.metadata ? JSON.parse(incident.metadata) : undefined,
-        createdAt: incident.createdAt
+        createdAt: incident.createdAt,
       }));
 
       return incidents;
-
     } catch (error) {
       logger.error('Failed to export incidents', {
         operation: 'moderation-export',
         guildId,
-        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+        metadata: { errorMessage: error instanceof Error ? error.message : 'Unknown error' },
       });
       throw error;
     }
