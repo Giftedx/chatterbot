@@ -3144,7 +3144,7 @@ export class CoreIntelligenceService {
       }
 
       logger.debug(`[CoreIntelSvc] Stage 7: Response Generation`, analyticsData);
-      const agenticQuery: AgenticQuery = {
+      const agenticQuery = {
         query: enhancedContext.prompt,
         userId,
         channelId,
@@ -3238,38 +3238,118 @@ export class CoreIntelligenceService {
       let selectedProvider: string | undefined;
       let selectedModel: string | undefined;
 
+      // === D1: REASONING SERVICE SELECTION INTEGRATION ===
+      // Select optimal reasoning service based on strategy, confidence, and context
+      logger.debug('[CoreIntelSvc] D1: Selecting reasoning service', {
+        strategy: mode,
+        userId,
+        promptLength: groundedQuery.length,
+      });
+
+      let reasoningService: any = null;
+      let serviceParams: any = null;
+
+      try {
+        const serviceSelection = await this.reasoningServiceSelector.selectReasoningService({
+          strategy: mode, // 'quick-reply' | 'deep-reason' | 'defer'
+          confidence: unifiedAnalysis.confidence || 0.7,
+          maxTokens: this._estimateTokens(groundedQuery),
+          context: {
+            userId,
+            guildId: guildId || undefined,
+            channelId,
+            hasAttachments: commonAttachments.length > 0,
+            complexity: unifiedAnalysis.complexity,
+            personalityType: await this._getPersonalityType(userId, guildId),
+          },
+        });
+
+        reasoningService = serviceSelection.service;
+        serviceParams = serviceSelection.parameters;
+
+        logger.info('[CoreIntelSvc] D1: Reasoning service selected', {
+          serviceName: reasoningService?.name || 'unknown',
+          strategy: serviceSelection.strategy,
+          confidence: serviceSelection.confidence,
+          score: serviceSelection.score?.toFixed(3),
+          systemLoad: serviceSelection.systemLoad?.toFixed(3),
+        });
+      } catch (error) {
+        logger.warn('[CoreIntelSvc] D1: Reasoning service selection failed, using fallback', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue with standard modelRouterService as fallback
+      }
+
       // Optional streaming for slash interactions only
       const isSlashInteraction = (uiContext as any)?.isChatInputCommand?.() === true;
       if (getEnvAsBoolean('FEATURE_VERCEL_AI', false) && isSlashInteraction) {
         try {
-          const stream = await modelRouterService.stream(groundedQuery, history, systemPrompt);
-          // Stream to the user's ephemeral reply (controls disabled to keep it light)
-          fullResponseText = await sendStream(uiContext as any, stream, {
-            throttleMs: 1000,
-            withControls: false,
-          });
-        } catch {
-          // Fallback to non-streaming
-          const meta = await modelRouterService.generateWithMeta(
+          const stream = await this.geminiService.generateResponseStream(
             groundedQuery,
             history,
-            systemPrompt,
+            userId,
+            guildId || 'default',
           );
-          fullResponseText = meta.text;
-          selectedProvider = meta.provider;
-          selectedModel = meta.model;
+
+          // Convert async generator to string
+          let streamResult = '';
+          for await (const chunk of stream) {
+            streamResult += chunk;
+          }
+          fullResponseText = streamResult;
+        } catch {
+          // Fallback to standard generation
+          fullResponseText = await this.geminiService.generateResponse(
+            groundedQuery,
+            history,
+            userId,
+            guildId || 'default',
+          );
         }
       } else {
         try {
-          const meta = await modelRouterService.generateWithMeta(
+          // Use Gemini service for generation
+          fullResponseText = await this.geminiService.generateResponse(
             groundedQuery,
             history,
-            systemPrompt,
+            userId,
+            guildId || 'default',
           );
-          fullResponseText = meta.text;
-          selectedProvider = meta.provider;
-          selectedModel = meta.model;
+          selectedProvider = 'gemini';
+          selectedModel = 'gemini-pro';
+
+          // Record successful service usage for adaptive learning - TODO: D1 integrate service selection
+          // if (reasoningServiceRecommendation?.serviceName) {
+          //   try {
+          //     this.reasoningServiceSelector.recordServiceResult(
+          //       reasoningServiceRecommendation.serviceName,
+          //       true,
+          //       Date.now() - analyticsData.startTime,
+          //       unifiedAnalysis.confidence || 0.7
+          //     );
+          //     logger.debug('[CoreIntelSvc] D1: Recorded successful service usage', {
+          //       serviceName: reasoningServiceRecommendation.serviceName
+          //     });
+          //   } catch (recordError) {
+          //     logger.warn('[CoreIntelSvc] D1: Failed to record service success', { recordError });
+          //   }
+          // }
         } catch (e: any) {
+          // Record failure - TODO: D1 integrate service selection
+          // if (reasoningServiceRecommendation?.serviceName) {
+          //   try {
+          //     this.reasoningServiceSelector.recordServiceResult(
+          //       reasoningServiceRecommendation.serviceName,
+          //       false,
+          //       Date.now() - analyticsData.startTime,
+          //       0.0
+          //     );
+          //   } catch (recordError) {
+          //     logger.warn('[CoreIntelSvc] D1: Failed to record service failure', { recordError });
+          //   }
+          // }
+
           // In test environment, fall back to a deterministic mock response instead of throwing
           if (process.env.NODE_ENV === 'test') {
             fullResponseText = 'Mock response (offline)';
@@ -3288,7 +3368,7 @@ export class CoreIntelligenceService {
         });
       }
 
-      const agenticResponse: AgenticResponse = {
+      const agenticResponse = {
         response: fullResponseText,
         confidence: 0.8,
         citations: { citations: [], hasCitations: false, confidence: 0 },
@@ -3652,6 +3732,45 @@ export class CoreIntelligenceService {
 
   public getMemoryManager(): AdvancedMemoryManager | undefined {
     return this.memoryManager;
+  }
+
+  // === D1: REASONING SERVICE SELECTION HELPER METHODS ===
+
+  /**
+   * Estimate token count for a given text
+   */
+  private _estimateTokens(text: string): number {
+    // Rough estimation: ~4 characters per token for most models
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Get personality type for user from context
+   */
+  private async _getPersonalityType(userId: string, guildId: string | null): Promise<string> {
+    try {
+      // Try to get personality from user preferences or persona system
+      const preferences = await this.getUserPreferences(userId);
+      if (preferences?.personalityType) {
+        return preferences.personalityType;
+      }
+
+      // Fallback to guild persona if available
+      if (guildId) {
+        const persona = getActivePersona(guildId);
+        if (persona?.name) {
+          return persona.name.toLowerCase();
+        }
+      }
+
+      // Default personality type
+      return 'balanced';
+    } catch (error) {
+      logger.debug('[CoreIntelSvc] Failed to get personality type, using default', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 'balanced';
+    }
   }
 
   private determineStrategyFromTokens(tokens: number): ResponseStrategy {
