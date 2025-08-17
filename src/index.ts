@@ -71,12 +71,8 @@ coreIntelConfig.mcpManager = mcpManagerInstance;
 const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list
-const coreCommands = coreIntelligenceService.buildCommands().map(cmd => cmd.toJSON());
+const allCommands: any[] = [];
 
-// Hide extra commands: do not register privacy/memory/agentic by default
-const allCommands = [
-  ...coreCommands
-];
 
 client.once('ready', async () => {
   console.log(`✅ Logged in as ${client.user?.tag}`);
@@ -150,7 +146,6 @@ client.once('ready', async () => {
   try {
     await rest.put(Routes.applicationCommands(DISCORD_CLIENT_ID), { body: allCommands });
     console.log(`✅ Registered ${allCommands.length} commands:`);
-    coreCommands.forEach(cmd => console.log(`   - /${cmd.name} (Core Intelligence)`));
   } catch (error) {
     console.error('❌ Error registering commands:', error);
   }
@@ -216,7 +211,13 @@ client.on('interactionCreate', async (interaction: Interaction) => {
         return;
       }
 
-      await coreIntelligenceService.handleInteraction(interaction);
+      if (interaction.isCommand()) {
+        // This is a placeholder for command handling.
+        // The actual implementation will be added in a future update.
+        if (!interaction.replied) {
+          await interaction.reply({ content: 'Command handling is not yet implemented.', ephemeral: true });
+        }
+      }
     } catch (err) {
       logger.error('Unhandled error in interactionCreate', err as Error, { metadata: { traceId } });
     }

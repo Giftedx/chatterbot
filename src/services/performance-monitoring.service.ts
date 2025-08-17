@@ -1,5 +1,5 @@
 import { performance } from 'perf_hooks';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 export interface PerformanceMetric {
   serviceId: string;

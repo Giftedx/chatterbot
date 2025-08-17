@@ -6,7 +6,7 @@
 
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { features } from '../config/feature-flags.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 export interface QdrantDocument {
   id: string | number;

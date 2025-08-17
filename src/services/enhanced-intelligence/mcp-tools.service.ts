@@ -5,29 +5,12 @@
 
 import { MCPToolResult, ProcessingContext, AttachmentInfo } from './types.js';
 import { DirectMCPExecutor } from './direct-mcp-executor.service.js';
-import { AdvancedReasoningOrchestrator } from '../advanced-reasoning/index.js';
-import type { AdvancedReasoningConfig } from '../advanced-reasoning/types.js';
 
 export class EnhancedMCPToolsService {
   private mcpExecutor: DirectMCPExecutor;
-  private advancedOrchestrator: AdvancedReasoningOrchestrator;
 
   constructor() {
     this.mcpExecutor = new DirectMCPExecutor();
-    const defaultAdvancedConfig: AdvancedReasoningConfig = {
-      enableReAct: true,
-      enableChainOfDraft: true,
-      enableTreeOfThoughts: true,
-      enableCouncilOfCritics: true,
-      enableMetaCognitive: true,
-      maxProcessingTime: 8000,
-      maxReasoningSteps: 10,
-      confidenceThreshold: 0.6,
-      enableSelfReflection: true,
-      enableErrorRecovery: true,
-      adaptiveComplexity: true
-    };
-    this.advancedOrchestrator = new AdvancedReasoningOrchestrator(defaultAdvancedConfig);
   }
   
   /**
@@ -191,33 +174,6 @@ export class EnhancedMCPToolsService {
    */
   private async performComplexReasoning(content: string, context: ProcessingContext): Promise<void> {
     try {
-      // Prefer advanced reasoning orchestrator
-      const advancedResponse = await this.advancedOrchestrator.processAdvancedReasoning(
-        content,
-        {
-          userId: context.userId,
-          channelId: context.channelId,
-          guildId: context.guildId,
-          requiredTools: context.analysis.requiredTools,
-          urls: context.analysis.urls
-        }
-      );
-
-      context.results.set('complex-reasoning', {
-        success: true,
-        data: {
-          type: advancedResponse.type,
-          response: advancedResponse.primaryResponse,
-          reasoningProcess: advancedResponse.reasoningProcess,
-          confidence: advancedResponse.confidence,
-          alternatives: advancedResponse.alternatives || [],
-          metadata: advancedResponse.metadata
-        },
-        toolUsed: 'advanced_reasoning'
-      } as MCPToolResult);
-    } catch (advancedError) {
-      // Fallback to sequential thinking via DirectMCPExecutor
-      try {
         const result = await this.mcpExecutor.executeSequentialThinking(content);
         context.results.set('complex-reasoning', {
           success: result.success,
@@ -227,11 +183,10 @@ export class EnhancedMCPToolsService {
       } catch (fallbackError) {
         context.results.set('complex-reasoning', {
           success: false,
-          error: `Complex reasoning failed: ${advancedError}`,
-          toolUsed: 'advanced_reasoning'
+          error: `Complex reasoning failed: ${fallbackError}`,
+          toolUsed: 'sequential_thinking'
         } as MCPToolResult);
       }
-    }
   }
 
   /**

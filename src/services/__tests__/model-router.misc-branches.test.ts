@@ -16,6 +16,7 @@ describe('ModelRouterService - misc branch coverage', () => {
   });
 
   it('respects DISALLOW_PROVIDERS CSV when selecting preferred model', async () => {
+  process.env.FEATURE_ROUTER_UNIFIED_ANALYSIS = 'false';
     // Ensure both providers appear available in registry listing
     const models = [
       { provider: 'gemini', model: 'gemini-1.5-flash' },

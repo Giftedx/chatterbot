@@ -1,7 +1,6 @@
 import { Client, Message } from 'discord.js';
 import { knowledgeBaseIngestService } from '../knowledge-base-ingest.service.js';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
-import { modelRouterService } from '../model-router.service.js';
 import { logger } from '../../utils/logger.js';
 
 export class BackgroundIngestJob {

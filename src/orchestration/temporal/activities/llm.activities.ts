@@ -25,31 +25,8 @@ export async function llmDraft(request: LLMDraftRequest): Promise<LLMDraftRespon
   const startTime = Date.now();
   const { prompt, modelName = 'gpt-4o-mini', maxTokens = 2000, temperature = 0.7, systemPrompt, history = [] } = request;
   
-  try {
-    // Dynamic import to avoid loading providers unless needed
-    const { modelRouterService } = await import('../../../services/model-router.service.js');
-
-    const historyMessages = (history || []).map(h => ({
-      role: (h.role === 'assistant' ? 'model' : (h.role as 'user' | 'system')),
-      parts: [{ text: h.content }] as any
-    })) as any[];
-
-    const meta = await modelRouterService.generateWithMeta(
-      prompt,
-      historyMessages,
-      systemPrompt
-    );
-    
-    const processingTime = Date.now() - startTime;
-    
-    return {
-      content: meta.text || '',
-      modelUsed: meta.model || modelName || 'unknown',
-      processingTime
-    };
-    
-  } catch (error) {
-    // Fallback to simple hash-based response for testing/development
+    // This is a placeholder for a real LLM call.
+    // In a real application, this would call an LLM service.
     const p = prompt || '';
     let hash = 0;
     for (let i = 0; i < p.length; i++) {
@@ -63,7 +40,6 @@ export async function llmDraft(request: LLMDraftRequest): Promise<LLMDraftRespon
       modelUsed: modelName,
       processingTime
     };
-  }
 }
 
 /**

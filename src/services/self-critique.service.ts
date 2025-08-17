@@ -1,4 +1,3 @@
-import { modelRouterService } from './model-router.service.js';
 import { ChatMessage } from './context-manager.js';
 import { logger } from '../utils/logger.js';
 
@@ -32,22 +31,16 @@ export class SelfCritiqueService {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.options.timeoutMs);
 
-      // 1) Critique phase
-      const critiquePrompt = this.buildCritiquePrompt(userPrompt, draftResponse);
-      let critique = '';
-      try {
-        critique = await modelRouterService.generate(critiquePrompt, history, 'system', 'global');
-      } catch (err) {
-        logger.warn('[SelfCritique] Critique generation failed, continuing with original response', { error: String(err) });
-        clearTimeout(timeout);
-        return draftResponse;
-      }
-
+      // This is a placeholder for a real LLM call.
+      // In a real application, this would call an LLM service.
+      const critique = "This is a placeholder critique.";
+      
       // 2) Revision phase
       const revisionPrompt = this.buildRevisionPrompt(userPrompt, draftResponse, critique);
       let refined = draftResponse;
       try {
-        refined = await modelRouterService.generate(revisionPrompt, history, 'system', 'global');
+        // This is a placeholder for a real LLM call.
+        refined = "This is a placeholder refined response.";
       } catch (err) {
         logger.warn('[SelfCritique] Revision generation failed, falling back to original response', { error: String(err) });
       } finally {

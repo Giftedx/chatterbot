@@ -5,7 +5,7 @@
  */
 
 import { features } from '../config/feature-flags.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 import fs from 'fs/promises';
 import path from 'path';
 

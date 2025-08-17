@@ -6,8 +6,10 @@
  */
 
 import { Message, Attachment } from 'discord.js';
-import { UserCapabilities } from '../intelligence/permission.service.js';
 import { logger } from '../../utils/logger.js';
+import { advancedIntentDetectionService } from '../advanced-intent-detection.service.js';
+import type { IntentClassification } from '../advanced-intent-detection.service.js';
+import type { UserCapabilities } from '../intelligence/permission.service.js';
 
 function sanitizeUserInput(raw: string): string {
   const injectionPatterns = [
@@ -59,6 +61,29 @@ export interface UnifiedMessageAnalysis {
   needsMCPTools: boolean;
   mcpRequirements: string[];
   
+  // AI Model Routing Intelligence
+  preferredProvider?: 'openai' | 'anthropic' | 'gemini' | 'groq' | 'mistral' | 'openai_compat';
+  reasoningLevel: 'basic' | 'intermediate' | 'advanced' | 'expert';
+  contextRequirement: 'short' | 'medium' | 'long' | 'extra-long';
+  responseSpeed: 'fast' | 'balanced' | 'thorough';
+  modelCapabilities: {
+    needsCoding: boolean;
+    needsReasoning: boolean;
+    needsCreativity: boolean;
+    needsFactuality: boolean;
+    needsMultimodal: boolean;
+    needsTools: boolean;
+  };
+  
+  // Intelligence Service Routing
+  intelligenceServices: {
+    coreIntelligence: boolean;
+    agenticIntelligence: boolean;
+    enhancedIntelligence: boolean;
+    advancedCapabilities: boolean;
+    mcpIntegration: boolean;
+  };
+  
   // Analysis metadata
   confidence: number;
   processingRecommendations: string[];
@@ -68,6 +93,8 @@ export interface UnifiedMessageAnalysis {
   language?: string;
   topics?: string[];
   mentions?: string[];
+  urgency: 'low' | 'normal' | 'high' | 'urgent';
+  userExpertise: 'beginner' | 'intermediate' | 'advanced' | 'expert';
 }
 
 /**
@@ -114,9 +141,33 @@ export class UnifiedMessageAnalysisService {
       needsMCPTools: false,
       mcpRequirements: [],
       
+      // AI Model Routing Intelligence
+      reasoningLevel: 'basic',
+      contextRequirement: 'short',
+      responseSpeed: 'balanced',
+      modelCapabilities: {
+        needsCoding: false,
+        needsReasoning: false,
+        needsCreativity: false,
+        needsFactuality: false,
+        needsMultimodal: false,
+        needsTools: false,
+      },
+      
+      // Intelligence Service Routing
+      intelligenceServices: {
+        coreIntelligence: true,
+        agenticIntelligence: false,
+        enhancedIntelligence: false,
+        advancedCapabilities: false,
+        mcpIntegration: false,
+      },
+      
       // Metadata
       confidence: 0.8,
-      processingRecommendations: []
+      processingRecommendations: [],
+      urgency: 'normal',
+      userExpertise: 'intermediate'
     };
 
     try {
@@ -131,9 +182,32 @@ export class UnifiedMessageAnalysisService {
         analysis.needsMultimodal = userCapabilities?.hasMultimodal ?? true;
       }
       
-      // Detect intents and complexity
-      analysis.intents = this.detectIntents(content);
-      analysis.complexity = this.calculateComplexity(content, analysis);
+      // Detect intents and complexity (enhanced with advanced classification)
+      const intentResult = await this.detectIntents(content, {
+        hasAttachments: analysis.hasAttachments,
+        attachmentTypes: analysis.attachmentTypes,
+        hasUrls: analysis.hasUrls
+      });
+      
+      analysis.intents = intentResult.intents;
+      
+      // Use advanced classification to enhance analysis
+      const { intentClassification } = intentResult;
+      
+      // Update analysis with advanced classification insights
+      analysis.complexity = this.mapComplexityFromClassification(intentClassification.complexity, analysis);
+      analysis.urgency = intentClassification.urgency;
+      
+      // Update user expertise based on classification
+      if (intentClassification.complexity === 'expert') {
+        analysis.userExpertise = 'expert';
+      } else if (intentClassification.complexity === 'complex') {
+        analysis.userExpertise = 'advanced';
+      } else if (intentClassification.complexity === 'moderate') {
+        analysis.userExpertise = 'intermediate';
+      } else {
+        analysis.userExpertise = 'beginner';
+      }
       
       // Map to required tools
       analysis.requiredTools = this.mapIntentsToTools(analysis.intents, analysis.attachmentTypes, analysis.urls);
@@ -142,6 +216,14 @@ export class UnifiedMessageAnalysisService {
       if (userCapabilities) {
         this.performEnhancedAnalysis(content, analysis, userCapabilities);
       }
+      
+      // Perform AI routing intelligence analysis
+      this.analyzeModelCapabilities(content, analysis);
+      this.analyzeReasoningLevel(content, analysis);
+      this.analyzeContextRequirement(content, analysis);
+      this.analyzeResponseSpeed(content, analysis);
+      this.analyzeIntelligenceServices(content, analysis);
+      this.analyzeUrgencyAndExpertise(content, analysis);
       
       // Generate processing recommendations
       analysis.processingRecommendations = this.generateProcessingRecommendations(analysis);
@@ -229,7 +311,69 @@ export class UnifiedMessageAnalysisService {
   /**
    * Detect user intents from content
    */
-  private detectIntents(content: string): string[] {
+  /**
+   * Advanced intent detection using machine learning style classification
+   */
+  private async detectIntents(
+    content: string, 
+    context?: {
+      hasAttachments?: boolean;
+      attachmentTypes?: string[];
+      hasUrls?: boolean;
+    }
+  ): Promise<{ intents: string[], intentClassification: IntentClassification }> {
+    try {
+      // Use advanced intent detection service
+      const classification = await advancedIntentDetectionService.classifyIntent(content, context);
+      
+      // Map intent classification to legacy intent format
+      const intents = [classification.primary, ...classification.secondary];
+      
+      logger.debug('Advanced intent detection completed', {
+        operation: 'intent-detection',
+        metadata: {
+          primary: classification.primary,
+          confidence: classification.confidence,
+          category: classification.category,
+          complexity: classification.complexity,
+          urgency: classification.urgency
+        }
+      });
+      
+      return {
+        intents,
+        intentClassification: classification
+      };
+      
+    } catch (error) {
+      logger.error('Advanced intent detection failed, falling back to basic detection', {
+        operation: 'intent-detection-fallback',
+        metadata: { error: String(error) }
+      });
+      
+      // Fallback to basic intent detection
+      const basicIntents = this.detectBasicIntents(content);
+      const fallbackClassification: IntentClassification = {
+        primary: basicIntents[0] || 'general',
+        secondary: basicIntents.slice(1),
+        confidence: 0.6,
+        category: 'informational',
+        reasoning: ['Fallback classification due to advanced detection failure'],
+        urgency: 'normal',
+        complexity: 'moderate'
+      };
+      
+      return {
+        intents: basicIntents,
+        intentClassification: fallbackClassification
+      };
+    }
+  }
+  
+  /**
+   * Basic intent detection (fallback method)
+   */
+  private detectBasicIntents(content: string): string[] {
     const intents = [];
     const lower = content.toLowerCase();
     
@@ -274,7 +418,51 @@ export class UnifiedMessageAnalysisService {
       intents.push('text-to-speech');
     }
     
-    return intents;
+    return intents.length > 0 ? intents : ['general'];
+  }
+
+  /**
+   * Map advanced intent classification complexity to legacy complexity levels
+   */
+  private mapComplexityFromClassification(
+    classificationComplexity: 'simple' | 'moderate' | 'complex' | 'expert', 
+    analysis: Partial<UnifiedMessageAnalysis>
+  ): UnifiedMessageAnalysis['complexity'] {
+    // Start with classification complexity
+    let mappedComplexity: UnifiedMessageAnalysis['complexity'];
+    
+    switch (classificationComplexity) {
+      case 'expert':
+        mappedComplexity = 'advanced';
+        break;
+      case 'complex':
+        mappedComplexity = 'complex';
+        break;
+      case 'moderate':
+        mappedComplexity = 'moderate';
+        break;
+      case 'simple':
+      default:
+        mappedComplexity = 'simple';
+        break;
+    }
+    
+    // Apply additional complexity factors from legacy analysis
+    const additionalFactors = [
+      (analysis.attachmentTypes?.length || 0) > 1,
+      analysis.hasUrls,
+      (analysis.intents?.length || 0) > 2,
+      analysis.intents?.some(intent => ['comparison', 'problem-solving', 'analysis'].includes(intent))
+    ].filter(Boolean).length;
+    
+    // Upgrade complexity if additional factors suggest higher complexity
+    if (additionalFactors >= 3 && mappedComplexity !== 'advanced') {
+      if (mappedComplexity === 'complex') mappedComplexity = 'advanced';
+      else if (mappedComplexity === 'moderate') mappedComplexity = 'complex';
+      else if (mappedComplexity === 'simple') mappedComplexity = 'moderate';
+    }
+    
+    return mappedComplexity;
   }
 
   /**
@@ -479,6 +667,201 @@ export class UnifiedMessageAnalysisService {
     }
 
     return { needed: requirements.length > 0, requirements };
+  }
+
+  /**
+   * Analyze model capabilities needed for the request
+   */
+  private analyzeModelCapabilities(content: string, analysis: UnifiedMessageAnalysis): void {
+    const lower = content.toLowerCase();
+    
+    // Coding capability detection
+    analysis.modelCapabilities.needsCoding = /\b(code|program|function|class|api|debug|error|exception|typescript|javascript|python|java|css|html|sql)\b/.test(lower) 
+      || /```/.test(content)
+      || analysis.intents.includes('problem-solving') && lower.includes('programming');
+    
+    // Reasoning capability detection
+    analysis.modelCapabilities.needsReasoning = /\b(analyze|compare|explain|why|because|reason|logic|think|understand|complex|detailed|elaborate)\b/.test(lower)
+      || analysis.complexity === 'complex' || analysis.complexity === 'advanced'
+      || analysis.intents.includes('analysis') || analysis.intents.includes('comparison');
+    
+    // Creativity capability detection
+    analysis.modelCapabilities.needsCreativity = /\b(create|generate|write|story|poem|creative|imagine|brainstorm|original|artistic|design)\b/.test(lower)
+      || analysis.intents.includes('image-generation');
+    
+    // Factuality capability detection
+    analysis.modelCapabilities.needsFactuality = /\b(fact|facts|accurate|precise|research|study|statistics|data|evidence|truth|correct|verify)\b/.test(lower)
+      || analysis.hasUrls && analysis.intents.includes('analysis');
+    
+    // Multimodal capability detection
+    analysis.modelCapabilities.needsMultimodal = analysis.hasAttachments 
+      || analysis.attachmentTypes.includes('image') 
+      || analysis.attachmentTypes.includes('audio')
+      || analysis.intents.includes('image-generation');
+    
+    // Tools capability detection
+    analysis.modelCapabilities.needsTools = analysis.requiredTools.length > 1
+      || analysis.needsMCPTools
+      || analysis.intents.some(intent => ['search', 'analysis', 'problem-solving'].includes(intent));
+  }
+
+  /**
+   * Analyze reasoning complexity level needed
+   */
+  private analyzeReasoningLevel(content: string, analysis: UnifiedMessageAnalysis): void {
+    const lower = content.toLowerCase();
+    let score = 0;
+    
+    // Basic reasoning indicators
+    if (/\b(what|how|when|where)\b/.test(lower)) score += 1;
+    
+    // Intermediate reasoning indicators
+    if (/\b(why|because|explain|compare|difference)\b/.test(lower)) score += 2;
+    if (analysis.intents.includes('analysis') || analysis.intents.includes('comparison')) score += 2;
+    
+    // Advanced reasoning indicators
+    if (/\b(complex|detailed|elaborate|comprehensive|thorough|in-depth)\b/.test(lower)) score += 3;
+    if (analysis.complexity === 'complex') score += 2;
+    
+    // Expert reasoning indicators
+    if (/\b(research|academic|scientific|technical|professional|expert|advanced)\b/.test(lower)) score += 4;
+    if (analysis.complexity === 'advanced') score += 3;
+    if (analysis.modelCapabilities.needsCoding && analysis.modelCapabilities.needsReasoning) score += 2;
+    
+    if (score >= 8) analysis.reasoningLevel = 'expert';
+    else if (score >= 5) analysis.reasoningLevel = 'advanced';
+    else if (score >= 3) analysis.reasoningLevel = 'intermediate';
+    else analysis.reasoningLevel = 'basic';
+  }
+
+  /**
+   * Analyze context window requirements
+   */
+  private analyzeContextRequirement(content: string, analysis: UnifiedMessageAnalysis): void {
+    let score = 0;
+    
+    // Content length indicators
+    if (content.length > 500) score += 1;
+    if (content.length > 1500) score += 2;
+    if (content.length > 3000) score += 3;
+    
+    // Attachment indicators
+    score += analysis.attachmentTypes.length;
+    
+    // URL indicators
+    score += Math.min(analysis.urls.length, 3);
+    
+    // Intent indicators
+    if (analysis.intents.includes('analysis') || analysis.intents.includes('comparison')) score += 2;
+    if (analysis.intents.includes('conversation-management')) score += 3;
+    
+    // Complexity indicators
+    if (analysis.complexity === 'complex') score += 2;
+    if (analysis.complexity === 'advanced') score += 4;
+    
+    if (score >= 10) analysis.contextRequirement = 'extra-long';
+    else if (score >= 6) analysis.contextRequirement = 'long';
+    else if (score >= 3) analysis.contextRequirement = 'medium';
+    else analysis.contextRequirement = 'short';
+  }
+
+  /**
+   * Analyze response speed preference
+   */
+  private analyzeResponseSpeed(content: string, analysis: UnifiedMessageAnalysis): void {
+    const lower = content.toLowerCase();
+    
+    // Fast response indicators
+    if (/\b(quick|fast|urgent|now|asap|immediately|hurry)\b/.test(lower)) {
+      analysis.responseSpeed = 'fast';
+      return;
+    }
+    
+    // Thorough response indicators  
+    if (/\b(detailed|comprehensive|thorough|complete|elaborate|in-depth|analyze|research)\b/.test(lower)) {
+      analysis.responseSpeed = 'thorough';
+      return;
+    }
+    
+    // Complex requests default to thorough
+    if (analysis.complexity === 'advanced' || analysis.reasoningLevel === 'expert') {
+      analysis.responseSpeed = 'thorough';
+      return;
+    }
+    
+    // Simple requests default to fast
+    if (analysis.complexity === 'simple' && analysis.reasoningLevel === 'basic') {
+      analysis.responseSpeed = 'fast';
+      return;
+    }
+    
+    // Default balanced
+    analysis.responseSpeed = 'balanced';
+  }
+
+  /**
+   * Analyze which intelligence services should be activated
+   */
+  private analyzeIntelligenceServices(content: string, analysis: UnifiedMessageAnalysis): void {
+    // Core intelligence is always active
+    analysis.intelligenceServices.coreIntelligence = true;
+    
+    // Agentic intelligence for complex reasoning and problem-solving
+    analysis.intelligenceServices.agenticIntelligence = 
+      analysis.reasoningLevel === 'advanced' || analysis.reasoningLevel === 'expert'
+      || analysis.modelCapabilities.needsReasoning && analysis.modelCapabilities.needsTools
+      || analysis.intents.includes('problem-solving')
+      || analysis.complexity === 'advanced';
+    
+    // Enhanced intelligence for personalization and advanced features
+    analysis.intelligenceServices.enhancedIntelligence = 
+      analysis.needsPersonaSwitch
+      || analysis.needsConversationManagement 
+      || analysis.needsMemoryOperation
+      || analysis.responseSpeed === 'thorough'
+      || analysis.contextRequirement === 'long' || analysis.contextRequirement === 'extra-long';
+    
+    // Advanced capabilities for specialized tools and features
+    analysis.intelligenceServices.advancedCapabilities = 
+      analysis.modelCapabilities.needsMultimodal && analysis.hasAttachments
+      || analysis.intents.includes('image-generation')
+      || analysis.intents.includes('text-to-speech')
+      || analysis.requiredTools.length > 3;
+    
+    // MCP integration for external tool requirements
+    analysis.intelligenceServices.mcpIntegration = 
+      analysis.needsMCPTools
+      || analysis.intents.includes('search')
+      || analysis.hasUrls && analysis.intents.includes('analysis');
+  }
+
+  /**
+   * Analyze urgency and user expertise level
+   */
+  private analyzeUrgencyAndExpertise(content: string, analysis: UnifiedMessageAnalysis): void {
+    const lower = content.toLowerCase();
+    
+    // Urgency analysis
+    if (/\b(emergency|urgent|critical|asap|now|immediately|help me)\b/.test(lower)) {
+      analysis.urgency = 'urgent';
+    } else if (/\b(soon|quickly|fast|hurry|priority)\b/.test(lower)) {
+      analysis.urgency = 'high';
+    } else if (/\b(whenever|no rush|take your time|later)\b/.test(lower)) {
+      analysis.urgency = 'low';
+    } else {
+      analysis.urgency = 'normal';
+    }
+    
+    // User expertise analysis
+    if (/\b(beginner|new|learning|don't know|simple|basic|explain like|eli5)\b/.test(lower)) {
+      analysis.userExpertise = 'beginner';
+    } else if (/\b(advanced|expert|professional|detailed|technical|complex|in-depth)\b/.test(lower)) {
+      analysis.userExpertise = 'expert';
+    } else if (/\b(intermediate|some experience|familiar|understand)\b/.test(lower) || analysis.modelCapabilities.needsCoding) {
+      analysis.userExpertise = 'advanced';
+    } else {
+      analysis.userExpertise = 'intermediate';
+    }
   }
 
   /**

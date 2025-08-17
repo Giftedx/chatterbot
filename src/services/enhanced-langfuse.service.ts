@@ -7,7 +7,7 @@
 import { Langfuse } from 'langfuse';
 import { features } from '../config/feature-flags.js';
 import { getEnvAsBoolean } from '../utils/env.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 interface TokenUsage {
   input?: number;

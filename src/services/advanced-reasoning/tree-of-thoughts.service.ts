@@ -16,24 +16,10 @@ import {
     ThoughtNode, 
     TreeOfThoughtsSession,
     ReasoningStep,
-    AdvancedReasoningResponse 
+    AdvancedReasoningResponse,
+    TreeSearchConfig,
+    ThoughtEvaluation
 } from './types.js';
-
-export interface TreeSearchConfig {
-    maxDepth: number;
-    branchingFactor: number;
-    evaluationMethod: 'value' | 'vote' | 'confidence';
-    searchStrategy: 'breadth-first' | 'depth-first' | 'best-first';
-    pruningThreshold: number;
-}
-
-export interface ThoughtEvaluation {
-    nodeId: string;
-    value: number;
-    reasoning: string;
-    isPromising: boolean;
-    shouldExpand: boolean;
-}
 
 export class TreeOfThoughtsService {
     private sessions = new Map<string, TreeOfThoughtsSession>();
@@ -47,19 +33,19 @@ export class TreeOfThoughtsService {
     }) {}
 
     /**
-     * Start a new Tree of Thoughts session
+     * Create a new Tree of Thoughts session
      */
-    async startSession(
+    createSession(
         sessionId: string,
         problem: string,
         config?: Partial<TreeSearchConfig>
-    ): Promise<TreeOfThoughtsSession> {
-        const searchConfig = { ...this.defaultConfig, ...config };
+    ): TreeOfThoughtsSession {
+        const fullConfig = { ...this.defaultConfig, ...config };
         
-        // Create root node
         const rootNode: ThoughtNode = {
-            id: 'root',
-            content: problem,
+            id: `root-${sessionId}`,
+            content: `Initial analysis: ${problem}`,
+            parentId: null,
             children: [],
             depth: 0,
             value: 0.5, // Neutral starting value
@@ -67,24 +53,23 @@ export class TreeOfThoughtsService {
             isSelected: false,
             metadata: {
                 timestamp: new Date(),
-                isRoot: true,
-                config: searchConfig
+                generationIndex: 0
             }
         };
 
         const session: TreeOfThoughtsSession = {
             id: sessionId,
             problem,
-            nodes: new Map([['root', rootNode]]),
-            rootNodeId: 'root',
-            selectedPath: [],
-            maxDepth: searchConfig.maxDepth,
-            branchingFactor: searchConfig.branchingFactor,
-            isComplete: false
+            rootNodeId: rootNode.id,
+            nodes: new Map([[rootNode.id, rootNode]]),
+            maxDepth: fullConfig.maxDepth,
+            branchingFactor: fullConfig.branchingFactor,
+            isComplete: false,
+            createdAt: new Date()
         };
 
         this.sessions.set(sessionId, session);
-        logger.info(`Started Tree of Thoughts session: ${sessionId} with problem: ${problem}`);
+        logger.debug(`Created Tree of Thoughts session ${sessionId}`, { problem });
         
         return session;
     }
@@ -148,33 +133,20 @@ export class TreeOfThoughtsService {
     }
 
     /**
-     * Evaluate nodes for their promise and value
+     * Evaluate nodes and assign values
      */
-    async evaluateNodes(
-        sessionId: string,
-        nodeIds: string[]
-    ): Promise<ThoughtEvaluation[]> {
+    async evaluateNodes(sessionId: string, nodeIds: string[]): Promise<void> {
         const session = this.sessions.get(sessionId);
-        if (!session) {
-            throw new Error(`Session ${sessionId} not found`);
-        }
-
-        const evaluations: ThoughtEvaluation[] = [];
+        if (!session) return;
 
         for (const nodeId of nodeIds) {
             const node = session.nodes.get(nodeId);
-            if (!node) continue;
-
-            const evaluation = await this.evaluateNode(node, session);
-            evaluations.push(evaluation);
-            
-            // Update node value
-            node.value = evaluation.value;
-            node.metadata.evaluation = evaluation;
+            if (node) {
+                const evaluation = await this.evaluateNode(node, session);
+                node.value = evaluation.value;
+                node.metadata.evaluationReason = evaluation.reasoning;
+            }
         }
-
-        logger.debug(`Evaluated ${evaluations.length} nodes for session ${sessionId}`);
-        return evaluations;
     }
 
     /**
@@ -210,72 +182,36 @@ export class TreeOfThoughtsService {
         config?: Partial<TreeSearchConfig>
     ): Promise<AdvancedReasoningResponse> {
         const startTime = Date.now();
-        const session = await this.startSession(sessionId, problem, config);
+        
+        // Create or retrieve session
+        const session = this.sessions.get(sessionId) || 
+                       this.createSession(sessionId, problem, config);
+
         const reasoningSteps: ReasoningStep[] = [];
 
-        // Initial step
-        reasoningSteps.push({
-            id: `tot-start-${sessionId}`,
-            type: 'thought',
-            content: `Starting Tree of Thoughts exploration for: ${problem}`,
-            timestamp: new Date(),
-            confidence: 0.5,
-            metadata: { nodeId: session.rootNodeId, depth: 0 }
-        });
+        // Explore the tree systematically
+        await this.exploreTree(session, session.branchingFactor > 2 ? 'best-first' : 'breadth-first', reasoningSteps);
 
-        // Tree exploration process
-        const searchStrategy = config?.searchStrategy || this.defaultConfig.searchStrategy;
-        await this.exploreTree(session, searchStrategy, reasoningSteps);
-
-        // Select best path
+        // Select the best path
         const bestPath = this.selectBestPath(sessionId);
-        const solution = this.constructSolution(session, bestPath);
-
-        // Final reasoning step
-        reasoningSteps.push({
-            id: `tot-solution-${sessionId}`,
-            type: 'thought',
-            content: `Final solution: ${solution}`,
-            timestamp: new Date(),
-            confidence: this.calculatePathConfidence(session, bestPath),
-            metadata: { 
-                pathLength: bestPath.length,
-                totalNodesExplored: session.nodes.size
-            }
-        });
+        const pathContent = this.constructSolution(session, bestPath);
 
         session.isComplete = true;
-        session.solution = solution;
-
-        const finalConfidence = this.calculateOverallConfidence(session);
         const processingTime = Date.now() - startTime;
 
         return {
             id: sessionId,
             type: 'tree-of-thoughts',
-            primaryResponse: solution,
+            primaryResponse: pathContent,
             reasoningProcess: reasoningSteps,
-            confidence: finalConfidence,
+            confidence: this.calculatePathConfidence(session, bestPath),
             alternatives: this.generateAlternatives(session),
             metadata: {
                 processingTime,
                 complexityScore: this.calculateComplexity(session),
-                resourcesUsed: ['tree-of-thoughts', 'multi-path-exploration'],
-                errorRecovery: this.getErrorRecovery(session)
+                resourcesUsed: ['tree-of-thoughts', 'evaluation-heuristics']
             }
         };
-    }
-
-    /**
-     * Get session tree visualization
-     */
-    getTreeVisualization(sessionId: string): Record<string, any> {
-        const session = this.sessions.get(sessionId);
-        if (!session) {
-            throw new Error(`Session ${sessionId} not found`);
-        }
-
-        return this.buildTreeVisualization(session);
     }
 
     // Private helper methods
@@ -302,61 +238,27 @@ export class TreeOfThoughtsService {
     }
 
     private generateProblemDecomposition(problem: string): string[] {
-        const decompositions: string[] = [];
-        
-        // Analytical decomposition
-        decompositions.push(`Break down "${problem}" into smaller sub-problems`);
-        
-        // Different perspective approaches
-        decompositions.push(`Approach "${problem}" from a practical implementation perspective`);
-        decompositions.push(`Consider the theoretical foundations needed for "${problem}"`);
-        
-        // Creative approaches
-        if (decompositions.length < 3) {
-            decompositions.push(`Explore unconventional solutions to "${problem}"`);
-        }
-
-        return decompositions;
+        return [
+            `Break down the core components of: ${problem}`,
+            `Consider different perspectives on: ${problem}`,
+            `Identify key constraints and requirements for: ${problem}`
+        ];
     }
 
     private generateApproachVariations(parentContent: string): string[] {
-        const variations: string[] = [];
-        
-        if (parentContent.includes('break down')) {
-            variations.push("Identify the core components and their relationships");
-            variations.push("Prioritize components by complexity and dependency");
-            variations.push("Map out sequential steps for implementation");
-        } else if (parentContent.includes('practical')) {
-            variations.push("Focus on immediate, actionable steps");
-            variations.push("Consider resource constraints and limitations");
-            variations.push("Develop a minimum viable solution first");
-        } else if (parentContent.includes('theoretical')) {
-            variations.push("Research existing frameworks and methodologies");
-            variations.push("Understand underlying principles and concepts");
-            variations.push("Analyze similar problems and their solutions");
-        } else {
-            variations.push("Explore this direction with systematic analysis");
-            variations.push("Consider alternative interpretations of this approach");
-            variations.push("Develop this idea with concrete examples");
-        }
-
-        return variations;
+        return [
+            `Direct approach: ${parentContent} - implement straightforward solution`,
+            `Alternative approach: ${parentContent} - explore creative alternatives`,
+            `Systematic approach: ${parentContent} - use structured methodology`
+        ];
     }
 
     private generateRefinements(content: string, depth: number): string[] {
-        const refinements: string[] = [];
-        
-        // Add depth-specific refinements
-        if (depth === 2) {
-            refinements.push(`Elaborate on: ${content} with specific examples`);
-            refinements.push(`Consider potential challenges with: ${content}`);
-            refinements.push(`Optimize the approach in: ${content}`);
-        } else if (depth >= 3) {
-            refinements.push(`Final implementation details for: ${content}`);
-            refinements.push(`Validation and testing approach for: ${content}`);
-        }
-
-        return refinements;
+        return [
+            `Refine and elaborate on: ${content}`,
+            `Consider edge cases for: ${content}`,
+            `Optimize the solution: ${content}`
+        ];
     }
 
     private async evaluateNode(
@@ -381,70 +283,56 @@ export class TreeOfThoughtsService {
     }
 
     private assessRelevance(content: string, problem: string): number {
-        // Simple relevance assessment based on word overlap and context
-        const problemWords = problem.toLowerCase().split(' ');
-        const contentWords = content.toLowerCase().split(' ');
-        
-        const overlap = problemWords.filter(word => 
-            word.length > 3 && contentWords.some(cWord => cWord.includes(word))
-        ).length;
-        
-        const maxRelevance = Math.min(problemWords.length, 5);
-        return Math.min(1.0, overlap / maxRelevance + 0.3); // Base relevance of 0.3
+        // Simple relevance assessment based on keyword overlap
+        const problemWords = problem.toLowerCase().split(/\s+/);
+        const contentWords = content.toLowerCase().split(/\s+/);
+        const overlap = problemWords.filter(word => contentWords.includes(word)).length;
+        return Math.min(1.0, overlap / Math.max(problemWords.length * 0.3, 1));
     }
 
     private assessClarity(content: string): number {
-        let score = 0.5; // Base score
+        // Assess clarity based on content length and structure
+        const words = content.split(/\s+/).length;
+        const sentences = content.split(/[.!?]+/).length;
+        const avgWordsPerSentence = words / Math.max(sentences, 1);
         
-        // Clarity indicators
-        if (content.includes('specifically') || content.includes('by')) score += 0.2;
-        if (content.length > 20 && content.length < 200) score += 0.2;
-        if (content.includes('step') || content.includes('approach')) score += 0.1;
-        
-        // Clarity detractors
-        if (content.includes('somehow') || content.includes('maybe')) score -= 0.2;
-        if (content.length < 10) score -= 0.3;
-        
-        return Math.max(0.1, Math.min(1.0, score));
+        // Prefer moderate length with clear structure
+        if (avgWordsPerSentence >= 5 && avgWordsPerSentence <= 20 && words >= 10) {
+            return 0.8;
+        } else if (words < 5) {
+            return 0.4; // Too brief
+        } else {
+            return 0.6; // Either too long or poorly structured
+        }
     }
 
     private assessFeasibility(content: string, depth: number): number {
-        let score = 0.6; // Base feasibility
-        
-        // More specific thoughts at deeper levels should be more feasible
-        score += depth * 0.1;
-        
-        // Feasibility indicators
-        if (content.includes('implement') || content.includes('use')) score += 0.2;
-        if (content.includes('simple') || content.includes('direct')) score += 0.1;
-        
-        // Feasibility concerns
-        if (content.includes('complex') || content.includes('difficult')) score -= 0.1;
-        if (content.includes('impossible') || content.includes('can\'t')) score -= 0.3;
-        
-        return Math.max(0.1, Math.min(1.0, score));
+        // Deeper nodes should be more specific and actionable
+        const specificity = content.includes('implement') || content.includes('use') || 
+                          content.includes('apply') || content.includes('create') ? 0.8 : 0.5;
+        const depthBonus = Math.min(0.3, depth * 0.1);
+        return Math.min(1.0, specificity + depthBonus);
     }
 
     private assessCreativity(content: string, session: TreeOfThoughtsSession): number {
-        let score = 0.4; // Base creativity
+        // Check for creative or novel approaches
+        const creativeWords = ['innovative', 'creative', 'novel', 'unique', 'alternative', 'unconventional'];
+        const hasCreativeWords = creativeWords.some(word => content.toLowerCase().includes(word));
         
-        // Check for unique words compared to other nodes
-        const allContent = Array.from(session.nodes.values())
-            .map(n => n.content.toLowerCase())
-            .join(' ');
+        // Check for uniqueness within the session
+        const allContent = Array.from(session.nodes.values()).map(n => n.content);
+        const similarity = allContent.filter(other => other !== content && 
+                                           this.calculateSimilarity(content, other) > 0.7).length;
         
-        const contentWords = content.toLowerCase().split(' ');
-        const uniqueWords = contentWords.filter(word => 
-            word.length > 4 && !allContent.includes(word)
-        );
-        
-        score += uniqueWords.length * 0.1;
-        
-        // Creativity indicators
-        if (content.includes('alternative') || content.includes('innovative')) score += 0.2;
-        if (content.includes('unconventional') || content.includes('creative')) score += 0.2;
-        
-        return Math.max(0.1, Math.min(1.0, score));
+        const uniqueness = Math.max(0, 1 - similarity * 0.2);
+        return (hasCreativeWords ? 0.7 : 0.5) * uniqueness;
+    }
+
+    private calculateSimilarity(text1: string, text2: string): number {
+        const words1 = text1.toLowerCase().split(/\s+/);
+        const words2 = text2.toLowerCase().split(/\s+/);
+        const intersection = words1.filter(word => words2.includes(word));
+        return intersection.length / Math.max(words1.length, words2.length);
     }
 
     private async exploreTree(
@@ -553,102 +441,43 @@ export class TreeOfThoughtsService {
     private constructSolution(session: TreeOfThoughtsSession, path: string[]): string {
         const pathNodes = path.map(id => session.nodes.get(id)).filter(Boolean) as ThoughtNode[];
         
-        if (pathNodes.length <= 1) {
-            return "Unable to construct solution from the explored tree.";
+        if (pathNodes.length === 0) {
+            return "Unable to construct solution path.";
         }
 
-        // Construct solution from the path
-        const solutionParts = pathNodes.slice(1).map((node, index) => 
-            `${index + 1}. ${node.content}`
-        );
+        const solution = [
+            `**Analysis of: ${session.problem}**`,
+            '',
+            ...pathNodes.slice(1).map((node, index) => 
+                `${index + 1}. ${node.content} *(confidence: ${Math.round(node.value * 100)}%)*`
+            ),
+            '',
+            `**Final recommendation:** ${pathNodes[pathNodes.length - 1].content}`
+        ];
 
-        return `Solution approach:\n${solutionParts.join('\n')}`;
+        return solution.join('\n');
     }
 
     private calculatePathConfidence(session: TreeOfThoughtsSession, path: string[]): number {
         const pathNodes = path.map(id => session.nodes.get(id)).filter(Boolean) as ThoughtNode[];
+        if (pathNodes.length === 0) return 0;
         
-        if (pathNodes.length === 0) return 0.1;
-        
-        const avgValue = pathNodes.reduce((sum, node) => sum + node.value, 0) / pathNodes.length;
-        return Math.max(0.1, Math.min(1.0, avgValue));
-    }
-
-    private calculateOverallConfidence(session: TreeOfThoughtsSession): number {
-        const pathConfidence = this.calculatePathConfidence(session, session.selectedPath);
-        const explorationBonus = Math.min(0.2, session.nodes.size * 0.01); // Bonus for thorough exploration
-        
-        return Math.max(0.1, Math.min(1.0, pathConfidence + explorationBonus));
+        const avgConfidence = pathNodes.reduce((sum, node) => sum + node.value, 0) / pathNodes.length;
+        return Math.round(avgConfidence * 100) / 100;
     }
 
     private generateAlternatives(session: TreeOfThoughtsSession): string[] {
-        const alternatives: string[] = [];
-        
         // Find alternative high-value paths
-        const allLeafNodes = Array.from(session.nodes.values())
-            .filter(node => node.children.length === 0 && node.value > 0.5);
+        const allNodes = Array.from(session.nodes.values());
+        const leafNodes = allNodes.filter(node => node.children.length === 0 && node.value > 0.5);
         
-        if (allLeafNodes.length > 1) {
-            alternatives.push("Multiple promising solution paths were identified");
-        }
-        
-        // Check for unexplored high-value nodes
-        const unexploredNodes = Array.from(session.nodes.values())
-            .filter(node => !node.isExpanded && node.value > 0.6);
-        
-        if (unexploredNodes.length > 0) {
-            alternatives.push("Additional promising paths could be explored");
-        }
-        
-        return alternatives;
+        return leafNodes
+            .sort((a, b) => b.value - a.value)
+            .slice(1, 4) // Top 3 alternatives
+            .map(node => `Alternative approach: ${node.content} (${Math.round(node.value * 100)}% confidence)`);
     }
 
     private calculateComplexity(session: TreeOfThoughtsSession): number {
-        const nodeCount = session.nodes.size;
-        const maxDepth = Math.max(...Array.from(session.nodes.values()).map(n => n.depth));
-        return Math.min(10, nodeCount * 0.1 + maxDepth);
-    }
-
-    private getErrorRecovery(session: TreeOfThoughtsSession): string[] {
-        const recovery: string[] = [];
-        
-        const lowValueNodes = Array.from(session.nodes.values())
-            .filter(node => node.value < this.defaultConfig.pruningThreshold);
-        
-        if (lowValueNodes.length > 0) {
-            recovery.push("Pruned low-value reasoning paths to focus on promising directions");
-        }
-        
-        return recovery;
-    }
-
-    private buildTreeVisualization(session: TreeOfThoughtsSession): Record<string, any> {
-        const visualization: Record<string, any> = {
-            sessionId: session.id,
-            problem: session.problem,
-            totalNodes: session.nodes.size,
-            selectedPath: session.selectedPath,
-            isComplete: session.isComplete,
-            tree: {}
-        };
-
-        // Build tree structure
-        const buildNodeTree = (nodeId: string): any => {
-            const node = session.nodes.get(nodeId);
-            if (!node) return null;
-
-            return {
-                id: node.id,
-                content: node.content,
-                value: node.value,
-                depth: node.depth,
-                isSelected: node.isSelected,
-                isExpanded: node.isExpanded,
-                children: node.children.map(childId => buildNodeTree(childId)).filter(Boolean)
-            };
-        };
-
-        visualization.tree = buildNodeTree(session.rootNodeId);
-        return visualization;
+        return session.nodes.size / 10; // Simple complexity based on tree size
     }
 }

@@ -44,7 +44,8 @@
     "config:check": "node scripts/production-validation.js",
     "health:check": "curl -f http://localhost:${HEALTH_CHECK_PORT:-3000}/health || echo 'Health check failed'",
     "performance:test": "echo 'Performance testing requires running service'",
-    "load:test": "echo 'Load testing requires running service'"
+  "load:test": "echo 'Load testing requires running service'",
+  "demo:perf-routing": "tsx src/scripts/perf-routing-demo.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,cts,mts,cjs,mjs}": [

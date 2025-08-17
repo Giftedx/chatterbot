@@ -1,5 +1,9 @@
 {
-  "entryPoints": ["src/index.ts"],
+  "entryPoints": [
+    "src/index.ts",
+    "src/services/performance-aware-routing.service.ts",
+    "src/services/intelligent-fallback-system.service.ts"
+  ],
   "out": "docs/api",
   "name": "Chatterbot",
   "includeVersion": true,

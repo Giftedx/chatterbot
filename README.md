@@ -16,6 +16,7 @@ Chatterbot is a modern Discord bot that gives your server a helpful, safe, multi
 - **Enhanced AI Pipeline**: `src/services/core-intelligence.service.ts`
   - **Multi-layered Processing**: Semantic caching → Enhanced observability → Message analysis → Multimodal processing → Knowledge graph integration → RAG optimization → Model routing → AI evaluation → Performance monitoring
   - **10 AI Enhancement Services**: Advanced capabilities including sentiment analysis, context memory, conversation threading, predictive responses, and more
+  - Optional: Unified Cognitive Pipeline orchestrator (`src/services/unified-cognitive-pipeline.service.ts`) behind a feature flag for end-to-end, options-tree-driven processing. Enable with `FEATURE_UNIFIED_COGNITIVE_PIPELINE=true` in `.env`.
 - Providers and routing: `src/services/model-router.service.ts`, `src/config/models.ts`
 - **Enhanced Knowledge Systems**: 
   - Vector search: `src/services/qdrant-vector.service.ts` (Qdrant integration)
@@ -277,6 +278,26 @@ Enable lightweight telemetry events to Langfuse. Safe no-op unless enabled and k
   - `LANGFUSE_SECRET_KEY=...`
   - Optional: `LANGFUSE_BASE_URL=https://cloud.langfuse.com`
 
+## Performance-Aware Routing
+For provider/model/service selection based on real-time performance and historical data.
+
+- Overview: `AI-PERFORMANCE-AWARE-ROUTING-COMPLETE.md`
+- Guide: `docs/routing/performance-aware-routing.md`
+- API: generated TypeDoc at `docs/api`
+
+Quickstart:
+
+```ts
+import { PerformanceAwareRoutingSystem } from './src/services/performance-aware-routing.service';
+
+const router = new PerformanceAwareRoutingSystem();
+const decision = await router.makePerformanceAwareRoutingDecision(
+  { content: 'Summarize this', complexity: 0.5 },
+  { maxResponseTime: 3000, qualityThreshold: 0.85 }
+);
+console.log(decision.selectedProvider, decision.selectedModel, decision.selectedService);
+```
+
 ## Commands
 - `/chat` — initial opt-in only (sets up consent and a DM or personal thread)
   - After opting in, just send messages directly (DM or your personal thread). You don't need to use `/chat` again.
@@ -347,6 +368,11 @@ docker run -d --name chatterbot --env-file .env \
 ```
 - CI: `.github/workflows/ci.yml` (typecheck/lint/test/build), `.github/workflows/docker-publish.yml` (GHCR)
 - Railway: see `DEPLOYMENT.md`
+
+## Documentation
+- API reference is generated with TypeDoc into `docs/api/` and is automatically published to GitHub Pages from `main`.
+- Entry point for guides: `docs/INDEX.md` (routing, troubleshooting, integration, feature flags, and more).
+- If Pages is enabled for this repository, the API docs will be available at: `https://<owner>.github.io/<repo>/`.
 
 ## Security and privacy
 - Secrets live in `.env` (gitignored). Do not commit credentials.

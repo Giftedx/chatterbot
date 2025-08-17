@@ -1,5 +1,5 @@
 import { performanceMonitor, PerformanceDashboard } from '../services/performance-monitoring.service.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Performance Dashboard Controller

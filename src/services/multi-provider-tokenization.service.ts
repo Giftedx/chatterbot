@@ -6,7 +6,7 @@
 
 import { encoding_for_model, get_encoding } from '@dqbd/tiktoken';
 import { features } from '../config/feature-flags.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 export type SupportedProvider = 'openai' | 'anthropic' | 'google' | 'qwen' | 'mistral' | 'groq';
 export type SupportedModel = 

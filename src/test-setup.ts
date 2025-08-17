@@ -124,6 +124,12 @@ if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === undefined) {
       'TensorFlow.js in Node.js',
       // Provider/client mock advisories
       'OpenAI client not available, using mock response',
+      // Qdrant noisy client/network warnings surfaced after tests complete
+      'Qdrant',
+      'QDRANT',
+      'qdrant',
+      // Jest prints this when something logs after teardown; swallow to keep output clean
+      'Cannot log after tests are done',
     ];
     if (silencePatterns.some((p) => text.includes(p))) {
       return; // ignore expected provider warnings in test mode

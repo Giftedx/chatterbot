@@ -6,7 +6,7 @@
 
 import neo4j, { Driver, Session, Record, Node, Relationship } from 'neo4j-driver';
 import { features } from '../config/feature-flags.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 export interface GraphEntity {
   id?: string;

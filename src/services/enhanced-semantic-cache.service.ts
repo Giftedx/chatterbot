@@ -6,7 +6,7 @@
 
 import { createHash } from 'crypto';
 import { features } from '../config/feature-flags.js';
-import logger from '../utils/logger.js';
+import { logger } from '../utils/logger.js';
 
 interface CacheEntry {
   id: string;

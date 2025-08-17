@@ -10,22 +10,21 @@ import { privacyCommands } from '../../commands/privacy-commands.js';
 // Use moduleNameMapper for @prisma/client and our db/prisma uses that; avoid overriding here
 
 // Mock logger first before any imports
-jest.mock('../../utils/logger.js', () => ({
-  logger: {
+jest.mock('../../utils/logger.js', () => {
+  const mock = {
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-  },
-  Logger: {
-    getInstance: jest.fn(() => ({
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    })),
-  },
-}));
+  };
+  return {
+    logger: mock,
+    default: mock,
+    Logger: {
+      getInstance: jest.fn(() => mock),
+    },
+  };
+});
 
 // Mock other services that may cause issues
 jest.mock('../../services/cache.service.js', () => ({

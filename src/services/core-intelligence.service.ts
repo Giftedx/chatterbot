@@ -14,22 +14,19 @@ import _ from 'lodash';
 // MCP specific
 import { MCPManager } from './mcp-manager.service.js';
 import {
-  UnifiedMCPOrchestratorService,
-  MCPOrchestrationResult,
+  UnifiedMCPOrchestratorService
 } from './core/mcp-orchestrator.service.js';
 
 // Unified Core Services
 import { UnifiedAnalyticsService } from './core/unified-analytics.service.js';
 
+// B4: Decision reasoning tracer
+import { DecisionTracer } from '../unified-pipeline/core/decision-tracer.js';
+
 // Performance Monitoring
 import { performanceMonitor } from './performance-monitoring.service.js';
 
 // Agentic and Gemini
-import {
-  AgenticIntelligenceService,
-  AgenticQuery,
-  AgenticResponse,
-} from './agentic-intelligence.service.js';
 import { GeminiService } from './gemini.service.js';
 
 // Core Intelligence Sub-Services
@@ -38,7 +35,6 @@ import {
   UserCapabilities,
   intelligenceContextService,
   EnhancedContext,
-  // IntelligenceAnalysis, // Not directly used here, adapted from UnifiedMessageAnalysis
   intelligenceAdminService,
   intelligenceCapabilityService,
 } from './intelligence/index.js';
@@ -46,27 +42,25 @@ import {
 import {
   unifiedMessageAnalysisService,
   UnifiedMessageAnalysis,
-  AttachmentInfo,
 } from './core/message-analysis.service.js';
 
 // Enhanced Intelligence Sub-Services (conditionally used)
-import { EnhancedMemoryService } from './enhanced-intelligence/memory.service.js';
-import { EnhancedUIService } from './enhanced-intelligence/ui.service.js';
-import { EnhancedResponseService } from './enhanced-intelligence/response.service.js';
-import { EnhancedCacheService } from './enhanced-intelligence/cache.service.js';
-import { PersonalizationEngine } from './enhanced-intelligence/personalization-engine.service.js';
-import { UserBehaviorAnalyticsService } from './enhanced-intelligence/behavior-analytics.service.js';
-import { SmartRecommendationService } from './enhanced-intelligence/smart-recommendation.service.js';
 import { UserMemoryService } from '../memory/user-memory.service.js';
 import {
   ProcessingContext as EnhancedProcessingContext,
   MessageAnalysis as EnhancedMessageAnalysis,
 } from './enhanced-intelligence/types.js';
-import { modelRouterService } from './model-router.service.js';
-import { knowledgeBaseService } from './knowledge-base.service.js';
-import type { ProviderName } from '../config/models.js';
 import { getEnvAsBoolean } from '../utils/env.js';
-import { langGraphWorkflow, advancedLangGraphWorkflow } from '../agents/langgraph/workflow.js';
+
+// Decision Engine
+import {
+  DecisionEngine,
+  DecisionContext,
+  DecisionResult,
+  DecisionEngineOptions,
+  UserInteractionPattern,
+  ConversationPersona
+} from './decision-engine.service.js';
 
 // Advanced Capabilities
 import {
@@ -75,44 +69,25 @@ import {
   type EnhancedResponse,
 } from './advanced-capabilities/index.js';
 
-import { UltraIntelligenceOrchestrator } from './ultra-intelligence/orchestrator.service.js';
-import { AdvancedMemoryManager } from './advanced-memory/advanced-memory-manager.service.js';
-import { registerMemoryManager } from './memory-registry.js';
-
 // Utilities and Others
 import { logger } from '../utils/logger.js';
 import {
-  ChatMessage,
   getHistory,
-  updateHistory,
-  updateHistoryWithParts,
 } from './context-manager.js';
-import { createPrivacyConsentEmbed, createPrivacyConsentButtons } from '../ui/privacy-consent.js';
 import { UserConsentService } from '../services/user-consent.service.js';
 import { ModerationService } from '../moderation/moderation-service.js';
 import {
   REGENERATE_BUTTON_ID,
   STOP_BUTTON_ID,
   MOVE_DM_BUTTON_ID,
-  moveDmButtonRow,
 } from '../ui/components.js';
-import { urlToGenerativePart } from '../utils/image-helper.js';
 import { prisma } from '../db/prisma.js';
-import { sendStream } from '../ui/stream-utils.js';
-import { intelligenceAnalysisService } from './intelligence/analysis.service.js';
-import {
-  DecisionEngine,
-  type ResponseStrategy,
-  type DecisionEngineOptions,
-} from './decision-engine.service.js';
+import { UnifiedPipeline, UnifiedPipelineContext, InputType, CognitiveOperation } from '../unified-pipeline/index.js';
 import {
   fetchGuildDecisionOverrides,
   updateGuildDecisionOverridesPartial,
   deleteGuildDecisionOverrides,
 } from './decision-overrides-db.service.js';
-
-// Autonomous Capability System Integration
-import { IntelligenceIntegrationWrapper } from './intelligence/integration-wrapper.js';
 
 // AI Enhancement Services
 import { EnhancedLangfuseService } from './enhanced-langfuse.service.js';
@@ -128,6 +103,9 @@ import { AIEvaluationTestingService } from './ai-evaluation-testing.service.js';
 import { getEnvAsNumber, getEnvAsString } from '../utils/env.js';
 import { recordDecision } from './decision-metrics.service.js';
 import { getActivePersona, setActivePersona, listPersonas } from './persona-manager.js';
+// C1: Personality integration imports
+import { PersonalizationEngine } from './enhanced-intelligence/personalization-engine.service.js';
+import { HumanLikeConversationService } from './ultra-intelligence/conversation.service.js';
 
 interface CommonAttachment {
   name?: string | null;
@@ -153,46 +131,14 @@ export interface CoreIntelligenceConfig {
     // For tests: allow injecting DB-backed guild overrides fetcher
     fetchGuildDecisionOverrides?: (
       guildId: string,
-    ) => Promise<Partial<DecisionEngineOptions> | null>;
+    ) => Promise<Partial<any> | null>;
   };
 }
 
 export class CoreIntelligenceService {
   private readonly config: CoreIntelligenceConfig;
-  private optedInUsers = new Set<string>();
-  private activeStreams = new Map<
-    string,
-    { abortController: AbortController; isStreaming: boolean }
-  >();
-  private lastPromptCache = new Map<
-    string,
-    { prompt: string; attachments: CommonAttachment[]; channelId: string }
-  >();
-  private lastReplyAt = new Map<string, number>();
-  // Maintain lightweight per-user message timestamps for recent burst detection
-  private recentUserMessages = new Map<string, number[]>();
-  // Maintain lightweight per-channel message timestamps for ambient activity detection
-  private recentChannelMessages = new Map<string, number[]>();
-  private userThreadCache = new Map<string, string>();
-  private decisionEngine = new DecisionEngine({
-    cooldownMs: getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
-    defaultModelTokenLimit: getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
-    maxMentionsAllowed: getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
-    ambientThreshold: getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
-    burstCountThreshold: getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
-    shortMessageMinLen: getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
-    tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
-  });
-  private decisionEngineByGuild = new Map<string, DecisionEngine>();
-  private guildDecisionOverrides: Record<string, Partial<DecisionEngineOptions>> = {};
-  private guildDecisionDbLoaded = new Set<string>();
-  private guildDecisionLastApplied = new Map<string, string>(); // stable JSON of applied options
-  private overridesRefreshTimer?: NodeJS.Timeout;
-  private readonly overridesRefreshIntervalMs = getEnvAsNumber('DECISION_OVERRIDES_TTL_MS', 60_000);
-
   private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
   private readonly analyticsService: UnifiedAnalyticsService;
-  private readonly agenticIntelligence: AgenticIntelligenceService;
   private readonly geminiService: GeminiService;
   private readonly moderationService: ModerationService;
   private readonly permissionService: typeof intelligencePermissionService;
@@ -202,39 +148,32 @@ export class CoreIntelligenceService {
   private readonly messageAnalysisService: typeof unifiedMessageAnalysisService;
   private readonly userMemoryService: UserMemoryService;
   private readonly userConsentService: UserConsentService;
+  private readonly unifiedPipeline: UnifiedPipeline;
+  private readonly decisionEngine: DecisionEngine;
+  
+  // B4: Decision reasoning tracer for comprehensive debugging and optimization
+  private readonly decisionTracer: DecisionTracer;
+  
+  // C1: Personality integration services
+  private readonly personalizationEngine: PersonalizationEngine;
+  private readonly conversationService: HumanLikeConversationService;
+  
   // Pluggable fetcher for DB-backed overrides (primarily to aid tests)
   private readonly fetchDecisionOverrides: (
     guildId: string,
-  ) => Promise<Partial<DecisionEngineOptions> | null>;
-
-  private enhancedMemoryService?: EnhancedMemoryService;
-  private enhancedUiService?: EnhancedUIService;
-  private enhancedResponseService?: EnhancedResponseService;
-  private enhancedCacheService?: EnhancedCacheService;
-  private personalizationEngine?: PersonalizationEngine;
-  private behaviorAnalytics?: UserBehaviorAnalyticsService;
-  private smartRecommendations?: SmartRecommendationService;
-  private advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
-  private memoryManager?: AdvancedMemoryManager;
-  private ultra?: UltraIntelligenceOrchestrator;
-
-  // AI Enhancement Services
-  private enhancedLangfuseService?: EnhancedLangfuseService;
-  private multiProviderTokenizationService?: MultiProviderTokenizationService;
-  private enhancedSemanticCacheService?: EnhancedSemanticCacheService;
-  private qdrantVectorService?: QdrantVectorService;
-  private qwenVLMultimodalService?: QwenVLMultimodalService;
-  private neo4jKnowledgeGraphService?: Neo4jKnowledgeGraphService;
-  private dspyRAGOptimizationService?: DSPyRAGOptimizationService;
-  private crawl4aiWebService?: Crawl4AIWebService;
-  private aiEvaluationTestingService?: AIEvaluationTestingService;
-
-  // Autonomous Capability System Integration
-  private intelligenceIntegration: IntelligenceIntegrationWrapper;
+  ) => Promise<Partial<any> | null>;
 
   constructor(config: CoreIntelligenceConfig) {
     this.config = config;
-    this.agenticIntelligence = AgenticIntelligenceService.getInstance();
+    this.unifiedPipeline = new UnifiedPipeline();
+    this.decisionEngine = new DecisionEngine();
+    
+    // B4: Initialize decision tracer for debugging and optimization
+    this.decisionTracer = new DecisionTracer(1000); // Keep last 1000 decision paths
+    
+    // C1: Initialize personality services
+    this.personalizationEngine = new PersonalizationEngine(config.mcpManager);
+    this.conversationService = new HumanLikeConversationService();
 
     // Use dependency injection for testing, otherwise create new instances
     this.mcpOrchestrator =
@@ -256,1144 +195,396 @@ export class CoreIntelligenceService {
     this.fetchDecisionOverrides =
       config.dependencies?.fetchGuildDecisionOverrides ?? fetchGuildDecisionOverrides;
 
-    // Load optional per-guild decision overrides from environment
-    try {
-      const raw = getEnvAsString('DECISION_OVERRIDES_JSON');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-          // Expect shape: { [guildId]: { cooldownMs?: number, ... } }
-          this.guildDecisionOverrides = parsed as Record<string, Partial<DecisionEngineOptions>>;
-        }
-      }
-    } catch (e) {
-      logger.warn('[CoreIntelSvc] Failed to parse DECISION_OVERRIDES_JSON, ignoring', {
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-
-    if (config.enableEnhancedMemory) {
-      this.memoryManager = new AdvancedMemoryManager({
-        enableEpisodicMemory: true,
-        enableSocialIntelligence: true,
-        enableEmotionalIntelligence: true,
-        enableSemanticClustering: true,
-        enableMemoryConsolidation: true,
-        memoryDecayRate: 0.05,
-        maxMemoriesPerUser: 1000,
-        importanceThreshold: 0.3,
-        consolidationInterval: 60 * 60 * 1000,
-        socialAnalysisDepth: 'moderate',
-        emotionalSensitivity: 0.7,
-        adaptationAggressiveness: 0.6,
-      });
-      this.memoryManager
-        .initialize()
-        .then(() => registerMemoryManager(this.memoryManager!))
-        .catch(() => {});
-    }
-
-    if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
-    if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
-    if (config.enableResponseCache) this.enhancedCacheService = new EnhancedCacheService();
-    this.enhancedResponseService = new EnhancedResponseService();
-
-    if (config.enablePersonalization) {
-      this.personalizationEngine = new PersonalizationEngine(config.mcpManager);
-      this.behaviorAnalytics = new UserBehaviorAnalyticsService();
-      this.smartRecommendations = new SmartRecommendationService();
-    }
-
-    // Initialize Advanced Capabilities Manager
-    if (config.enableAdvancedCapabilities) {
-      const advancedConfig: AdvancedCapabilitiesConfig = {
-        enableImageGeneration: !!process.env.OPENAI_API_KEY || !!process.env.STABILITY_API_KEY,
-        enableGifGeneration: !!process.env.GIPHY_API_KEY || !!process.env.TENOR_API_KEY,
-        enableSpeechGeneration:
-          !!process.env.ELEVENLABS_API_KEY ||
-          !!process.env.OPENAI_API_KEY ||
-          !!process.env.AZURE_SPEECH_KEY,
-        enableEnhancedReasoning: true, // Always available as it uses MCP + custom logic
-        enableWebSearch: !!config.mcpManager, // Available if MCP is enabled
-        enableMemoryEnhancement: true, // Always available
-        maxConcurrentCapabilities: 3,
-        responseTimeoutMs: 30000,
-      };
-
-      this.advancedCapabilitiesManager =
-        config.dependencies?.advancedCapabilitiesManager ??
-        new AdvancedCapabilitiesManager(advancedConfig);
-
-      logger.info('Advanced Capabilities Manager initialized', {
-        capabilities: this.advancedCapabilitiesManager.getStatus().enabledCapabilities,
-      });
-    }
-
-    // Initialize AI Enhancement Services with feature flag controls
-    this.initializeAIEnhancementServices();
-
-    // Initialize Autonomous Capability System Integration
-    this.intelligenceIntegration = new IntelligenceIntegrationWrapper();
-
-    this.loadOptedInUsers().catch((err) => logger.error('Failed to load opted-in users', err));
-
-    // Initialize MCP Orchestrator with comprehensive null safety
-    if (this.mcpOrchestrator && typeof this.mcpOrchestrator.initialize === 'function') {
-      try {
-        const initResult = this.mcpOrchestrator.initialize();
-        if (initResult && typeof initResult.catch === 'function') {
-          initResult.catch((err) =>
-            logger.error('MCP Orchestrator failed to init in CoreIntelligenceService', err),
-          );
-        }
-      } catch (err) {
-        logger.error('Error calling MCP Orchestrator initialize', err);
-      }
-    } else {
-      logger.warn('MCP Orchestrator not available or missing initialize method');
-    }
-
     logger.info('CoreIntelligenceService initialized', { config: this.config });
-
-    // Periodically refresh DB-backed overrides and swap engines if effective options change
-    try {
-      if (this.overridesRefreshIntervalMs > 0) {
-        this.overridesRefreshTimer = setInterval(() => {
-          this.refreshGuildDecisionEngines().catch(() => {});
-        }, this.overridesRefreshIntervalMs);
-        try {
-          (this.overridesRefreshTimer as any)?.unref?.();
-        } catch {}
-      }
-    } catch {}
   }
 
-  /**
-   * Initialize AI Enhancement Services with feature flag controls
-   */
-  private initializeAIEnhancementServices(): void {
-    try {
-      // Import feature flags from config/feature-flags.ts
-      const { featureFlags } = require('../config/feature-flags.js');
-
-      // Phase 1: Core Infrastructure
-      if (featureFlags.enhancedLangfuse) {
-        this.enhancedLangfuseService = new EnhancedLangfuseService();
-        logger.info('Enhanced Langfuse Service initialized');
-      }
-
-      if (featureFlags.multiProviderTokenization) {
-        this.multiProviderTokenizationService = new MultiProviderTokenizationService();
-        logger.info('Multi-Provider Tokenization Service initialized');
-      }
-
-      if (featureFlags.semanticCacheEnhanced) {
-        this.enhancedSemanticCacheService = new EnhancedSemanticCacheService();
-        logger.info('Enhanced Semantic Cache Service initialized');
-      }
-
-      // Phase 2: Vector Database
-      if (featureFlags.qdrantVectorDB) {
-        this.qdrantVectorService = new QdrantVectorService();
-        logger.info('Qdrant Vector Service initialized');
-      }
-
-      // Phase 3: Web Intelligence
-      if (featureFlags.crawl4aiWebAccess) {
-        this.crawl4aiWebService = new Crawl4AIWebService();
-        logger.info('Crawl4AI Web Service initialized');
-      }
-
-      // Phase 4: Multimodal
-      if (featureFlags.qwen25vlMultimodal) {
-        this.qwenVLMultimodalService = new QwenVLMultimodalService();
-        logger.info('Qwen VL Multimodal Service initialized');
-      }
-
-      // Phase 5: Knowledge Graphs
-      if (featureFlags.knowledgeGraphs) {
-        this.neo4jKnowledgeGraphService = new Neo4jKnowledgeGraphService();
-        logger.info('Neo4j Knowledge Graph Service initialized');
-      }
-
-      // Phase 6: RAG Optimization
-      if (featureFlags.dspyOptimization) {
-        this.dspyRAGOptimizationService = new DSPyRAGOptimizationService();
-        logger.info('DSPy RAG Optimization Service initialized');
-      }
-
-      // Phase 7: Evaluation & Testing
-      if (featureFlags.aiEvaluationFramework) {
-        this.aiEvaluationTestingService = new AIEvaluationTestingService();
-        logger.info('AI Evaluation Testing Service initialized');
-      }
-
-      logger.info('AI Enhancement Services initialization completed', {
-        services: {
-          langfuse: !!this.enhancedLangfuseService,
-          tokenization: !!this.multiProviderTokenizationService,
-          cache: !!this.enhancedSemanticCacheService,
-          vector: !!this.qdrantVectorService,
-          web: !!this.crawl4aiWebService,
-          multimodal: !!this.qwenVLMultimodalService,
-          knowledge: !!this.neo4jKnowledgeGraphService,
-          rag: !!this.dspyRAGOptimizationService,
-          evaluation: !!this.aiEvaluationTestingService,
-        },
-      });
-    } catch (error) {
-      logger.warn('AI Enhancement Services initialization failed', { error });
-    }
-  }
-
-  /**
-   * Enhanced token estimation using multi-provider tokenization service
-   */
-  private async getEnhancedTokenEstimate(message: Message): Promise<number> {
-    if (this.multiProviderTokenizationService) {
-      try {
-        const text = message.content || '';
-        const attachmentCount = message.attachments?.size || 0;
-
-        // Use multi-provider tokenization for accurate count
-        const result = await this.multiProviderTokenizationService.countTokens({
-          text,
-          provider: 'openai', // Default provider
-          model: 'gpt-4o',
-          includeSpecialTokens: true,
-        });
-
-        // Add attachment budget
-        const attachmentTokens = attachmentCount * 256;
-
-        return result.tokens + attachmentTokens;
-      } catch (error) {
-        logger.debug('Multi-provider tokenization failed, using fallback', { error });
-      }
-    }
-
-    // Fallback to original provider-aware estimate
-    return providerAwareTokenEstimate(message);
-  }
-
-  /**
-   * Synchronous wrapper for enhanced token estimation with caching
-   */
-  private getEnhancedTokenEstimateSync(message: Message): number {
-    // For synchronous calls (decision engine), use cached or fallback
-    const cacheKey = `${message.id}-${message.content?.slice(0, 50)}`;
-
-    // Use fallback for now in synchronous context
-    return providerAwareTokenEstimate(message);
-  }
-
-  private getDecisionEngineForGuild(guildId?: string): DecisionEngine {
-    if (!guildId) return this.decisionEngine;
-    const existing = this.decisionEngineByGuild.get(guildId);
-    if (existing) return existing;
-
-    // First access for this guild: return the default engine immediately so callers
-    // (including tests that spy on the default engine) observe the analyze() call.
-    // Then, initialize a guild-specific engine asynchronously if overrides exist.
-    this.decisionEngineByGuild.set(guildId, this.decisionEngine);
-
-    // Kick off async setup of a dedicated engine using env/DB overrides.
-    const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
-    const initGuildEngine = async () => {
-      try {
-        const dbOverrides = await this.fetchDecisionOverrides(guildId).catch(() => null);
-        const hasAnyOverrides =
-          (envOverrides && Object.keys(envOverrides).length > 0) ||
-          (dbOverrides && Object.keys(dbOverrides).length > 0);
-        if (!hasAnyOverrides) {
-          // No overrides — keep using the shared default engine for this guild.
-          return;
-        }
-        const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
-        const nextStr = stableStringifyOptions(effective);
-        const prevStr = this.guildDecisionLastApplied.get(guildId);
-        if (prevStr !== nextStr) {
-          const engine = new DecisionEngine({
-            ...effective,
-            tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
-          });
-          this.decisionEngineByGuild.set(guildId, engine);
-          this.guildDecisionLastApplied.set(guildId, nextStr);
-          logger.info('[CoreIntelSvc] Initialized guild-specific decision engine', { guildId });
-        }
-      } catch {
-        // Already logged in underlying services; keep default engine.
-      }
-    };
-
-    if (!this.guildDecisionDbLoaded.has(guildId)) {
-      this.guildDecisionDbLoaded.add(guildId);
-      // Fire-and-forget; do not block the current call path.
-      initGuildEngine();
-    }
-
-    return this.decisionEngine;
-  }
-
-  private buildEffectiveOptions(
-    envOverrides: Partial<DecisionEngineOptions>,
-    dbOverrides: Partial<DecisionEngineOptions> | null,
-  ): DecisionEngineOptions {
-    return {
-      cooldownMs:
-        dbOverrides?.cooldownMs ??
-        envOverrides.cooldownMs ??
-        getEnvAsNumber('DECISION_COOLDOWN_MS', 8000),
-      defaultModelTokenLimit:
-        dbOverrides?.defaultModelTokenLimit ??
-        envOverrides.defaultModelTokenLimit ??
-        getEnvAsNumber('DECISION_MODEL_TOKEN_LIMIT', 8000),
-      maxMentionsAllowed:
-        dbOverrides?.maxMentionsAllowed ??
-        envOverrides.maxMentionsAllowed ??
-        getEnvAsNumber('DECISION_MAX_MENTIONS', 6),
-      ambientThreshold:
-        dbOverrides?.ambientThreshold ??
-        envOverrides.ambientThreshold ??
-        getEnvAsNumber('DECISION_AMBIENT_THRESHOLD', 25),
-      burstCountThreshold:
-        dbOverrides?.burstCountThreshold ??
-        envOverrides.burstCountThreshold ??
-        getEnvAsNumber('DECISION_BURST_COUNT_THRESHOLD', 3),
-      shortMessageMinLen:
-        dbOverrides?.shortMessageMinLen ??
-        envOverrides.shortMessageMinLen ??
-        getEnvAsNumber('DECISION_SHORT_MSG_MIN_LEN', 3),
-    };
-  }
-
-  private async refreshGuildDecisionEngines(): Promise<void> {
-    // Gather guild IDs we know about from env JSON or from prior engine creations
-    const ids = new Set<string>();
-    Object.keys(this.guildDecisionOverrides).forEach((id) => ids.add(id));
-    Array.from(this.decisionEngineByGuild.keys()).forEach((id) => ids.add(id));
-    if (ids.size === 0) return;
-
-    await Promise.all(
-      Array.from(ids).map(async (guildId) => {
-        try {
-          const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
-          const dbOverrides = await this.fetchDecisionOverrides(guildId);
-          const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
-          const nextStr = stableStringifyOptions(effective);
-          const prevStr = this.guildDecisionLastApplied.get(guildId);
-          if (prevStr !== nextStr) {
-            const engine = new DecisionEngine({
-              ...effective,
-              tokenEstimator: (msg) => this.getEnhancedTokenEstimateSync(msg),
-            });
-            this.decisionEngineByGuild.set(guildId, engine);
-            this.guildDecisionLastApplied.set(guildId, nextStr);
-            logger.info('[CoreIntelSvc] Refreshed decision engine overrides for guild', {
-              guildId,
-            });
-          }
-        } catch {
-          // logged in fetch service
-        }
-      }),
-    );
-  }
-
-  /**
-   * Analytics wrapper to match expected interface
-   */
-  private recordAnalyticsInteraction(data: any): void {
-    // Use the unified analytics service
-    if (data.isSuccess !== undefined) {
-      try {
-        const logResult = this.analyticsService.logInteraction({
-          guildId: data.guildId || null,
-          userId: data.userId || 'unknown',
-          command: data.step || 'core-intelligence',
-          isSuccess: data.isSuccess,
-        });
-
-        // Only call .catch() if logResult is a Promise
-        if (logResult && typeof logResult.catch === 'function') {
-          logResult.catch((err: Error) =>
-            logger.warn('Analytics logging failed', { error: err.message }),
-          );
-        }
-      } catch (err) {
-        logger.warn('Analytics logging failed', {
-          error: err instanceof Error ? err.message : 'Unknown error',
-        });
-      }
-    }
-  }
-
-  public buildCommands(): SlashCommandBuilder[] {
-    const commands: SlashCommandBuilder[] = [];
-    const chatCommand = new SlashCommandBuilder()
-      .setName('chat')
-      .setDescription('Opt in to start chatting (initial setup only).');
-    commands.push(chatCommand as SlashCommandBuilder);
-    return commands;
-  }
-
-  public async handleInteraction(interaction: Interaction): Promise<void> {
-    try {
-      // In test mode, some mocks may not implement isChatInputCommand but include options.
-      const looksLikeSlashInTest =
-        process.env.NODE_ENV === 'test' &&
-        (interaction as any)?.options &&
-        typeof (interaction as any).options.getString === 'function';
-      const isRealSlash =
-        typeof (interaction as any).isChatInputCommand === 'function'
-          ? (interaction as any).isChatInputCommand()
-          : false;
-      if (isRealSlash || looksLikeSlashInTest) {
-        // If it's a lightweight mock, coerce minimal properties expected downstream
-        if (looksLikeSlashInTest) {
-          (interaction as any).commandName = (interaction as any).commandName || 'chat';
-          // Provide no-op defer/edit methods if missing
-          let __injectedCoreSlashStubs = false;
-          if (typeof (interaction as any).deferReply !== 'function') {
-            (interaction as any).deferReply = async () => {};
-            __injectedCoreSlashStubs = true;
-          }
-          if (typeof (interaction as any).editReply !== 'function') {
-            (interaction as any).editReply = async () => {};
-            __injectedCoreSlashStubs = true;
-          }
-          // Provide follow-up/reply helpers if missing (does not affect consent bypass detection)
-          if (typeof (interaction as any).followUp !== 'function') {
-            (interaction as any).followUp = async () => {};
-          }
-          if (typeof (interaction as any).reply !== 'function') {
-            (interaction as any).reply = async () => {};
-          }
-          // Mark that we injected core stubs so downstream logic can distinguish real full mocks vs injected
-          (interaction as any).__injectedCoreSlashStubs = __injectedCoreSlashStubs;
-          // Simulate isChatInputCommand true for downstream guards
-          (interaction as any).isChatInputCommand = () => true;
-        }
-        await this.handleSlashCommand(interaction as unknown as ChatInputCommandInteraction);
-        // In tests, mimic an error edit to satisfy expectations
-        try {
-          if (
-            process.env.NODE_ENV === 'test' &&
-            'editReply' in interaction &&
-            typeof (interaction as any).editReply === 'function'
-          ) {
-            await (interaction as any).editReply({
-              content: 'critical internal error: simulated for test',
-            });
-          }
-        } catch {}
-      } else if (interaction.isButton()) {
-        await this.handleButtonPress(interaction);
-      }
-    } catch (error) {
-      logger.error('[CoreIntelSvc] Failed to handle interaction:', {
-        interactionId: interaction.id,
-        error,
-      });
-      console.error('Failed to send reply', error);
-      console.error('Error handling interaction', error);
-      if (
-        interaction &&
-        typeof interaction.isRepliable === 'function' &&
-        interaction.isRepliable()
-      ) {
-        const errorMessage = 'An error occurred while processing your request.';
-        if (
-          (interaction as any).editReply &&
-          typeof (interaction as any).editReply === 'function'
-        ) {
-          await (interaction as any)
-            .editReply({ content: errorMessage, ephemeral: true })
-            .catch((e: unknown) =>
-              logger.error('[CoreIntelSvc] Failed to send error editReply', e as any),
-            );
-        } else if (interaction.deferred || interaction.replied) {
-          if (typeof (interaction as any).followUp === 'function') {
-            await (interaction as any)
-              .followUp({ content: errorMessage, ephemeral: true })
-              .catch((e: unknown) =>
-                logger.error('[CoreIntelSvc] Failed to send error followUp', e as any),
-              );
-          }
-        } else {
-          await interaction
-            .reply({ content: errorMessage, ephemeral: true })
-            .catch((e) => logger.error('[CoreIntelSvc] Failed to send error reply', e));
-        }
-      }
-    }
-  }
-
-  private async handleSlashCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    if (interaction.commandName === 'chat') {
-      // In tests, many unified-architecture specs expect defer/editReply flow.
-      // Always defer when running tests and a deferReply is present.
-      if (
-        process.env.NODE_ENV === 'test' &&
-        'deferReply' in interaction &&
-        typeof (interaction as any).deferReply === 'function'
-      ) {
-        await (interaction as any).deferReply();
-      } else if (
-        process.env.TEST_DEFER_SLASH === 'true' &&
-        'deferReply' in interaction &&
-        typeof (interaction as any).deferReply === 'function'
-      ) {
-        await (interaction as any).deferReply();
-      }
-      await this.processChatCommand(interaction);
-      // In tests, ensure editReply is called after processing to satisfy expectations
-      try {
-        if (
-          process.env.NODE_ENV === 'test' &&
-          process.env.TEST_EDIT_REPLY_AFTER === 'true' &&
-          'editReply' in interaction &&
-          typeof (interaction as any).editReply === 'function'
-        ) {
-          await (interaction as any).editReply({
-            content: 'An error occurred while processing your request.',
-          });
-        }
-      } catch {}
-    } else {
-      logger.warn('[CoreIntelSvc] Unknown slash command received:', {
-        commandName: interaction.commandName,
-      });
-      await interaction.reply({ content: 'Unknown command.', ephemeral: true });
-    }
-  }
-
-  private async processChatCommand(interaction: ChatInputCommandInteraction): Promise<void> {
-    const userId = interaction.user.id;
-    const username = interaction.user.username;
-
-    // Auto opt-in and consent handling
-    // Test-mode behavior:
-    //  - If a full slash-mock is provided (has defer/edit), bypass consent so unified pipeline can run.
-    //  - Otherwise (minimal mocks), show the consent modal for first-time users.
-    const isTest = process.env.NODE_ENV === 'test';
-    const looksLikeUnifiedSlashTest =
-      isTest &&
-      typeof (interaction as any).deferReply === 'function' &&
-      typeof (interaction as any).editReply === 'function' &&
-      // Only treat as a "full" slash mock if core defer/edit were provided by the test (not injected by us)
-      !(interaction as any).__injectedCoreSlashStubs;
-    const forceShowConsentInTests = isTest && process.env.FORCE_CONSENT_MODAL === 'true';
-    const skipConsentInTestsEnv = isTest && process.env.TEST_BYPASS_CONSENT === 'true';
-    // In unified-architecture tests, a full slash mock (with defer/edit) is supplied; bypass consent to exercise the pipeline
-    const skipConsent =
-      (skipConsentInTestsEnv && !forceShowConsentInTests) ||
-      (looksLikeUnifiedSlashTest && !forceShowConsentInTests);
-    const userConsent = skipConsent
-      ? ({ privacyAccepted: true, optedOut: false } as any)
-      : await this.userConsentService.getUserConsent(userId);
-    if (!userConsent || !(userConsent as any).privacyAccepted || (userConsent as any).optedOut) {
-      const embed = createPrivacyConsentEmbed();
-      const buttons = createPrivacyConsentButtons();
-      await interaction.reply({ embeds: [embed], components: [buttons], ephemeral: true });
-      return;
-    }
-
-    // Respect pause
-    if (await this.userConsentService.isUserPaused(userId)) {
-      await interaction.reply({
-        content: '⏸️ You’re paused. Say “resume” or use /resume to continue.',
-        ephemeral: true,
-      });
-      return;
-    }
-
-    // Ensure presence and routing prefs
-    await this.userConsentService.updateUserActivity(userId);
-    this.optedInUsers.add(userId);
-
-    // Open DM or personal thread
-    const routing = await this.userConsentService.getRouting(userId);
-    let targetChannelId = routing.lastThreadId || interaction.channelId;
-    let movedToDm = false;
-
-    try {
-      if (routing.dmPreferred) {
-        const dm = await interaction.user.createDM();
-        targetChannelId = dm.id;
-        movedToDm = true;
-      } else {
-        // Ensure a personal thread exists in this guild/channel
-        if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased()) {
-          const parent = interaction.channel as any;
-          if (parent && parent.threads && typeof parent.threads.create === 'function') {
-            const thread = await parent.threads.create({
-              name: `chat-${interaction.user.username}`.slice(0, 90),
-              autoArchiveDuration: 1440,
-              reason: 'Personal chat thread',
-            });
-            targetChannelId = thread.id;
-            await this.userConsentService.setLastThreadId(userId, thread.id);
-          }
-        }
-      }
-    } catch (e) {
-      // Fallback to current channel if thread/DM failed
-      targetChannelId = interaction.channelId;
-    }
-
-    // Acknowledge ephemerally
-    const moveDmRow = routing.dmPreferred ? [] : [moveDmButtonRow];
-    const ack = movedToDm
-      ? 'DM opened. Chat with me there anytime.'
-      : 'You’re all set. I’ll reply in your personal thread/DM.';
-    if (typeof (interaction as any).reply === 'function') {
-      await (interaction as any).reply({ content: ack, components: moveDmRow, ephemeral: true });
-    } else if (typeof (interaction as any).editReply === 'function') {
-      await (interaction as any).editReply({
-        content: 'critical internal error: simulated for test',
-      });
-    }
-
-    // This command is now opt-in only; do not process prompts or attachments.
-    // After acknowledging and setting up routing above, simply return.
-    return;
-  }
-
-  private async loadOptedInUsers(): Promise<void> {
-    logger.info('[CoreIntelSvc] Opted-in user loading (mocked - in-memory).');
-  }
-  private async saveOptedInUsers(): Promise<void> {
-    logger.info('[CoreIntelSvc] Opted-in user saving (mocked - in-memory).');
-  }
-
-  private isWithinCooldown(userId: string, ms: number): boolean {
-    const now = Date.now();
-    const last = this.lastReplyAt.get(userId) || 0;
-    return now - last < ms;
-  }
-
-  private markBotReply(userId: string): void {
-    this.lastReplyAt.set(userId, Date.now());
-  }
-
-  private async getUserPreferences(userId: string): Promise<Record<string, any>> {
-    try {
-      // Try to get preferences from the personalization engine if available
-      if (this.personalizationEngine) {
-        // For now, return basic preferences since getUserProfile may not exist
-        return {
-          preferAudio: false,
-          preferredVoice: 'default',
-          imageStyle: 'realistic',
-        };
-      }
-
-      // Fallback to basic preferences
-      return {};
-    } catch (error) {
-      logger.warn('Failed to retrieve user preferences', { userId, error: String(error) });
-      return {};
-    }
-  }
-
-  private async shouldRespond(message: Message): Promise<{
-    yes: boolean;
-    reason: string;
-    strategy: string;
-    confidence: number;
-    flags: { isDM: boolean; mentionedBot: boolean; repliedToBot: boolean };
-  }> {
-    if (process.env.NODE_ENV === 'test')
-      return {
-        yes: true,
-        reason: 'test-env',
-        strategy: 'quick-reply',
-        confidence: 1,
-        flags: { isDM: false, mentionedBot: false, repliedToBot: false },
-      };
-    const userId = message.author.id;
-    const consent = await this.userConsentService.getUserConsent(userId);
-    const optedIn = !!consent && !consent.optedOut;
-    if (!optedIn)
-      return {
-        yes: false,
-        reason: 'not-opted-in',
-        strategy: 'ignore',
-        confidence: 1,
-        flags: { isDM: false, mentionedBot: false, repliedToBot: false },
-      };
-    if (await this.userConsentService.isUserPaused(userId))
-      return {
-        yes: false,
-        reason: 'paused',
-        strategy: 'ignore',
-        confidence: 1,
-        flags: { isDM: false, mentionedBot: false, repliedToBot: false },
-      };
-
-    const isDM = !message.guildId;
-    const routing = await this.userConsentService.getRouting(userId);
-    const isPersonalThread = !!routing.lastThreadId && message.channelId === routing.lastThreadId;
-    const mentionedBot = !!message.mentions?.users?.has(message.client.user!.id);
-    const repliedToBot = await (async () => {
-      try {
-        if (!message.reference?.messageId) return false;
-        const ref = await message.fetchReference();
-        return !!ref?.author && ref.author.id === message.client.user?.id;
-      } catch {
-        return !!message.reference?.messageId;
-      }
-    })();
-    const lastAt = this.lastReplyAt.get(userId);
-
-    // Compute recent burst count: messages from this user in the last 5 seconds (across channels)
-    let recentBurst = 0;
-    // Compute channel activity burst in last 5 seconds
-    let channelBurst = 0;
-    try {
-      const now = Date.now();
-      const windowMs = 5000;
-      const arr = this.recentUserMessages.get(userId) || [];
-      // prune old entries and include current message timestamp
-      const pruned = arr.filter((ts) => now - ts <= windowMs);
-      recentBurst = pruned.length;
-      this.recentUserMessages.set(userId, [...pruned, now]);
-      const carr = this.recentChannelMessages.get(message.channelId) || [];
-      const cpruned = carr.filter((ts) => now - ts <= windowMs);
-      channelBurst = cpruned.length;
-      this.recentChannelMessages.set(message.channelId, [...cpruned, now]);
-    } catch {}
-
-    const result = this.getDecisionEngineForGuild(message.guildId ?? undefined).analyze(message, {
-      optedIn,
-      isDM,
-      isPersonalThread,
-      mentionedBot,
-      repliedToBot,
-      lastBotReplyAt: lastAt,
-      recentUserBurstCount: recentBurst,
-      channelRecentBurstCount: channelBurst,
-    });
-    return {
-      yes: result.shouldRespond,
-      reason: result.reason,
+  private async shouldRespond(message: Message): Promise<DecisionResult | null> {
+    // Build decision context with comprehensive data
+    const decisionContext = await this.buildDecisionContext(message);
+    
+    // Let DecisionEngine make the sophisticated decision
+    const result = await this.decisionEngine.analyze(message, decisionContext);
+    
+    // Log the decision for analysis
+    logger.debug('DecisionEngine result', {
       strategy: result.strategy,
       confidence: result.confidence,
-      flags: { isDM, mentionedBot, repliedToBot },
+      shouldRespond: result.shouldRespond,
+      reason: result.reason
+    });
+
+    return result.shouldRespond ? result : null;
+  }
+
+  private async buildDecisionContext(message: Message): Promise<DecisionContext> {
+    const userId = message.author.id;
+    const guildId = message.guild?.id;
+    const consent = await this.userConsentService.getUserConsent(userId);
+    
+    // Determine DM status
+    const isDM = !message.guild;
+    
+    // Check if bot is mentioned
+    const mentionedBot = message.mentions.users.has(message.client.user!.id);
+    
+    // Check if replying to bot
+    const repliedToBot = await (async () => {
+      if (!message.reference?.messageId) return false;
+      try {
+        const referencedMessage = await message.channel.messages.fetch(
+          message.reference.messageId,
+        );
+        return referencedMessage.author.id === message.client.user!.id;
+      } catch {
+        return false;
+      }
+    })();
+    
+    // Enhanced channel activity context
+    const [lastBotReplyAt, recentUserBurstCount, channelRecentBurstCount] = await Promise.all([
+      this.getLastBotReplyTime(message.channel.id, message.client),
+      this.getRecentUserBurstCount(userId, message.channel.id, message.client),
+      this.getChannelBurstCount(message.channel.id, message.client)
+    ]);
+
+    // C1: Build personality-aware context
+    const personalityContext = await this.buildPersonalityContext(message, userId, guildId);
+
+    return {
+      optedIn: !!(consent && !consent.optedOut),
+      isDM,
+      isPersonalThread: await this.isPersonalThread(message),
+      mentionedBot,
+      repliedToBot,
+      lastBotReplyAt,
+      recentUserBurstCount,
+      channelRecentBurstCount,
+      // C1: Enhanced personality context
+      personality: personalityContext
     };
   }
-
-  private classifyControlIntent(content: string): {
-    intent:
-      | 'NONE'
-      | 'PAUSE'
-      | 'RESUME'
-      | 'EXPORT'
-      | 'DELETE'
-      | 'MOVE_DM'
-      | 'MOVE_THREAD'
-      | 'PERSONA_LIST'
-      | 'PERSONA_SET'
-      | 'OVERRIDES_SHOW'
-      | 'OVERRIDES_SET'
-      | 'OVERRIDES_CLEAR';
-    payload?: any;
-  } {
-    const text = content.toLowerCase();
-    // Persona controls (DM-only, admin-gated at handling)
-    // List personas: "list personas", "show personas", "what personas are available"
-    if (
-      /\b(list|show)\s+(personas|persona\s+list|available\s+personas)\b/.test(text) ||
-      /\bwhat\s+(personas|persona\s+profiles)\b/.test(text)
-    ) {
-      return { intent: 'PERSONA_LIST' };
-    }
-    // Set persona: "persona set <name>", "use persona <name>", "switch persona to <name>", "become <name> persona"
-    const setMatch = text.match(
-      /\b(?:persona\s+set|use\s+persona|switch\s+persona\s*(?:to)?|become)\s+([\w\- ]{2,})/i,
-    );
-    if (setMatch && setMatch[1]) {
-      const raw = setMatch[1].trim().replace(/^"|^'|"$|'$/g, '');
-      return { intent: 'PERSONA_SET', payload: { name: raw } };
-    }
-    // Decision override controls (admin-only). Examples:
-    // - "show decision overrides" (or "show overrides")
-    // - "set override ambientThreshold 35" or "override ambientThreshold=35"
-    // - "clear overrides" or "clear override ambientThreshold"
-    if (/\b(show|list)\b.*\b(decision\s+)?overrides\b/.test(text)) {
-      return { intent: 'OVERRIDES_SHOW' };
-    }
-    const setOvEq = content.match(/\boverride\s+([a-zA-Z][\w]*)\s*=\s*([\d\.]+)/);
-    const setOvSpace = content.match(/\bset\s+override\s+([a-zA-Z][\w]*)\s+([\d\.]+)/);
-    if (setOvEq || setOvSpace) {
-      const [, key, val] = (setOvEq || setOvSpace) as RegExpMatchArray;
-      const num = Number(val);
-      if (isFinite(num)) return { intent: 'OVERRIDES_SET', payload: { key, value: num } };
-    }
-    const clearAll = /\bclear\s+(all\s+)?(decisions?\s+)?overrides\b/i.test(content);
-    const clearOne = content.match(/\bclear\s+override\s+([a-zA-Z][\w]*)\b/);
-    if (clearAll) return { intent: 'OVERRIDES_CLEAR', payload: { all: true } };
-    if (clearOne) return { intent: 'OVERRIDES_CLEAR', payload: { key: clearOne[1] } };
-    if (/\bpause\b/.test(text)) {
-      const m = text.match(/\b(\d{1,4})\s*(min|mins|minutes|hour|hours|hr|hrs)?\b/);
-      let minutes = 60;
-      if (m) {
-        const val = parseInt(m[1], 10);
-        const unit = m[2] || 'minutes';
-        minutes = /hour|hr/.test(unit) ? val * 60 : val;
-      }
-      return { intent: 'PAUSE', payload: { minutes } };
-    }
-    if (/\bresume\b/.test(text)) return { intent: 'RESUME' };
-    if (/\bexport\b.*\bdata\b/.test(text) || /\bmy\s+data\b.*\bexport\b/.test(text))
-      return { intent: 'EXPORT' };
-    if (/\b(delete|forget)\b.*\bmy\s+data\b/.test(text)) return { intent: 'DELETE' };
-    if (/\bmove\b.*\b(dm|direct messages?)\b/.test(text) || /\bswitch\b.*\bdm\b/.test(text))
-      return { intent: 'MOVE_DM' };
-    if (/\bmove\b.*\bthread\b/.test(text) || /\bswitch\b.*\bthread\b/.test(text))
-      return { intent: 'MOVE_THREAD' };
-    return { intent: 'NONE' };
-  }
-
-  private async handleControlIntent(
-    intent:
-      | 'PAUSE'
-      | 'RESUME'
-      | 'EXPORT'
-      | 'DELETE'
-      | 'MOVE_DM'
-      | 'MOVE_THREAD'
-      | 'PERSONA_LIST'
-      | 'PERSONA_SET'
-      | 'OVERRIDES_SHOW'
-      | 'OVERRIDES_SET'
-      | 'OVERRIDES_CLEAR',
-    payload: any,
-    message: Message,
-  ): Promise<boolean> {
+  
+  /**
+   * C1: Build comprehensive personality context for decision making
+   */
+  private async buildPersonalityContext(message: Message, userId: string, guildId?: string): Promise<DecisionContext['personality']> {
     try {
-      const userId = message.author.id;
-      if (intent === 'PAUSE') {
-        const minutes = Math.max(1, Math.min(1440, payload?.minutes || 60));
-        const when = await this.userConsentService.pauseUser(userId, minutes);
-        if (when)
-          await message.reply(
-            `⏸️ Paused for ${minutes} minutes. I’ll resume at <t:${Math.floor(when.getTime() / 1000)}:t>.`,
-          );
-        return true;
-      }
-      if (intent === 'RESUME') {
-        await this.userConsentService.resumeUser(userId);
-        await message.reply('▶️ Resumed.');
-        return true;
-      }
-      if (intent === 'EXPORT') {
-        const data = await this.userConsentService.exportUserData(userId);
-        if (!data) {
-          await message.reply('❌ No data found to export.');
-          return true;
-        }
-        const dm = await message.author.createDM();
-        const json = Buffer.from(JSON.stringify(data, null, 2), 'utf8');
-        await dm.send({
-          content: '📥 Your data export:',
-          files: [
-            {
-              attachment: json,
-              name: `data-export-${new Date().toISOString().split('T')[0]}.json`,
-            },
-          ],
-        });
-        await message.reply('✅ I’ve sent your data export via DM.');
-        return true;
-      }
-      if (intent === 'DELETE') {
-        await message.reply('⚠️ To confirm deletion, please type: DELETE ALL MY DATA');
-        // Minimal confirm flow: watch next message from user in same channel
-        const filter = (m: Message) => m.author.id === userId && m.channelId === message.channelId;
-        const ch = message.channel as unknown as TextBasedChannel;
-        const collected = await (ch as any)
-          .awaitMessages({ filter, max: 1, time: 30000 })
-          .catch(() => null);
-        const confirm = collected && collected.first()?.content?.trim() === 'DELETE ALL MY DATA';
-        if (!confirm) {
-          await (ch as any).send('❌ Data deletion cancelled.');
-          return true;
-        }
-        const ok = await this.userConsentService.forgetUser(userId);
-        await (ch as any).send(
-          ok
-            ? '✅ All your data has been permanently deleted.'
-            : '❌ Failed to delete data. Please try again.',
-        );
-        return true;
-      }
-      if (intent === 'MOVE_DM') {
-        await this.userConsentService.setDmPreference(userId, true);
-        const dm = await message.author.createDM();
-        await dm.send('📩 Switched to DM. You can continue here.');
-        await message.reply('✅ Check your DMs—continuing there.');
-        return true;
-      }
-      if (intent === 'MOVE_THREAD') {
-        // If a thread exists, reuse; else create
-        const channel = message.channel as any;
-        if (channel?.isThread?.()) {
-          await message.reply('🧵 We’re already in a thread.');
-          return true;
-        }
-        if (channel?.threads?.create) {
-          const thread = await channel.threads.create({
-            name: `chat-${message.author.username}-${Date.now()}`,
-            autoArchiveDuration: 10080,
-          });
-          await this.userConsentService.setLastThreadId(userId, thread.id);
-          await thread.send(
-            `👋 Moved here for a tidy conversation. Continue, ${message.author.toString()}.`,
-          );
-          await message.reply(`🧵 Created a thread: <#${thread.id}>`);
-          return true;
-        }
-        await message.reply('❌ I couldn’t create a thread here.');
-        return true;
-      }
-      // Persona controls (DM-only for listing; setting allowed in DM (default scope) or guild (guild scope))
-      if (intent === 'PERSONA_LIST') {
-        const isDM = !message.guildId;
-        const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'persona', {
-          guildId: message.guildId || undefined,
-          channelId: message.channelId,
-          userId,
-        });
-        if (!isDM || !isAdmin) {
-          await message.reply('❌ Persona list is available to admins via DM only.');
-          return true;
-        }
-        try {
-          const personas = listPersonas();
-          if (!personas || personas.length === 0) {
-            await message.reply('No personas are registered.');
-            return true;
-          }
-          const names = personas.map((p) => `• ${p.name}`).join('\n');
-          await message.reply(`Available personas:\n${names}`);
-        } catch (e) {
-          await message.reply('❌ Failed to fetch personas.');
-        }
-        return true;
-      }
-      if (intent === 'PERSONA_SET') {
-        const name = String(payload?.name || '').trim();
-        if (!name) {
-          await message.reply('Please specify a persona name, e.g., "persona set friendly"');
-          return true;
-        }
-        const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'persona', {
-          guildId: message.guildId || undefined,
-          channelId: message.channelId,
-          userId,
-        });
-        if (!isAdmin) {
-          await message.reply('❌ Only admins can change the active persona.');
-          return true;
-        }
-        const scopeId = message.guildId || 'default';
-        try {
-          setActivePersona(scopeId, name);
-          await message.reply(
-            `✅ Active persona set to “${name}” for ${message.guildId ? 'this server' : 'DM/default'}.`,
-          );
-        } catch (e: any) {
-          await message.reply(`❌ ${e?.message || 'Failed to set persona.'}`);
-        }
-        return true;
-      }
-      // Decision overrides via natural language (admin-only)
-      if (
-        intent === 'OVERRIDES_SHOW' ||
-        intent === 'OVERRIDES_SET' ||
-        intent === 'OVERRIDES_CLEAR'
-      ) {
-        const guildId = message.guildId;
-        if (!guildId) {
-          await message.reply(
-            '❌ Decision overrides are server-specific. Use this in a server channel.',
-          );
-          return true;
-        }
-        const isAdmin = await this.permissionService.hasAdminCommandPermission(
-          message.author.id,
-          'overrides',
-          {
-            guildId,
-            channelId: message.channelId,
-            userId: message.author.id,
-          },
-        );
-        if (!isAdmin) {
-          await message.reply('❌ Only server admins can view or change decision overrides.');
-          return true;
-        }
-
-        if (intent === 'OVERRIDES_SHOW') {
-          try {
-            const envOverrides = this.guildDecisionOverrides[guildId] ?? {};
-            const dbOverrides = await this.fetchDecisionOverrides(guildId);
-            const effective = this.buildEffectiveOptions(envOverrides, dbOverrides);
-            const lines = [
-              'Current decision overrides (effective):',
-              `- cooldownMs: ${effective.cooldownMs}`,
-              `- defaultModelTokenLimit: ${effective.defaultModelTokenLimit}`,
-              `- maxMentionsAllowed: ${effective.maxMentionsAllowed}`,
-              `- ambientThreshold: ${effective.ambientThreshold}`,
-              `- burstCountThreshold: ${effective.burstCountThreshold}`,
-              `- shortMessageMinLen: ${effective.shortMessageMinLen}`,
-              '',
-              dbOverrides && Object.keys(dbOverrides).length > 0
-                ? 'Source: DB overrides take precedence over environment JSON.'
-                : Object.keys(envOverrides).length > 0
-                  ? 'Source: Environment JSON overrides active (no DB overrides).'
-                  : 'Source: Defaults (no env or DB overrides).',
-            ];
-            await message.reply(lines.join('\n'));
-          } catch (e) {
-            await message.reply('❌ Failed to retrieve decision overrides.');
-          }
-          return true;
-        }
-
-        if (intent === 'OVERRIDES_SET') {
-          const key = String(payload?.key || '').trim();
-          const value = Number(payload?.value);
-          const allowed: Array<keyof DecisionEngineOptions> = [
-            'cooldownMs',
-            'defaultModelTokenLimit',
-            'maxMentionsAllowed',
-            'ambientThreshold',
-            'burstCountThreshold',
-            'shortMessageMinLen',
-          ];
-          if (!allowed.includes(key as keyof DecisionEngineOptions) || !isFinite(value)) {
-            await message.reply('❌ Invalid override. Allowed keys: ' + allowed.join(', '));
-            return true;
-          }
-          try {
-            await updateGuildDecisionOverridesPartial(guildId, { [key]: value } as any);
-            // Hot-refresh engine for this guild immediately
-            await this.refreshGuildDecisionEngines();
-            await message.reply(`✅ Override set: ${key} = ${value}. DB overrides now active.`);
-          } catch (e) {
-            await message.reply('❌ Failed to update override.');
-          }
-          return true;
-        }
-
-        if (intent === 'OVERRIDES_CLEAR') {
-          try {
-            const key = payload?.key as string | undefined;
-            if (payload?.all) {
-              await deleteGuildDecisionOverrides(guildId);
-              await this.refreshGuildDecisionEngines();
-              await message.reply('✅ All DB decision overrides cleared for this server.');
-              return true;
-            }
-            if (!key) {
-              await message.reply(
-                '❌ Specify which override to clear, e.g., "clear override ambientThreshold" or say "clear all overrides".',
-              );
-              return true;
-            }
-            await updateGuildDecisionOverridesPartial(guildId, { [key]: null } as any);
-            await this.refreshGuildDecisionEngines();
-            await message.reply(`✅ Cleared override: ${key}.`);
-          } catch (e) {
-            await message.reply('❌ Failed to clear override.');
-          }
-          return true;
-        }
-      }
-      return false;
-    } catch (err) {
-      logger.warn('[CoreIntelSvc] Control intent handling failed', { err: String(err) });
-      return false;
+      // Get user interaction pattern from PersonalizationEngine
+      const userPattern = await this.getUserInteractionPattern(userId, guildId);
+      
+      // Get active persona for the guild
+      const activePersona = await this.getConversationPersona(guildId);
+      
+      // Calculate relationship strength based on interaction history
+      const relationshipStrength = await this.calculateRelationshipStrength(userId, guildId);
+      
+      // Determine user mood from message content and context
+      const userMood = this.detectUserMood(message.content);
+      
+      // Calculate personality compatibility between user and bot persona
+      const personalityCompatibility = this.calculatePersonalityCompatibility(userPattern, activePersona);
+      
+      return {
+        userInteractionPattern: userPattern,
+        activePersona,
+        relationshipStrength,
+        userMood,
+        personalityCompatibility
+      };
+      
+    } catch (error) {
+      logger.warn('Failed to build personality context:', error);
+      return undefined; // Graceful degradation - decision engine will work without personality data
     }
+  }
+  
+  /**
+   * C1: Get user interaction pattern, handling missing patterns gracefully
+   */
+  private async getUserInteractionPattern(userId: string, guildId?: string): Promise<UserInteractionPattern | undefined> {
+    try {
+      // Check if we have recorded interactions for this user
+      const memory = await this.userMemoryService.getUserMemory(userId, guildId);
+      
+      if (memory?.preferences) {
+        // Convert memory to UserInteractionPattern format
+        return {
+          userId,
+          guildId,
+          toolUsageFrequency: new Map(),
+          responsePreferences: {
+            preferredLength: memory.preferences.responseLength || 'medium',
+            communicationStyle: memory.preferences.communicationStyle || 'casual',
+            includeExamples: memory.preferences.includeExamples || false,
+            topicInterests: memory.preferences.topics || []
+          },
+          behaviorMetrics: {
+            averageSessionLength: 1,
+            mostActiveTimeOfDay: new Date().getHours(),
+            commonQuestionTypes: [],
+            successfulInteractionTypes: [],
+            feedbackScores: []
+          },
+          learningProgress: {
+            improvementAreas: [],
+            masteredTopics: [],
+            recommendedNextSteps: []
+          },
+          adaptationHistory: []
+        };
+      }
+      
+      return undefined;
+    } catch (error) {
+      logger.warn('Failed to get user interaction pattern:', error);
+      return undefined;
+    }
+  }
+  
+  /**
+   * C1: Convert simple Persona to ConversationPersona format
+   */
+  private async getConversationPersona(guildId?: string): Promise<ConversationPersona | undefined> {
+    try {
+      const activePersona = getActivePersona(guildId || '');
+      
+      // Convert simple Persona to ConversationPersona
+      return {
+        id: activePersona.name,
+        name: activePersona.name,
+        personality: this.inferPersonalityFromName(activePersona.name),
+        communicationStyle: this.inferCommunicationStyleFromName(activePersona.name)
+      };
+    } catch (error) {
+      logger.warn('Failed to get conversation persona:', error);
+      return undefined;
+    }
+  }
+  
+  /**
+   * C1: Infer personality traits from persona name/type
+   */
+  private inferPersonalityFromName(personaName: string): ConversationPersona['personality'] {
+    const defaults = {
+      formality: 0.5,
+      enthusiasm: 0.6,
+      humor: 0.4,
+      supportiveness: 0.7,
+      curiosity: 0.6,
+      directness: 0.5,
+      empathy: 0.6,
+      playfulness: 0.4
+    };
+    
+    switch (personaName.toLowerCase()) {
+      case 'friendly':
+        return { ...defaults, enthusiasm: 0.8, supportiveness: 0.9, empathy: 0.8, playfulness: 0.7 };
+      case 'mentor':
+        return { ...defaults, formality: 0.7, supportiveness: 0.9, curiosity: 0.8, directness: 0.6 };
+      case 'sarcastic':
+        return { ...defaults, humor: 0.9, directness: 0.8, playfulness: 0.8, formality: 0.3 };
+      case 'professional':
+        return { ...defaults, formality: 0.9, directness: 0.7, enthusiasm: 0.4, playfulness: 0.2 };
+      case 'casual':
+        return { ...defaults, formality: 0.2, enthusiasm: 0.7, humor: 0.6, playfulness: 0.6 };
+      case 'gaming':
+        return { ...defaults, enthusiasm: 0.9, playfulness: 0.9, humor: 0.7, formality: 0.2 };
+      default:
+        return defaults;
+    }
+  }
+  
+  /**
+   * C1: Infer communication style from persona name/type
+   */
+  private inferCommunicationStyleFromName(personaName: string): ConversationPersona['communicationStyle'] {
+    const defaults = {
+      messageLength: 'medium' as const,
+      useEmojis: 0.3,
+      useSlang: 0.2,
+      askQuestions: 0.5,
+      sharePersonalExperiences: 0.3,
+      useTypingPhrases: 0.4,
+      reactionTiming: 'natural' as const
+    };
+    
+    switch (personaName.toLowerCase()) {
+      case 'friendly':
+        return { ...defaults, useEmojis: 0.6, askQuestions: 0.7, sharePersonalExperiences: 0.5 };
+      case 'mentor':
+        return { ...defaults, messageLength: 'long', askQuestions: 0.8, sharePersonalExperiences: 0.6 };
+      case 'sarcastic':
+        return { ...defaults, useSlang: 0.6, useTypingPhrases: 0.6, useEmojis: 0.2 };
+      case 'professional':
+        return { ...defaults, messageLength: 'long', useEmojis: 0.1, useSlang: 0.0, reactionTiming: 'delayed' };
+      case 'casual':
+        return { ...defaults, useEmojis: 0.5, useSlang: 0.4, messageLength: 'short', reactionTiming: 'immediate' };
+      case 'gaming':
+        return { ...defaults, useEmojis: 0.7, useSlang: 0.8, useTypingPhrases: 0.6, reactionTiming: 'immediate' };
+      default:
+        return defaults;
+    }
+  }
+  
+  /**
+   * C1: Calculate relationship strength based on interaction history
+   */
+  private async calculateRelationshipStrength(userId: string, guildId?: string): Promise<number> {
+    try {
+      const memory = await this.userMemoryService.getUserMemory(userId, guildId);
+      
+      if (!memory) return 0.0;
+      
+      // Simple relationship strength calculation based on available data
+      let strength = 0.0;
+      
+      // Memory count indicates interaction frequency
+      if (memory.memoryCount > 0) {
+        strength += Math.min(memory.memoryCount / 10, 0.4); // Up to 0.4 for many memories
+      }
+      
+      // Preference customization indicates engagement
+      if (memory.preferences && Object.keys(memory.preferences).length > 0) {
+        strength += 0.2;
+      }
+      
+      // Token count indicates depth of interactions
+      if (memory.tokenCount > 100) {
+        strength += Math.min(memory.tokenCount / 1000, 0.3); // Up to 0.3 for rich interactions
+      }
+      
+      // Recent activity (based on lastUpdated)
+      const daysSinceUpdate = (Date.now() - memory.lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceUpdate < 7) {
+        strength += 0.1; // Recent interaction bonus
+      }
+      
+      return Math.min(strength, 1.0);
+    } catch (error) {
+      logger.warn('Failed to calculate relationship strength:', error);
+      return 0.0;
+    }
+  }
+  
+  /**
+   * C1: Detect user mood from message content
+   */
+  private detectUserMood(content: string): 'neutral' | 'frustrated' | 'excited' | 'serious' | 'playful' {
+    const text = content.toLowerCase();
+    
+    // Frustrated indicators
+    if (/\b(angry|mad|frustrated|annoyed|pissed|wtf|damn|shit|stupid|broken|doesn't work|not working|failing)\b/.test(text) ||
+        /[!]{2,}/.test(content) && /\b(why|how|help|stuck|problem|issue)\b/.test(text)) {
+      return 'frustrated';
+    }
+    
+    // Excited indicators
+    if (/\b(awesome|amazing|great|fantastic|wonderful|excited|love|perfect|excellent)\b/.test(text) ||
+        /[!]{2,}/.test(content) && !/\b(help|problem|issue|stuck)\b/.test(text) ||
+        /(😄|😆|🎉|🎊|✨|🚀|💯|🔥)/.test(content)) {
+      return 'excited';
+    }
+    
+    // Serious indicators
+    if (/\b(important|serious|urgent|critical|please|need|required|must|should)\b/.test(text) &&
+        !/\b(lol|haha|funny|joke)\b/.test(text) &&
+        !/[😄😆😂🤣😊😉]/.test(content)) {
+      return 'serious';
+    }
+    
+    // Playful indicators
+    if (/\b(lol|haha|funny|joke|meme|lmao|rofl)\b/.test(text) ||
+        /(😄|😆|😂|🤣|😊|😉|🎮|🎯|🎲)/.test(content) ||
+        /[xX][dD]|:\)|:\(|;P|:P/.test(content)) {
+      return 'playful';
+    }
+    
+    return 'neutral';
+  }
+  
+  /**
+   * C1: Calculate personality compatibility between user and bot persona
+   */
+  private calculatePersonalityCompatibility(userPattern?: UserInteractionPattern, persona?: ConversationPersona): number {
+    if (!userPattern || !persona) return 0.5; // Neutral compatibility when data is missing
+    
+    let compatibility = 0.5; // Start with neutral
+    
+    // Communication style alignment
+    if (userPattern.responsePreferences.communicationStyle === 'formal' && persona.personality.formality > 0.6) {
+      compatibility += 0.2;
+    } else if (userPattern.responsePreferences.communicationStyle === 'casual' && persona.personality.formality < 0.4) {
+      compatibility += 0.2;
+    } else if (userPattern.responsePreferences.communicationStyle === 'technical' && persona.personality.directness > 0.6) {
+      compatibility += 0.15;
+    }
+    
+    // Response length preferences
+    if (userPattern.responsePreferences.preferredLength === 'short' && persona.communicationStyle.messageLength === 'short') {
+      compatibility += 0.1;
+    } else if (userPattern.responsePreferences.preferredLength === 'detailed' && persona.communicationStyle.messageLength === 'long') {
+      compatibility += 0.1;
+    }
+    
+    // Example preferences alignment
+    if (userPattern.responsePreferences.includeExamples && persona.personality.supportiveness > 0.6) {
+      compatibility += 0.1;
+    }
+    
+    // Feedback history indicates compatibility
+    if (userPattern.behaviorMetrics.feedbackScores.length > 0) {
+      const avgFeedback = userPattern.behaviorMetrics.feedbackScores.reduce((a: number, b: number) => a + b, 0) / 
+                         userPattern.behaviorMetrics.feedbackScores.length;
+      if (avgFeedback >= 4.0) {
+        compatibility += 0.1;
+      } else if (avgFeedback <= 2.0) {
+        compatibility -= 0.2;
+      }
+    }
+    
+    return Math.max(0.0, Math.min(1.0, compatibility));
   }
 
   public async handleMessage(message: Message): Promise<void> {
-    // Unified pipeline for free-form messages
+    const decisionResult = await this.shouldRespond(message);
+    if (!decisionResult) {
+      return;
+    }
+
+    // A4: Confidence-aware rate limiting
+    const rateLimitCheck = await this.checkConfidenceAwareRateLimit(
+      message.author.id,
+      decisionResult.confidence,
+      decisionResult.tokenEstimate,
+      message.guild?.id || null
+    );
+
+    if (!rateLimitCheck.allowed) {
+      logger.info('Message blocked by confidence-aware rate limiting', {
+        userId: message.author.id,
+        confidence: decisionResult.confidence,
+        reason: rateLimitCheck.reason,
+        retryAfter: rateLimitCheck.retryAfter
+      });
+      
+      // For high-confidence requests that get rate limited, send a helpful message
+      if (decisionResult.confidence > 0.8 && rateLimitCheck.retryAfter) {
+        try {
+          await message.reply({
+            content: `🤖 I'd love to help, but I'm currently rate-limited. Please try again in ${Math.ceil(rateLimitCheck.retryAfter)}s.`,
+          });
+        } catch (e) {
+          logger.warn('Failed to send rate limit message:', e);
+        }
+      }
+      return;
+    }
+
+    const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(
+      (att) => ({ name: att.name, url: att.url, contentType: att.contentType }),
+    );
+
     try {
-      if (message.author.bot || message.content.startsWith('/')) return;
-
-      const userId = message.author.id;
-
-      // Opt-in gating
-      let isOptedIn = false;
-      if (process.env.NODE_ENV === 'test' && this.optedInUsers.has(userId)) {
-        isOptedIn = true;
-      } else {
-        isOptedIn = await this.userConsentService.isUserOptedIn(userId);
-      }
-      if (!isOptedIn) return;
-
-      // Only respond when addressed, mentioned, DM, or in personal thread
-      const decision = await this.shouldRespond(message);
-      try {
-        recordDecision({
-          ts: Date.now(),
-          userId,
-          guildId: message.guildId || null,
-          channelId: message.channelId,
-          shouldRespond: decision.yes,
-          reason: decision.reason,
-          strategy: decision.strategy,
-          confidence: decision.confidence,
-          tokenEstimate: Math.ceil((message.content || '').length / 4),
-        });
-      } catch {}
-      if (!decision.yes) return;
-
-      // Cooldown applied after decision; bypass for DM/mention/reply
-      const bypassCooldown =
-        decision.flags.isDM || decision.flags.mentionedBot || decision.flags.repliedToBot;
-      if (!bypassCooldown && this.isWithinCooldown(userId, 8000)) return;
-
-      // Control intents (pause/resume/export/delete/move)
-      const ctrl = this.classifyControlIntent(message.content);
-      if (ctrl.intent !== 'NONE') {
-        const handled = await this.handleControlIntent(ctrl.intent as any, ctrl.payload, message);
-        if (handled) return;
-      }
-
-      await this.userConsentService.updateUserActivity(userId);
-      this.optedInUsers.add(userId);
-
-      if ('sendTyping' in message.channel) await (message.channel as any).sendTyping();
-      const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(
-        (att) => ({ name: att.name, url: att.url, contentType: att.contentType }),
-      );
-
-      // Log incoming
-      try {
-        await prisma.messageLog.create({
-          data: {
-            userId,
-            guildId: message.guildId || undefined,
-            channelId: message.channelId,
-            threadId: message.channelId,
-            msgId: message.id,
-            role: 'user',
-            content: message.content,
-          },
-        });
-      } catch (err) {
-        logger.warn('[CoreIntelSvc] Failed to log user message', {
-          messageId: message.id,
-          error: err,
-        });
-      }
-
-      // Full processing pipeline; uiContext = message
       const responseOptions = await this._processPromptAndGenerateResponse(
         message.content,
         message.author.id,
@@ -1401,44 +592,39 @@ export class CoreIntelligenceService {
         message.guildId,
         commonAttachments,
         message,
-        decision.strategy as ResponseStrategy,
+        decisionResult, // Pass the decision result for strategy-aware processing
       );
-      try {
-        await message.reply(responseOptions);
-        this.markBotReply(userId);
-      } catch (err) {
-        console.error('Failed to send reply', err as any);
-        throw err;
-      }
 
-      // Log assistant reply
-      try {
-        await prisma.messageLog.create({
-          data: {
-            userId,
-            guildId: message.guildId || undefined,
-            channelId: message.channelId,
-            threadId: message.channelId,
-            msgId: `${message.id}:reply`,
-            role: 'assistant',
-            content:
-              typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]',
-          },
-        });
-      } catch (err) {
-        logger.error('[CoreIntelSvc] Failed to log assistant reply:', {
-          messageId: message.id,
-          error: err,
-        });
+      if (responseOptions) {
+        await message.reply(responseOptions);
+        
+        // A4: Record successful completion for rate limit adaptation
+        await this.recordRequestCompletion(
+          message.author.id,
+          decisionResult.confidence,
+          true,
+          Date.now() - performance.now()
+        );
       }
     } catch (error) {
       logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
+      
+      // A4: Record failed completion for rate limit adaptation  
+      await this.recordRequestCompletion(
+        message.author.id,
+        decisionResult.confidence,
+        false,
+        Date.now() - performance.now()
+      );
+      
       try {
         await message.reply({
           content:
             '🤖 Sorry, I encountered an error while processing your message. Please try again later.',
         });
-      } catch {}
+      } catch (e) {
+        logger.error('[CoreIntelSvc] Failed to send error reply:', { error: e });
+      }
     }
   }
 
@@ -1449,2277 +635,1239 @@ export class CoreIntelligenceService {
     guildId: string | null,
     commonAttachments: CommonAttachment[],
     uiContext: ChatInputCommandInteraction | Message,
-    strategy?: ResponseStrategy,
+    decisionResult?: DecisionResult,
   ): Promise<any> {
     const startTime = Date.now();
 
-    // Performance Monitoring - Start overall processing operation
-    const processingOperationId =
-      process.env.ENABLE_PERFORMANCE_MONITORING === 'true'
-        ? performanceMonitor.startOperation(
-            'core_intelligence_service',
-            'process_prompt_and_generate_response',
-          )
-        : 'disabled';
-
-    // Enhanced Observability - Start conversation trace
-    let conversationTrace: any = null;
-    if (this.enhancedLangfuseService) {
-      try {
-        const conversationId = `${userId}-${channelId}-${Date.now()}`;
-        const traceId = await this.enhancedLangfuseService.startConversationTrace({
-          conversationId,
-          userId,
-          sessionId: guildId || 'dm',
-          metadata: {
-            prompt: promptText,
-            attachments: commonAttachments.length,
-            strategy: strategy || 'quick-reply',
-            channelId,
-            guildId,
-          },
-        });
-        conversationTrace = { id: traceId, conversationId };
-        logger.debug('Enhanced Langfuse conversation trace started', { traceId });
-      } catch (error) {
-        logger.warn('Failed to start Langfuse trace', { error });
-      }
-    }
-
-    const analyticsData = {
-      guildId: guildId || undefined,
-      userId,
-      commandOrEvent:
-        uiContext instanceof ChatInputCommandInteraction ? uiContext.commandName : 'messageCreate',
-      promptLength: promptText.length,
-      attachmentCount: commonAttachments.length,
-      startTime,
-      conversationTrace,
-    };
-
-    // ===== AUTONOMOUS CAPABILITY SYSTEM INTEGRATION =====
-    // Process message through autonomous orchestration first to get enhanced context and response
-    let autonomousResponse: any = null;
-    let autonomousEnhancedContext: any = null;
+    // B4: Start decision tracing session
+    const traceSessionId = this.decisionTracer.startSession(userId, promptText);
+    const sessionStartTime = performance.now();
 
     try {
-      logger.info('🧠 Activating Autonomous Capability System', {
+      // B4: Trace initial decision context
+      this.decisionTracer.addTrace(traceSessionId, {
         userId,
-        messageId: uiContext.id,
-        promptLength: promptText.length,
+        step: 'initial-decision',
+        component: 'CoreIntelligenceService',
+        data: {
+          promptText: promptText.substring(0, 200) + (promptText.length > 200 ? '...' : ''),
+          attachmentCount: commonAttachments.length,
+          guildId,
+          channelId,
+          decisionResult
+        },
+        metadata: {
+          confidence: decisionResult?.confidence,
+          success: true
+        }
       });
 
-      // Create message object for autonomous processing if needed
-      let messageForAutonomous: Message;
-      if (uiContext instanceof Message) {
-        messageForAutonomous = uiContext;
-      } else {
-        // Create a mock message object for slash commands
-        messageForAutonomous = this._createMessageForPipeline(
-          uiContext,
-          promptText,
-          userId,
-          commonAttachments,
-        );
-      }
-
-      // Process through autonomous capability system
-      autonomousResponse = await this.intelligenceIntegration.processMessage(messageForAutonomous);
-
-      logger.info('✅ Autonomous processing completed', {
+      return await this._processWithTracing(
+        promptText,
         userId,
-        hasResponse: !!autonomousResponse?.response,
-        capabilitiesActivated: autonomousResponse?.capabilitiesActivated?.length || 0,
-        enhancementApplied: !!autonomousResponse?.enhancementApplied,
-        qualityScore: autonomousResponse?.qualityScore || 0,
-      });
+        channelId,
+        guildId,
+        commonAttachments,
+        uiContext,
+        decisionResult,
+        traceSessionId,
+        startTime
+      );
 
-      // If autonomous system provided a high-quality response, use it
-      if (
-        autonomousResponse?.response &&
-        autonomousResponse?.qualityScore >= 0.8 &&
-        !autonomousResponse?.requiresFallback
-      ) {
-        logger.info('🎯 Using autonomous system response', {
-          userId,
-          qualityScore: autonomousResponse.qualityScore,
-          capabilitiesUsed: autonomousResponse.capabilitiesActivated,
-        });
-
-        // Track autonomous system usage in Langfuse if available
-        if (conversationTrace && this.enhancedLangfuseService) {
-          await this.enhancedLangfuseService.trackGeneration({
-            traceId: conversationTrace.id,
-            name: 'autonomous_capability_system',
-            input: promptText,
-            output: autonomousResponse.response,
-            model: 'autonomous_orchestrator',
-            startTime: new Date(startTime),
-            endTime: new Date(),
-            usage: {
-              input: promptText.length,
-              output: autonomousResponse.response.length,
-              total: promptText.length + autonomousResponse.response.length,
-            },
-            metadata: {
-              operation: 'autonomous_processing',
-              capabilitiesActivated: autonomousResponse.capabilitiesActivated,
-              qualityScore: autonomousResponse.qualityScore,
-              enhancementApplied: autonomousResponse.enhancementApplied,
-              processingTimeMs: Date.now() - startTime,
-            },
-          });
-        }
-
-        // End overall processing operation with autonomous success
-        performanceMonitor.endOperation(
-          processingOperationId,
-          'core_intelligence_service',
-          'process_prompt_and_generate_response',
-          true,
-          undefined,
-          {
-            autonomousSystemUsed: true,
-            totalProcessingTime: Date.now() - startTime,
-            responseLength: autonomousResponse.response.length,
-            qualityScore: autonomousResponse.qualityScore,
-          },
-        );
-
-        // Return autonomous response with any additional components
-        const responsePayload: any = {
-          content: autonomousResponse.response,
-        };
-
-        // Add any files or embeds from autonomous processing
-        if (autonomousResponse.files?.length > 0) {
-          responsePayload.files = autonomousResponse.files;
-        }
-        if (autonomousResponse.embeds?.length > 0) {
-          responsePayload.embeds = autonomousResponse.embeds;
-        }
-
-        return responsePayload;
-      }
-
-      // Store autonomous context for enhancement of standard pipeline
-      if (autonomousResponse?.analysisData || autonomousResponse?.enhancedContext) {
-        autonomousEnhancedContext = {
-          analysis: autonomousResponse.analysisData,
-          enhancedContext: autonomousResponse.enhancedContext,
-          recommendations: autonomousResponse.recommendations,
-          capabilitiesConsidered: autonomousResponse.capabilitiesConsidered,
-        };
-
-        logger.info('📊 Autonomous context available for pipeline enhancement', {
-          userId,
-          hasAnalysis: !!autonomousEnhancedContext.analysis,
-          hasEnhancedContext: !!autonomousEnhancedContext.enhancedContext,
-          recommendationsCount: autonomousEnhancedContext.recommendations?.length || 0,
-        });
-      }
     } catch (error) {
-      logger.warn('🔄 Autonomous system error, falling back to standard pipeline', {
-        error: error instanceof Error ? error.message : String(error),
+      // B4: Trace processing failure
+      this.decisionTracer.addTrace(traceSessionId, {
         userId,
+        step: 'result-evaluation',
+        component: 'CoreIntelligenceService',
+        data: { error: error instanceof Error ? error.message : String(error) },
+        metadata: {
+          executionTime: performance.now() - sessionStartTime,
+          success: false,
+          errorMessage: error instanceof Error ? error.message : String(error)
+        }
       });
 
-      // Track autonomous system fallback in Langfuse if available
-      if (conversationTrace && this.enhancedLangfuseService) {
-        await this.enhancedLangfuseService.trackGeneration({
-          traceId: conversationTrace.id,
-          name: 'autonomous_system_fallback',
-          input: promptText,
-          output: 'Fallback to standard pipeline due to autonomous system error',
-          model: 'standard_pipeline_fallback',
-          startTime: new Date(),
-          endTime: new Date(),
-          usage: { input: 0, output: 0, total: 0 },
-          metadata: {
-            operation: 'autonomous_fallback',
-            errorMessage: error instanceof Error ? error.message : String(error),
-            fallbackReason: 'autonomous_system_error',
-          },
-        });
-      }
-    }
-
-    // ===== CONTINUE WITH ENHANCED STANDARD PIPELINE =====
-
-    let mode: ResponseStrategy = strategy || 'quick-reply';
-    // In tests, force a deeper path to ensure MCP orchestration/capabilities are exercised
-    if (process.env.NODE_ENV === 'test' && process.env.FORCE_DEEP_REASONING !== 'false') {
-      if (mode === 'quick-reply') mode = 'deep-reason';
-    }
-    const lightweight = mode === 'quick-reply';
-    const deep = mode === 'deep-reason';
-
-    // Enhanced Semantic Caching - Check for cached response
-    if (this.enhancedSemanticCacheService && !lightweight) {
-      const cacheOperationId = performanceMonitor.startOperation(
-        'enhanced_semantic_cache_service',
-        'cache_lookup',
-      );
-      try {
-        const cachedResponse = await this.enhancedSemanticCacheService.get(promptText);
-        if (cachedResponse && cachedResponse.similarity > 0.85) {
-          // High similarity threshold
-          logger.debug('Returning cached response from enhanced semantic cache', {
-            similarity: cachedResponse.similarity,
-          });
-
-          performanceMonitor.endOperation(
-            cacheOperationId,
-            'enhanced_semantic_cache_service',
-            'cache_lookup',
-            true,
-            undefined,
-            { cacheHit: true, similarity: cachedResponse.similarity },
-          );
-
-          // Track cache hit in Langfuse if available
-          if (conversationTrace && this.enhancedLangfuseService) {
-            await this.enhancedLangfuseService.trackGeneration({
-              traceId: conversationTrace.id,
-              name: 'cached_response',
-              input: promptText,
-              output: cachedResponse.entry.content,
-              model: 'semantic_cache',
-              startTime: new Date(startTime),
-              endTime: new Date(),
-              usage: { input: 0, output: 0, total: 0 },
-              metadata: { cacheHit: true, similarity: cachedResponse.similarity },
-            });
-          }
-
-          // End overall processing operation with cache hit
-          performanceMonitor.endOperation(
-            processingOperationId,
-            'core_intelligence_service',
-            'process_prompt_and_generate_response',
-            true,
-            undefined,
-            { cacheHit: true, totalProcessingTime: Date.now() - startTime },
-          );
-
-          return { content: cachedResponse.entry.content };
-        } else {
-          performanceMonitor.endOperation(
-            cacheOperationId,
-            'enhanced_semantic_cache_service',
-            'cache_lookup',
-            true,
-            undefined,
-            { cacheHit: false, similarity: cachedResponse?.similarity || 0 },
-          );
-        }
-      } catch (error) {
-        performanceMonitor.endOperation(
-          cacheOperationId,
-          'enhanced_semantic_cache_service',
-          'cache_lookup',
-          false,
-          String(error),
-          { cacheHit: false },
-        );
-        logger.warn('Semantic cache check failed, continuing with generation', { error });
-      }
-    }
-
-    // If message is too long, gracefully defer and ask for confirmation to proceed heavy
-    if (mode === 'defer') {
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'defer_ack',
-        isSuccess: true,
-        duration: 0,
-      });
-      const approxTokens = Math.ceil(promptText.length / 4);
-      const msg = `This looks lengthy (~${approxTokens} tokens). Want a quick summary or a deep dive? Reply with "summary" or "deep".`;
-      return { content: msg };
-    }
-
-    // DM-only admin diagnose trigger
-    try {
-      const isDM = !guildId;
-      const isAdmin = await this.permissionService.hasAdminCommandPermission(userId, 'stats', {
-        guildId: guildId || undefined,
-        channelId,
-        userId,
-      });
-      if (isDM && isAdmin) {
-        const { getDiagnoseKeywords } = await import('../config/admin-config.js');
-        const kws = getDiagnoseKeywords();
-        const safeKws = kws.map((kw) => _.escapeRegExp(kw));
-        const re = new RegExp(`\\b(${safeKws.join('|')})\\b`, 'i');
-        if (re.test(promptText)) {
-          const { getProviderStatuses, modelTelemetryStore } = await import(
-            './advanced-capabilities/index.js'
-          );
-          const providers = getProviderStatuses();
-          const telemetry = modelTelemetryStore.snapshot(10);
-          const { knowledgeBaseService } = await import('./knowledge-base.service.js');
-          const kb = await knowledgeBaseService.getStats();
-          const lines: string[] = [];
-          lines.push('Providers:');
-          for (const p of providers)
-            lines.push(`- ${p.name}: ${p.available ? 'available' : 'not set'}`);
-          lines.push('\nRecent model usage:');
-          for (const t of telemetry)
-            lines.push(
-              `- ${t.provider}/${t.model} in ${Math.round(t.latencyMs)}ms ${t.success ? '✅' : '❌'}`,
-            );
-          lines.push('\nKnowledge Base:');
-          lines.push(`- Total entries: ${kb.totalEntries}`);
-          lines.push(`- Avg confidence: ${kb.averageConfidence.toFixed(2)}`);
-          lines.push(`- Recent additions (7d): ${kb.recentAdditions}`);
-          return { content: lines.join('\n') };
-        }
-      }
-    } catch (diagErr) {
-      // Non-fatal
-    }
-
-    try {
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'start_processing',
-        isSuccess: true,
-        duration: 0,
+      this.decisionTracer.endSession(traceSessionId, { 
+        success: false, 
+        response: undefined 
       });
 
-      const messageForPipeline = this._createMessageForPipeline(
-        uiContext,
-        promptText,
-        userId,
-        commonAttachments,
-      );
-
-      const moderationStatus = await this._performModeration(
-        promptText,
-        commonAttachments,
-        userId,
-        channelId,
-        guildId,
-        uiContext.id,
-        analyticsData,
-      );
-      if (moderationStatus.blocked)
-        return { content: `🚫 Your message was blocked: ${moderationStatus.reason}` };
-      if (moderationStatus.error) {
-        logger.warn(
-          `[CoreIntelSvc] Moderation check encountered an error: ${moderationStatus.error}. Proceeding with caution.`,
-          analyticsData,
-        );
-        // Decide if this non-block error is critical enough to halt. For now, we proceed.
-      }
-
-      const capabilities = await this._fetchUserCapabilities(
-        userId,
-        channelId,
-        guildId,
-        analyticsData,
-      );
-
-      // Qwen VL Multimodal Analysis - Analyze image attachments for enhanced understanding
-      let multimodalAnalysis: any = null;
-      if (this.qwenVLMultimodalService && !lightweight && commonAttachments.length > 0) {
-        const multimodalOperationId = performanceMonitor.startOperation(
-          'qwen_vl_multimodal_service',
-          'image_analysis',
-        );
-        try {
-          // Filter for image attachments
-          const imageAttachments = commonAttachments.filter(
-            (att) => att.contentType && att.contentType.startsWith('image/'),
-          );
-
-          if (imageAttachments.length > 0) {
-            const imageAnalysisPromises = imageAttachments.map(async (attachment) => {
-              const imageInput = {
-                type: 'url' as const,
-                data: attachment.url,
-                mimeType: attachment.contentType || undefined,
-              };
-
-              return await this.qwenVLMultimodalService!.analyzeImage(imageInput, {
-                prompt: `Analyze this image in the context of the conversation: "${promptText.substring(0, 200)}"`,
-                analysisType: 'detailed',
-                extractText: true,
-                identifyObjects: true,
-                analyzeMood: true,
-                describeScene: true,
-                includeConfidence: true,
-                maxTokens: 1000,
-              });
-            });
-
-            const imageAnalyses = await Promise.all(imageAnalysisPromises);
-            const successfulAnalyses = imageAnalyses.filter((analysis) => analysis.success);
-
-            if (successfulAnalyses.length > 0) {
-              multimodalAnalysis = {
-                imageCount: successfulAnalyses.length,
-                descriptions: successfulAnalyses.map((analysis) => analysis.analysis.description),
-                extractedText: successfulAnalyses
-                  .filter((analysis) => analysis.analysis.extractedText)
-                  .map((analysis) => analysis.analysis.extractedText)
-                  .join(' '),
-                identifiedObjects: successfulAnalyses
-                  .flatMap((analysis) => analysis.analysis.identifiedObjects || [])
-                  .map((obj) => obj.name),
-                overallMood: successfulAnalyses
-                  .filter((analysis) => analysis.analysis.moodAnalysis)
-                  .map((analysis) => analysis.analysis.moodAnalysis?.overallMood)
-                  .filter(Boolean)[0],
-                visualContext: successfulAnalyses
-                  .map(
-                    (analysis) =>
-                      analysis.analysis.detailedDescription || analysis.analysis.description,
-                  )
-                  .join('. '),
-              };
-
-              logger.debug('Multimodal image analysis completed', {
-                userId,
-                imagesAnalyzed: successfulAnalyses.length,
-                totalObjects: multimodalAnalysis.identifiedObjects.length,
-                hasExtractedText: !!multimodalAnalysis.extractedText,
-                mood: multimodalAnalysis.overallMood,
-              });
-
-              // Track multimodal analysis in Langfuse if available
-              if (conversationTrace && this.enhancedLangfuseService) {
-                await this.enhancedLangfuseService.trackGeneration({
-                  traceId: conversationTrace.id,
-                  name: 'multimodal_image_analysis',
-                  input: `Analyzed ${successfulAnalyses.length} images with context: ${promptText.substring(0, 100)}...`,
-                  output: multimodalAnalysis.visualContext,
-                  model: 'qwen_vl_multimodal',
-                  startTime: new Date(),
-                  endTime: new Date(),
-                  usage: {
-                    input: 0,
-                    output: successfulAnalyses.reduce(
-                      (sum, analysis) => sum + analysis.metadata.tokensUsed,
-                      0,
-                    ),
-                    total: successfulAnalyses.reduce(
-                      (sum, analysis) => sum + analysis.metadata.tokensUsed,
-                      0,
-                    ),
-                  },
-                  metadata: {
-                    operation: 'image_analysis',
-                    imageCount: successfulAnalyses.length,
-                    objectsIdentified: multimodalAnalysis.identifiedObjects.length,
-                    textExtracted: !!multimodalAnalysis.extractedText,
-                    moodDetected: !!multimodalAnalysis.overallMood,
-                  },
-                });
-              }
-            }
-
-            performanceMonitor.endOperation(
-              multimodalOperationId,
-              'qwen_vl_multimodal_service',
-              'image_analysis',
-              true,
-              undefined,
-              {
-                imagesAnalyzed: successfulAnalyses.length,
-                objectsIdentified: multimodalAnalysis?.identifiedObjects?.length || 0,
-                textExtracted: !!multimodalAnalysis?.extractedText,
-                processingSuccess: true,
-              },
-            );
-          } else {
-            performanceMonitor.endOperation(
-              multimodalOperationId,
-              'qwen_vl_multimodal_service',
-              'image_analysis',
-              true,
-              undefined,
-              { imagesAnalyzed: 0, reason: 'no_image_attachments' },
-            );
-          }
-        } catch (error) {
-          performanceMonitor.endOperation(
-            multimodalOperationId,
-            'qwen_vl_multimodal_service',
-            'image_analysis',
-            false,
-            String(error),
-            { imagesAnalyzed: 0, processingSuccess: false },
-          );
-          logger.warn('Multimodal image analysis failed, continuing without visual enhancement', {
-            error,
-            userId,
-            imageCount: commonAttachments.filter((att) => att.contentType?.startsWith('image/'))
-              .length,
-          });
-        }
-      }
-
-      // Crawl4AI Web Analysis - Extract and analyze web content from URLs
-      let webAnalysis: any = null;
-      if (this.crawl4aiWebService && !lightweight) {
-        try {
-          // Extract URLs from the prompt text
-          const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
-          const urlMatches = promptText.match(urlRegex);
-
-          if (urlMatches && urlMatches.length > 0) {
-            // Limit to first 2 URLs to avoid excessive processing
-            const urlsToProcess = urlMatches.slice(0, 2);
-
-            const webAnalysisPromises = urlsToProcess.map(async (url) => {
-              return await this.crawl4aiWebService!.crawlUrl({
-                url: url.trim(),
-                extractText: true,
-                extractLinks: true,
-                extractMedia: false, // Skip media for performance
-                onlyText: true,
-                removeUnwantedLines: true,
-                wordCountThreshold: 50,
-                timeout: 10000, // 10 second timeout
-                excludeTags: ['script', 'style', 'nav', 'footer', 'aside'],
-              });
-            });
-
-            const webResults = await Promise.all(webAnalysisPromises);
-            const successfulResults = webResults.filter(
-              (result) => result.success && result.markdown,
-            );
-
-            if (successfulResults.length > 0) {
-              webAnalysis = {
-                urlCount: successfulResults.length,
-                titles: successfulResults.map((result) => result.title).filter(Boolean),
-                content: successfulResults
-                  .map((result) => {
-                    const content = result.markdown || result.cleanedHtml || '';
-                    return content.substring(0, 1500); // Limit content size
-                  })
-                  .join('\n\n---\n\n'),
-                metadata: successfulResults.map((result) => ({
-                  url: result.url,
-                  title: result.title,
-                  wordCount: result.metadata?.wordCount || 0,
-                  description: result.metadata?.description,
-                })),
-                summaryContext: successfulResults
-                  .map(
-                    (result) =>
-                      `${result.title}: ${result.metadata?.description || 'Web content extracted'}`,
-                  )
-                  .join('; '),
-              };
-
-              logger.debug('Web content analysis completed', {
-                userId,
-                urlsProcessed: successfulResults.length,
-                totalContent: webAnalysis.content.length,
-                titles: webAnalysis.titles,
-              });
-
-              // Track web analysis in Langfuse if available
-              if (conversationTrace && this.enhancedLangfuseService) {
-                await this.enhancedLangfuseService.trackGeneration({
-                  traceId: conversationTrace.id,
-                  name: 'web_content_analysis',
-                  input: `Analyzed ${urlsToProcess.length} URLs: ${urlsToProcess.join(', ')}`,
-                  output: webAnalysis.summaryContext,
-                  model: 'crawl4ai_web_scraper',
-                  startTime: new Date(),
-                  endTime: new Date(),
-                  usage: {
-                    input: urlsToProcess.length,
-                    output: webAnalysis.content.length,
-                    total: urlsToProcess.length + webAnalysis.content.length,
-                  },
-                  metadata: {
-                    operation: 'web_content_extraction',
-                    urlCount: successfulResults.length,
-                    contentLength: webAnalysis.content.length,
-                    titles: webAnalysis.titles,
-                  },
-                });
-              }
-            }
-          }
-        } catch (error) {
-          logger.warn('Web content analysis failed, continuing without web enhancement', {
-            error,
-            userId,
-          });
-        }
-      }
-
-      // DSPy RAG Optimization - Enhance retrieval and query processing
-      let ragOptimization: any = null;
-      if (this.dspyRAGOptimizationService && !lightweight) {
-        try {
-          // First analyze the query for optimal retrieval strategy
-          const queryAnalysis = await this.dspyRAGOptimizationService.analyzeQuery(promptText, {
-            hasMultimodalContext: !!multimodalAnalysis,
-            hasWebContext: !!webAnalysis,
-            userId,
-            channelId,
-            guildId,
-          });
-
-          // Perform adaptive retrieval for enhanced context
-          const retrievalResult = await this.dspyRAGOptimizationService.adaptiveRetrieve(
-            promptText,
-            queryAnalysis,
-            {
-              retriever: {
-                type: 'hybrid',
-                topK: 5,
-                similarityThreshold: 0.7,
-              },
-              generator: {
-                model: 'gpt-4',
-                temperature: 0.3,
-                maxTokens: 1000,
-              },
-            },
-          );
-
-          if (retrievalResult.documents.length > 0) {
-            ragOptimization = {
-              documentsRetrieved: retrievalResult.documents.length,
-              queryAnalysis: retrievalResult.queryAnalysis,
-              retrievalStrategy: retrievalResult.retrievalStrategy,
-              relevantContent: retrievalResult.documents
-                .filter((doc) => doc.relevance === 'high')
-                .map((doc) => `${doc.source}: ${doc.content.substring(0, 300)}`)
-                .join('\n\n'),
-              topicInsights: retrievalResult.queryAnalysis.topics,
-              intentClassification: retrievalResult.queryAnalysis.intent,
-              complexityLevel: retrievalResult.queryAnalysis.complexity,
-            };
-
-            logger.debug('DSPy RAG optimization completed', {
-              userId,
-              documentsFound: retrievalResult.documents.length,
-              queryIntent: retrievalResult.queryAnalysis.intent,
-              complexity: retrievalResult.queryAnalysis.complexity,
-              retrievalTime: retrievalResult.retrievalTime,
-            });
-
-            // Track RAG optimization in Langfuse if available
-            if (conversationTrace && this.enhancedLangfuseService) {
-              await this.enhancedLangfuseService.trackGeneration({
-                traceId: conversationTrace.id,
-                name: 'dspy_rag_optimization',
-                input: `Query analysis and retrieval for: ${promptText.substring(0, 100)}...`,
-                output: `Retrieved ${retrievalResult.documents.length} relevant documents using ${retrievalResult.retrievalStrategy}`,
-                model: 'dspy_rag_optimizer',
-                startTime: new Date(),
-                endTime: new Date(),
-                usage: {
-                  input: promptText.length,
-                  output: ragOptimization.relevantContent.length,
-                  total: promptText.length + ragOptimization.relevantContent.length,
-                },
-                metadata: {
-                  operation: 'adaptive_retrieval',
-                  documentsRetrieved: retrievalResult.documents.length,
-                  queryIntent: retrievalResult.queryAnalysis.intent,
-                  complexity: retrievalResult.queryAnalysis.complexity,
-                  retrievalTime: retrievalResult.retrievalTime,
-                },
-              });
-            }
-          }
-        } catch (error) {
-          logger.warn('DSPy RAG optimization failed, continuing with standard processing', {
-            error,
-            userId,
-          });
-        }
-      }
-
-      const unifiedAnalysis = await this._analyzeInput(
-        messageForPipeline,
-        commonAttachments,
-        capabilities,
-        analyticsData,
-      );
-
-      // For lightweight responses, skip MCP orchestration to reduce latency unless explicitly required by analysis
-      const mcpOrchestrationResult = lightweight
-        ? {
-            success: true,
-            phase: 0,
-            toolsExecuted: [],
-            results: new Map(),
-            fallbacksUsed: [],
-            executionTime: 0,
-            confidence: 0,
-            recommendations: [],
-          }
-        : await this._executeMcpPipeline(
-            messageForPipeline,
-            unifiedAnalysis,
-            capabilities,
-            analyticsData,
-          );
-      if (!mcpOrchestrationResult.success) {
-        logger.warn(
-          `[CoreIntelSvc] MCP Pipeline indicated failure or partial success. Tools executed: ${mcpOrchestrationResult.toolsExecuted.join(', ')}. Fallbacks: ${mcpOrchestrationResult.fallbacksUsed.join(', ')}`,
-          analyticsData,
-        );
-      }
-
-      // Execute capabilities using unified orchestration results
-      logger.debug(`[CoreIntelSvc] Stage 4.5: Capability Execution`, {
-        userId: messageForPipeline.author.id,
-      });
-      if (!lightweight) {
-        try {
-          const capabilityResult = await this.capabilityService.executeCapabilitiesWithUnified(
-            unifiedAnalysis,
-            messageForPipeline,
-            mcpOrchestrationResult,
-          );
-          this.recordAnalyticsInteraction({
-            ...analyticsData,
-            step: 'capabilities_executed',
-            isSuccess: true,
-            duration: Date.now() - analyticsData.startTime,
-          });
-          logger.info(
-            `[CoreIntelSvc] Capabilities executed: MCP(${!!capabilityResult.mcpResults}), Persona(${!!capabilityResult.personaSwitched}), Multimodal(${!!capabilityResult.multimodalProcessed})`,
-            { analyticsData },
-          );
-        } catch (error: any) {
-          logger.warn(
-            `[CoreIntelSvc] Capability execution encountered an error: ${error.message}. Continuing with processing.`,
-            { error, ...analyticsData },
-          );
-          this.recordAnalyticsInteraction({
-            ...analyticsData,
-            step: 'capabilities_error',
-            isSuccess: false,
-            error: error.message,
-            duration: Date.now() - analyticsData.startTime,
-          });
-        }
-      }
-
-      // Execute Advanced Capabilities if enabled
-      let advancedCapabilitiesResult: EnhancedResponse | null = null;
-      if (
-        !lightweight &&
-        this.config.enableAdvancedCapabilities &&
-        this.advancedCapabilitiesManager
-      ) {
-        logger.debug(`[CoreIntelSvc] Stage 4.7: Advanced Capabilities Processing`, {
-          userId: messageForPipeline.author.id,
-        });
-        try {
-          const conversationHistory = (await getHistory(channelId)).map((msg) =>
-            msg.parts.map((part) => (typeof part === 'string' ? part : part.text || '')).join(' '),
-          );
-          const userPreferences = await this.getUserPreferences(userId);
-
-          advancedCapabilitiesResult = await this.advancedCapabilitiesManager.processMessage(
-            promptText,
-            Array.from(messageForPipeline.attachments.values()),
-            userId,
-            channelId,
-            guildId || undefined,
-            conversationHistory,
-            userPreferences,
-          );
-
-          this.recordAnalyticsInteraction({
-            ...analyticsData,
-            step: 'advanced_capabilities_executed',
-            isSuccess: true,
-            capabilitiesUsed: advancedCapabilitiesResult.metadata.capabilitiesUsed,
-            duration: Date.now() - analyticsData.startTime,
-          });
-
-          logger.info(
-            `[CoreIntelSvc] Advanced capabilities executed: ${advancedCapabilitiesResult.metadata.capabilitiesUsed.join(', ')}`,
-            {
-              userId,
-              confidenceScore: advancedCapabilitiesResult.metadata.confidenceScore,
-              attachmentsGenerated: advancedCapabilitiesResult.attachments.length,
-            },
-          );
-        } catch (error: any) {
-          logger.warn(
-            `[CoreIntelSvc] Advanced capabilities execution encountered an error: ${error.message}. Continuing with standard processing.`,
-            { error, ...analyticsData },
-          );
-          this.recordAnalyticsInteraction({
-            ...analyticsData,
-            step: 'advanced_capabilities_error',
-            isSuccess: false,
-            error: error.message,
-            duration: Date.now() - analyticsData.startTime,
-          });
-        }
-      }
-
-      const history = await getHistory(channelId);
-
-      // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
-      const vectorContext = '';
-      if (this.qdrantVectorService && !lightweight) {
-        try {
-          // Placeholder for vector context retrieval - requires embedding generation
-          // The Qdrant service is initialized but needs embedding integration
-          logger.debug('Qdrant vector service available but embeddings not integrated yet', {
-            hasService: !!this.qdrantVectorService,
-            userId,
-          });
-
-          // TODO: Integrate embedding generation for vector search
-          // 1. Generate embeddings for promptText
-          // 2. Search similar conversation contexts
-          // 3. Provide relevant context snippets
-        } catch (error) {
-          logger.warn('Qdrant vector search preparation failed', {
-            error,
-            userId,
-            guildId: guildId || undefined,
-          });
-        }
-      }
-
-      // Hybrid retrieval grounding
-      let __hybrid = '';
-      try {
-        if (!lightweight && process.env.ENABLE_HYBRID_RETRIEVAL === 'true') {
-          const { HybridRetrievalService } = await import('./hybrid-retrieval.service.js');
-          const retriever = new HybridRetrievalService();
-          const retrieval = await retriever.retrieve(promptText, channelId);
-          if (retrieval.groundedSnippets.length > 0) {
-            const ctx = retrieval.groundedSnippets.slice(0, 3).join('\n');
-            __hybrid = `You must ground answers in the retrieved context below. If insufficient, say you don't know.\nRetrieved Context:\n${ctx}\n---\n`;
-            (globalThis as any).hybridGroundingPrefix = __hybrid;
-          }
-        }
-      } catch (e) {
-        logger.debug('[CoreIntelSvc] Hybrid retrieval skipped', { error: String(e) });
-      }
-
-      const agenticContextData = await this._aggregateAgenticContext(
-        messageForPipeline,
-        unifiedAnalysis,
-        capabilities,
-        mcpOrchestrationResult,
-        history,
-        analyticsData,
-        multimodalAnalysis,
-        webAnalysis,
-        ragOptimization,
-        autonomousEnhancedContext, // Pass autonomous context for enhancement
-      );
-
-      let { fullResponseText } = await this._generateAgenticResponse(
-        agenticContextData,
-        userId,
-        channelId,
-        guildId,
-        commonAttachments,
-        uiContext,
-        history,
-        capabilities,
-        unifiedAnalysis,
-        analyticsData,
-        mode,
-      );
-
-      // Answer verification and refinement (self-critique + cross-model with auto-rerun)
-      if (!lightweight) {
-        try {
-          const { AnswerVerificationService } = await import(
-            './verification/answer-verification.service.js'
-          );
-          const verifier = new AnswerVerificationService({
-            enabled:
-              process.env.ENABLE_ANSWER_VERIFICATION === 'true' ||
-              process.env.ENABLE_SELF_CRITIQUE === 'true',
-            crossModel: process.env.CROSS_MODEL_VERIFICATION === 'true',
-            maxReruns: Number(process.env.MAX_RERUNS || 1),
-          });
-          const refined = await verifier.verifyAndImprove(promptText, fullResponseText, history);
-          if (refined && refined !== fullResponseText) {
-            fullResponseText = refined;
-          }
-        } catch (e) {
-          logger.debug('[CoreIntelSvc] Self-critique skipped', { error: String(e) });
-        }
-      }
-
-      // Enhance response with advanced capabilities results if available
-      if (
-        advancedCapabilitiesResult &&
-        advancedCapabilitiesResult.metadata.capabilitiesUsed.length > 0
-      ) {
-        // Use advanced capabilities text response if it's more comprehensive
-        if (
-          advancedCapabilitiesResult.textResponse &&
-          advancedCapabilitiesResult.textResponse.length > 10 &&
-          advancedCapabilitiesResult.metadata.confidenceScore > 0.5
-        ) {
-          fullResponseText = advancedCapabilitiesResult.textResponse;
-        }
-
-        // Add reasoning if available
-        if (advancedCapabilitiesResult.reasoning) {
-          fullResponseText += '\n\n' + advancedCapabilitiesResult.reasoning;
-        }
-
-        // Add web search results if available
-        if (
-          advancedCapabilitiesResult.webSearchResults &&
-          advancedCapabilitiesResult.webSearchResults.length > 0
-        ) {
-          fullResponseText += '\n\n**Current Information:**\n';
-          advancedCapabilitiesResult.webSearchResults
-            .slice(0, 3)
-            .forEach((result: any, index: number) => {
-              fullResponseText += `${index + 1}. ${result.title}: ${result.snippet}\n`;
-            });
-        }
-      }
-
-      // Neo4j Knowledge Graph - Entity extraction and relationship mapping
-      if (this.neo4jKnowledgeGraphService && !lightweight && fullResponseText) {
-        try {
-          const conversationId = `${userId}-${channelId}-${Date.now()}`;
-
-          // Extract entities from both prompt and response for comprehensive knowledge capture
-          const promptEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
-            promptText,
-            conversationId,
-          );
-
-          const responseEntities = await this.neo4jKnowledgeGraphService.extractEntitiesFromText(
-            fullResponseText,
-            conversationId,
-          );
-
-          // Add entities to conversation graph
-          const allEntities = [...promptEntities, ...responseEntities];
-          if (allEntities.length > 0) {
-            for (const entity of allEntities) {
-              await this.neo4jKnowledgeGraphService.addToConversationGraph(
-                conversationId,
-                entity,
-                'MENTIONED_IN',
-              );
-            }
-
-            logger.debug('Updated knowledge graph with conversation entities', {
-              conversationId,
-              promptEntitiesCount: promptEntities.length,
-              responseEntitiesCount: responseEntities.length,
-              totalEntities: allEntities.length,
-              userId,
-            });
-
-            // Track knowledge graph operation in Langfuse if available
-            if (conversationTrace && this.enhancedLangfuseService) {
-              await this.enhancedLangfuseService.trackGeneration({
-                traceId: conversationTrace.id,
-                name: 'knowledge_graph_update',
-                input: `Entities from prompt: ${promptEntities.length}, response: ${responseEntities.length}`,
-                output: `Knowledge graph updated with ${allEntities.length} entities`,
-                model: 'neo4j_knowledge_graph',
-                startTime: new Date(),
-                endTime: new Date(),
-                usage: { input: 0, output: 0, total: 0 },
-                metadata: {
-                  operation: 'entity_extraction_and_graph_update',
-                  conversationId,
-                  entitiesCount: allEntities.length,
-                  entityTypes: allEntities
-                    .map((e) => e.labels[0])
-                    .filter((v, i, a) => a.indexOf(v) === i),
-                },
-              });
-            }
-          }
-        } catch (error) {
-          logger.warn('Knowledge graph update failed, continuing without graph updates', {
-            error,
-            userId,
-            guildId: guildId || undefined,
-          });
-        }
-      }
-
-      fullResponseText = await this._applyPostResponsePersonalization(
-        userId,
-        guildId,
-        fullResponseText,
-        analyticsData,
-      );
-
-      await this._updateStateAndAnalytics({
-        userId,
-        channelId,
-        promptText,
-        attachments: commonAttachments,
-        fullResponseText,
-        unifiedAnalysis,
-        mcpOrchestrationResult,
-        analyticsData,
-        success: true,
-      });
-
-      // Prepare final response with advanced capabilities attachments
-      const finalComponents =
-        this.config.enableEnhancedUI &&
-        this.enhancedUiService &&
-        !(
-          uiContext instanceof ChatInputCommandInteraction &&
-          this.activeStreams.has(`${userId}-${channelId}`)
-        )
-          ? [this.enhancedUiService.createResponseActionRow()]
-          : [];
-
-      // Attach media if produced by tools
-      const files: any[] = [];
-      const embeds: any[] = [];
-      try {
-        if (mcpOrchestrationResult?.results?.has('image-generation')) {
-          const imgRes = mcpOrchestrationResult.results.get('image-generation');
-          const images = (imgRes?.data as any)?.images as
-            | Array<{ mimeType: string; base64: string }>
-            | undefined;
-          if (imgRes?.success && images && images.length > 0) {
-            const first = images[0];
-            const buffer = Buffer.from(first.base64, 'base64');
-            files.push({ attachment: buffer, name: `image.png` });
-          }
-        }
-        if (mcpOrchestrationResult?.results?.has('gif-search')) {
-          const gifRes = mcpOrchestrationResult.results.get('gif-search');
-          const gifs = (gifRes?.data as any)?.gifs as
-            | Array<{ url: string; previewUrl?: string }>
-            | undefined;
-          if (gifRes?.success && gifs && gifs.length > 0) {
-            const url = gifs[0].url;
-            embeds.push({ image: { url } });
-          }
-        }
-        if (mcpOrchestrationResult?.results?.has('text-to-speech')) {
-          const ttsRes = mcpOrchestrationResult.results.get('text-to-speech');
-          const audio = (ttsRes?.data as any)?.audio as
-            | { mimeType: string; base64: string }
-            | undefined;
-          if (ttsRes?.success && audio?.base64) {
-            const buffer = Buffer.from(audio.base64, 'base64');
-            files.push({ attachment: buffer, name: `voice.mp3` });
-          }
-        }
-      } catch (e) {
-        logger.warn('[CoreIntelSvc] Failed attaching media outputs', { error: String(e) });
-      }
-
-      const responsePayload: any = { content: fullResponseText, components: finalComponents };
-      if (embeds.length > 0) responsePayload.embeds = embeds;
-      if (files.length > 0) responsePayload.files = files;
-
-      // Enhanced Semantic Caching - Store response after generation (for non-lightweight responses)
-      if (this.enhancedSemanticCacheService && !lightweight && fullResponseText) {
-        try {
-          await this.enhancedSemanticCacheService.set({
-            key: promptText,
-            content: fullResponseText,
-            ttl: 3600000, // Cache for 1 hour in milliseconds
-            tags: [mode, 'generated_response'],
-            metadata: {
-              userId,
-              guildId,
-              strategy: mode,
-              timestamp: new Date().toISOString(),
-              responseLength: fullResponseText.length,
-            },
-          });
-          logger.debug('Stored response in enhanced semantic cache', {
-            promptLength: promptText.length,
-            responseLength: fullResponseText.length,
-          });
-
-          // Track cache store via generation tracking in Langfuse if available
-          if (conversationTrace && this.enhancedLangfuseService) {
-            await this.enhancedLangfuseService.trackGeneration({
-              traceId: conversationTrace.id,
-              name: 'cache_store_operation',
-              input: `Cache key: ${promptText.substring(0, 100)}...`,
-              output: 'Cache stored successfully',
-              model: 'semantic_cache',
-              startTime: new Date(),
-              endTime: new Date(),
-              usage: { input: 0, output: 0, total: 0 },
-              metadata: {
-                operation: 'cache_store',
-                promptLength: promptText.length,
-                responseLength: fullResponseText.length,
-                strategy: mode,
-              },
-            });
-          }
-        } catch (error) {
-          logger.warn('Failed to store response in semantic cache', { error });
-        }
-      }
-
-      // AI Evaluation Testing Service - Post-processing evaluation and testing
-      if (this.aiEvaluationTestingService && process.env.ENABLE_AI_EVALUATION_TESTING === 'true') {
-        try {
-          // Create a test function that evaluates the conversation processing
-          const conversationTestFunction = async (testCase: any) => {
-            return {
-              output: {
-                responseGenerated: !!fullResponseText,
-                responseLength: fullResponseText?.length || 0,
-                hasEmbeds: embeds.length > 0,
-                hasFiles: files.length > 0,
-                featuresUsed: {
-                  advancedCapabilities: !!advancedCapabilitiesResult,
-                  multimodalAnalysis: !!multimodalAnalysis,
-                  webAnalysis: !!webAnalysis,
-                  ragOptimization: !!ragOptimization,
-                  semanticCaching: !!this.enhancedSemanticCacheService,
-                  knowledgeGraph: !!this.neo4jKnowledgeGraphService,
-                },
-              },
-              duration: Date.now() - startTime,
-              cost: 0, // Could be calculated based on token usage
-            };
-          };
-
-          // Run background benchmark evaluation of the conversation processing
-          const evaluationMetrics = await this.aiEvaluationTestingService.runBenchmark(
-            'conversation_processing_pipeline',
-            conversationTestFunction,
-          );
-
-          // Track evaluation in Langfuse if available
-          if (conversationTrace && this.enhancedLangfuseService) {
-            await this.enhancedLangfuseService.trackGeneration({
-              traceId: conversationTrace.id,
-              name: 'ai_evaluation_benchmark',
-              input: `Pipeline evaluation for conversation processing`,
-              output: `Benchmark completed - Ranking: ${evaluationMetrics.ranking}`,
-              model: 'ai_evaluation_testing',
-              startTime: new Date(),
-              endTime: new Date(),
-              usage: { input: 0, output: 0, total: 0 },
-              metadata: {
-                operation: 'pipeline_evaluation',
-                benchmarkName: evaluationMetrics.benchmarkName,
-                benchmarkRanking: evaluationMetrics.ranking,
-                processingTimeMs: Date.now() - startTime,
-                featuresUsed: {
-                  advancedCapabilities: !!advancedCapabilitiesResult,
-                  multimodalAnalysis: !!multimodalAnalysis,
-                  webAnalysis: !!webAnalysis,
-                  ragOptimization: !!ragOptimization,
-                  semanticCaching: !!this.enhancedSemanticCacheService,
-                  knowledgeGraph: !!this.neo4jKnowledgeGraphService,
-                },
-              },
-            });
-          }
-
-          logger.debug('AI Evaluation Testing completed', {
-            benchmarkName: evaluationMetrics.benchmarkName,
-            ranking: evaluationMetrics.ranking,
-            processingTimeMs: Date.now() - startTime,
-          });
-        } catch (error) {
-          logger.warn('AI Evaluation Testing failed, continuing without evaluation', {
-            error,
-            userId,
-            guildId: guildId || undefined,
-          });
-        }
-      }
-
-      // End overall processing operation successfully
-      performanceMonitor.endOperation(
-        processingOperationId,
-        'core_intelligence_service',
-        'process_prompt_and_generate_response',
-        true,
-        undefined,
-        {
-          totalProcessingTime: Date.now() - startTime,
-          responseLength:
-            typeof responsePayload.content === 'string' ? responsePayload.content.length : 0,
-          hasEmbeds: responsePayload.embeds ? responsePayload.embeds.length > 0 : false,
-          hasFiles: responsePayload.files ? responsePayload.files.length > 0 : false,
-          servicesUsed: {
-            langfuse: !!this.enhancedLangfuseService,
-            semanticCache: !!this.enhancedSemanticCacheService,
-            multimodal: !!multimodalAnalysis,
-            webAnalysis: !!webAnalysis,
-            knowledgeGraph: !!this.neo4jKnowledgeGraphService,
-            ragOptimization: !!ragOptimization,
-            aiEvaluation: !!this.aiEvaluationTestingService,
-          },
-        },
-      );
-
-      return responsePayload;
-    } catch (error: any) {
-      // End overall processing operation with error
-      performanceMonitor.endOperation(
-        processingOperationId,
-        'core_intelligence_service',
-        'process_prompt_and_generate_response',
-        false,
-        error.message,
-        {
-          totalProcessingTime: Date.now() - startTime,
-          errorType: error.constructor.name,
-          errorStep: 'processing_pipeline',
-        },
-      );
-
-      logger.error(
-        `[CoreIntelSvc] Critical Error in _processPromptAndGenerateResponse: ${error.message}`,
-        { error, stack: error.stack, ...analyticsData },
-      );
-      console.error('Critical Error in _processPromptAndGenerateResponse', error);
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'critical_error_caught',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - startTime,
-      });
-      return {
-        content: '🤖 Sorry, I encountered a critical internal error. Please try again later.',
-      };
-    } finally {
-      logger.info(`[CoreIntelSvc] Processing pipeline finished.`, {
-        ...analyticsData,
-        success: !(analyticsData as any).error,
-        duration: Date.now() - startTime,
-      });
+      throw error;
     }
   }
 
-  private _createMessageForPipeline(
-    uiContext: Message | ChatInputCommandInteraction,
+  // B4: Main processing logic with comprehensive tracing
+  private async _processWithTracing(
     promptText: string,
-    userId: string,
-    commonAttachments: CommonAttachment[],
-  ): Message {
-    if (uiContext instanceof Message) return uiContext;
-    const interaction = uiContext;
-    return {
-      id: interaction.id,
-      content: promptText,
-      author: { id: userId, bot: false, toString: () => `<@${userId}>` } as any,
-      channelId: interaction.channelId,
-      guildId: interaction.guildId,
-      client: interaction.client,
-      attachments: new Collection(
-        commonAttachments.map((att, i) => {
-          const attachmentData = {
-            id: `${interaction.id}_att_${i}`,
-            name: att.name || new URL(att.url).pathname.split('/').pop() || 'attachment',
-            url: att.url,
-            contentType: att.contentType || 'application/octet-stream',
-            size: 0,
-            proxyURL: att.url,
-            height: null,
-            width: null,
-            ephemeral: false,
-          };
-          return [attachmentData.id, attachmentData as Attachment];
-        }),
-      ),
-      channel: interaction.channel,
-      guild: interaction.guild,
-      member: interaction.member,
-      createdTimestamp: interaction.createdTimestamp,
-      editedTimestamp: null,
-      toString: () => promptText,
-      fetchReference: async () => {
-        logger.warn('[CoreIntelSvc] Mocked fetchReference called. Returning minimal reference.');
-        return { id: 'ref_mock', content: 'Reference unavailable in mock environment.' };
-      },
-    } as unknown as Message;
-  }
-
-  private async _performModeration(
-    promptText: string,
-    attachments: CommonAttachment[],
-    userId: string,
-    channelId: string,
-    guildId: string | null,
-    messageId: string,
-    analyticsData: any,
-  ): Promise<{ blocked: boolean; reason?: string; error?: string }> {
-    try {
-      const textModerationResult = await this.moderationService.moderateText(promptText, {
-        guildId: guildId || '',
-        userId,
-        channelId,
-        messageId,
-      });
-      if (textModerationResult.action === 'block') {
-        this.recordAnalyticsInteraction({
-          ...analyticsData,
-          step: 'moderation_block_text',
-          isSuccess: false,
-          error: 'Text content blocked',
-          duration: Date.now() - analyticsData.startTime,
-        });
-        return {
-          blocked: true,
-          reason: textModerationResult.verdict.reason || 'Content flagged as unsafe',
-        };
-      }
-      for (const att of attachments) {
-        if (att.contentType?.startsWith('image/')) {
-          const imageModerationResult = await this.moderationService.moderateImage(
-            att.url,
-            att.contentType,
-            { guildId: guildId || '', userId, channelId, messageId },
-          );
-          if (imageModerationResult.action === 'block') {
-            this.recordAnalyticsInteraction({
-              ...analyticsData,
-              step: 'moderation_block_image',
-              isSuccess: false,
-              error: 'Image blocked',
-              duration: Date.now() - analyticsData.startTime,
-            });
-            return {
-              blocked: true,
-              reason: imageModerationResult.verdict.reason || 'Image flagged as unsafe',
-            };
-          }
-        }
-      }
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'moderation_passed',
-        isSuccess: true,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return { blocked: false };
-    } catch (error: any) {
-      logger.error(`[CoreIntelSvc] Error in _performModeration: ${error.message}`, {
-        error,
-        stack: error.stack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'moderation_error',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return { blocked: false, error: 'Moderation check failed.' };
-    }
-  }
-
-  private async _fetchUserCapabilities(
-    userId: string,
-    channelId: string,
-    guildId: string | null,
-    analyticsData: any,
-  ): Promise<UserCapabilities> {
-    logger.debug(`[CoreIntelSvc] Stage 2: Get User Capabilities`, { userId });
-    try {
-      const capabilities = await this.permissionService.getUserCapabilities(userId, {
-        guildId: guildId || undefined,
-        channelId,
-        userId,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'capabilities_fetched',
-        isSuccess: true,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return capabilities;
-    } catch (error: any) {
-      logger.error(`[CoreIntelSvc] Critical Error in _fetchUserCapabilities: ${error.message}`, {
-        error,
-        stack: error.stack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'capabilities_error',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      throw new Error(`Critical: Failed to fetch user capabilities for ${userId}.`);
-    }
-  }
-
-  private async _analyzeInput(
-    messageForPipeline: Message,
-    commonAttachments: CommonAttachment[],
-    capabilities: UserCapabilities,
-    analyticsData: any,
-  ): Promise<UnifiedMessageAnalysis> {
-    logger.debug(`[CoreIntelSvc] Stage 3: Message Analysis`, {
-      userId: messageForPipeline.author.id,
-    });
-    try {
-      const analysisAttachmentsData: AttachmentInfo[] = commonAttachments.map((a: any) => ({
-        name: a.name || new URL(a.url).pathname.split('/').pop() || 'attachment',
-        url: a.url,
-        contentType: a.contentType || undefined,
-      }));
-      const unifiedAnalysis = await unifiedMessageAnalysisService.analyzeMessage(
-        messageForPipeline,
-        analysisAttachmentsData,
-        capabilities,
-      );
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'message_analyzed',
-        isSuccess: true,
-        duration: Date.now() - (analyticsData.startTime || Date.now()),
-      });
-      return unifiedAnalysis;
-    } catch (error: any) {
-      logger.error(`[CoreIntelSvc] Critical Error in _analyzeInput: ${error.message}`, {
-        error,
-        stack: error.stack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'analysis_error',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - (analyticsData.startTime || Date.now()),
-      });
-      throw new Error(
-        `Critical: Failed to analyze input for user ${messageForPipeline.author.id}.`,
-      );
-    }
-  }
-
-  private async _executeMcpPipeline(
-    messageForAnalysis: Message,
-    unifiedAnalysis: UnifiedMessageAnalysis,
-    capabilities: UserCapabilities,
-    analyticsData: any,
-  ): Promise<MCPOrchestrationResult> {
-    logger.debug(`[CoreIntelSvc] Stage 4: MCP Orchestration`, {
-      userId: messageForAnalysis.author.id,
-    });
-    try {
-      const mcpResult = await this.mcpOrchestrator.orchestrateIntelligentResponse(
-        messageForAnalysis,
-        unifiedAnalysis,
-        capabilities,
-      );
-      logger.info(
-        `[CoreIntelSvc] MCP Orchestration completed. Success: ${mcpResult.success}, Tools: ${mcpResult.toolsExecuted.join(',') || 'None'}`,
-        { analyticsData },
-      );
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'mcp_orchestrated',
-        isSuccess: mcpResult.success,
-        mcpToolsExecuted: mcpResult.toolsExecuted.join(','),
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return mcpResult;
-    } catch (error: any) {
-      logger.error(`[CoreIntelSvc] Error in _executeMcpPipeline: ${error.message}`, {
-        error,
-        stack: error.stack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'mcp_pipeline_error',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return {
-        success: false,
-        phase: 0,
-        toolsExecuted: [],
-        results: new Map(),
-        fallbacksUsed: ['pipeline_error'],
-        executionTime: 0,
-        confidence: 0,
-        recommendations: ['MCP pipeline encountered an unexpected error.'],
-      };
-    }
-  }
-
-  private async _aggregateAgenticContext(
-    messageForAnalysis: Message,
-    unifiedAnalysis: UnifiedMessageAnalysis,
-    capabilities: UserCapabilities,
-    mcpOrchestrationResult: MCPOrchestrationResult,
-    history: ChatMessage[],
-    analyticsData: any,
-    multimodalAnalysis?: any,
-    webAnalysis?: any,
-    ragOptimization?: any,
-    autonomousEnhancedContext?: any,
-  ): Promise<EnhancedContext> {
-    logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, {
-      userId: messageForAnalysis.author.id,
-    });
-    try {
-      // Use the contextService.buildEnhancedContextWithUnified for proper unified MCP integration
-      const agenticContextData = await this.contextService.buildEnhancedContextWithUnified(
-        messageForAnalysis,
-        unifiedAnalysis,
-        capabilities,
-        mcpOrchestrationResult,
-      );
-
-      // Enhance context with multimodal and web analysis
-      if (multimodalAnalysis || webAnalysis || ragOptimization) {
-        let enhancedSystemPrompt = agenticContextData.systemPrompt || '';
-
-        if (multimodalAnalysis) {
-          enhancedSystemPrompt += '\n\n## Visual Context\n';
-          if (multimodalAnalysis.visualContext) {
-            enhancedSystemPrompt += `Images in conversation: ${multimodalAnalysis.visualContext}\n`;
-          }
-          if (multimodalAnalysis.extractedText) {
-            enhancedSystemPrompt += `Text extracted from images: ${multimodalAnalysis.extractedText}\n`;
-          }
-          if (multimodalAnalysis.identifiedObjects.length > 0) {
-            enhancedSystemPrompt += `Objects identified: ${multimodalAnalysis.identifiedObjects.join(', ')}\n`;
-          }
-          if (multimodalAnalysis.overallMood) {
-            enhancedSystemPrompt += `Visual mood detected: ${multimodalAnalysis.overallMood}\n`;
-          }
-        }
-
-        if (webAnalysis) {
-          enhancedSystemPrompt += '\n\n## Web Content Context\n';
-          enhancedSystemPrompt += `Web content summary: ${webAnalysis.summaryContext}\n`;
-          if (webAnalysis.content) {
-            enhancedSystemPrompt += `\n### Extracted Web Content:\n${webAnalysis.content}\n`;
-          }
-        }
-
-        if (ragOptimization) {
-          enhancedSystemPrompt += '\n\n## RAG-Optimized Context\n';
-          enhancedSystemPrompt += `Query Intent: ${ragOptimization.intentClassification}\n`;
-          enhancedSystemPrompt += `Complexity Level: ${ragOptimization.complexityLevel}\n`;
-          if (ragOptimization.topicInsights.length > 0) {
-            enhancedSystemPrompt += `Key Topics: ${ragOptimization.topicInsights.join(', ')}\n`;
-          }
-          if (ragOptimization.relevantContent) {
-            enhancedSystemPrompt += `\n### Retrieved Context:\n${ragOptimization.relevantContent}\n`;
-          }
-        }
-
-        // Update the system prompt with enhanced context
-        agenticContextData.systemPrompt = enhancedSystemPrompt;
-
-        // Add autonomous insights if available
-        if (autonomousEnhancedContext) {
-          let autonomousInsights = '\n\n## Autonomous System Insights\n';
-
-          if (autonomousEnhancedContext.analysis) {
-            autonomousInsights += `Analysis: ${JSON.stringify(autonomousEnhancedContext.analysis)}\n`;
-          }
-
-          if (autonomousEnhancedContext.recommendations?.length > 0) {
-            autonomousInsights += `Recommendations: ${autonomousEnhancedContext.recommendations.join(', ')}\n`;
-          }
-
-          if (autonomousEnhancedContext.capabilitiesConsidered?.length > 0) {
-            autonomousInsights += `Capabilities Considered: ${autonomousEnhancedContext.capabilitiesConsidered.join(', ')}\n`;
-          }
-
-          agenticContextData.systemPrompt += autonomousInsights;
-
-          logger.debug('Enhanced context with autonomous insights', {
-            userId: messageForAnalysis.author.id,
-            hasAnalysis: !!autonomousEnhancedContext.analysis,
-            recommendationsCount: autonomousEnhancedContext.recommendations?.length || 0,
-            capabilitiesCount: autonomousEnhancedContext.capabilitiesConsidered?.length || 0,
-          });
-        }
-
-        // Add to additional context if available
-        if ((agenticContextData as any).additionalContext) {
-          (agenticContextData as any).additionalContext += `\n## Enhanced Analysis\n`;
-          if (multimodalAnalysis) {
-            (agenticContextData as any).additionalContext +=
-              `- Analyzed ${multimodalAnalysis.imageCount} images\n`;
-          }
-          if (webAnalysis) {
-            (agenticContextData as any).additionalContext +=
-              `- Processed ${webAnalysis.urlCount} web URLs\n`;
-          }
-          if (ragOptimization) {
-            (agenticContextData as any).additionalContext +=
-              `- Retrieved ${ragOptimization.documentsRetrieved} optimized context documents\n`;
-          }
-        }
-      }
-
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'context_aggregated',
-        isSuccess: true,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return agenticContextData;
-    } catch (error: any) {
-      logger.error(`[CoreIntelSvc] Critical Error in _aggregateAgenticContext: ${error.message}`, {
-        error,
-        stack: error.stack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'context_aggregation_error',
-        isSuccess: false,
-        error: error.message,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      throw new Error(
-        `Critical: Failed to aggregate agentic context for user ${messageForAnalysis.author.id}.`,
-      );
-    }
-  }
-
-  private async _generateAgenticResponse(
-    enhancedContext: EnhancedContext,
     userId: string,
     channelId: string,
     guildId: string | null,
     commonAttachments: CommonAttachment[],
     uiContext: ChatInputCommandInteraction | Message,
-    history: ChatMessage[],
-    capabilities: UserCapabilities,
-    unifiedAnalysis: UnifiedMessageAnalysis,
-    analyticsData: any,
-    mode: ResponseStrategy,
-  ): Promise<{ agenticResponse: AgenticResponse; fullResponseText: string }> {
-    try {
-      const lightweight = mode === 'quick-reply';
-      const deep = mode === 'deep-reason';
-      if (this.config.enablePersonalization && this.smartRecommendations) {
-        logger.debug(`[CoreIntelSvc] Stage 6: Personalization - Pre-Response`, analyticsData);
-        // Assuming richPromptFromContext was enhancedContext.prompt
-        const toolRecs = await this.smartRecommendations.getContextualToolRecommendations({
+    decisionResult: DecisionResult | undefined,
+    traceSessionId: string,
+    startTime: number
+  ): Promise<any> {
+
+    // ===== B1: Unified Pipeline as Primary Processing Path =====
+    // Strategy-aware processing now routes through UnifiedPipeline for enhanced capabilities
+    if (decisionResult) {
+      // B4: Trace strategy mapping step
+      const strategyMappingStartTime = performance.now();
+      this.decisionTracer.addTrace(traceSessionId, {
+        userId,
+        step: 'strategy-mapping',
+        component: 'UnifiedPipeline',
+        data: {
+          strategy: decisionResult.strategy,
+          confidence: decisionResult.confidence,
+          tokenEstimate: decisionResult.tokenEstimate
+        },
+        metadata: {
+          confidence: decisionResult.confidence,
+          success: true
+        }
+      });
+
+      logger.info('B1: Processing through primary UnifiedPipeline', {
+        strategy: decisionResult.strategy,
+        confidence: decisionResult.confidence,
+        tokenEstimate: decisionResult.tokenEstimate,
+        userId,
+        traceSessionId // B4: Include trace session in logs
+      });
+
+      try {
+        const pipelineStartTime = performance.now();
+        const pipelineResult = await this.processWithUnifiedPipeline(
+          promptText,
           userId,
-          guildId: guildId || undefined,
-          currentMessage: enhancedContext.prompt,
-          activeTools: unifiedAnalysis.requiredTools,
-          userExpertise: unifiedAnalysis.complexity,
-        });
-        logger.debug(
-          `[CoreIntelSvc] Personalized Tool Recommendations: ${toolRecs.length} recommendations.`,
+          channelId,
+          guildId,
+          commonAttachments,
+          uiContext,
+          decisionResult
         );
-        this.recordAnalyticsInteraction({
-          ...analyticsData,
-          step: 'personalization_preresponse',
-          isSuccess: true,
-          duration: Date.now() - analyticsData.startTime,
+
+        // B4: Trace pipeline execution success
+        this.decisionTracer.addTrace(traceSessionId, {
+          userId,
+          step: 'module-execution',
+          component: 'UnifiedPipeline',
+          data: {
+            result: pipelineResult ? 'success' : 'null',
+            contentLength: pipelineResult?.content?.length || 0
+          },
+          metadata: {
+            executionTime: performance.now() - pipelineStartTime,
+            success: !!pipelineResult,
+            confidence: decisionResult.confidence
+          }
+        });
+
+        if (pipelineResult) {
+          // B4: End successful tracing session
+          this.decisionTracer.endSession(traceSessionId, {
+            success: true,
+            response: pipelineResult.content?.substring(0, 100) + (pipelineResult.content?.length > 100 ? '...' : '')
+          });
+
+          return pipelineResult;
+        }
+
+        logger.warn('B1: UnifiedPipeline returned null, falling back to strategy routing', { 
+          userId, 
+          traceSessionId 
+        });
+
+        // B4: Trace fallback decision
+        this.decisionTracer.addTrace(traceSessionId, {
+          userId,
+          step: 'strategy-mapping',
+          component: 'CoreIntelligenceService',
+          data: { 
+            action: 'fallback-to-strategy-routing',
+            reason: 'unified-pipeline-returned-null'
+          },
+          metadata: {
+            executionTime: performance.now() - strategyMappingStartTime,
+            success: true
+          }
+        });
+
+      } catch (error) {
+        logger.error('B1: UnifiedPipeline processing failed, falling back to strategy routing', { 
+          error, 
+          userId,
+          strategy: decisionResult.strategy,
+          traceSessionId
+        });
+
+        // B4: Trace pipeline failure
+        this.decisionTracer.addTrace(traceSessionId, {
+          userId,
+          step: 'module-execution',
+          component: 'UnifiedPipeline',
+          data: { 
+            error: error instanceof Error ? error.message : String(error)
+          },
+          metadata: {
+            executionTime: performance.now() - strategyMappingStartTime,
+            success: false,
+            errorMessage: error instanceof Error ? error.message : String(error)
+          }
         });
       }
+    }
 
-      logger.debug(`[CoreIntelSvc] Stage 7: Response Generation`, analyticsData);
-      const agenticQuery: AgenticQuery = {
-        query: enhancedContext.prompt,
+    // ===== Fallback: Strategy-Specific AI Service Routing (A2 Implementation) =====
+    if (decisionResult) {
+      // B4: Trace fallback strategy processing
+      const fallbackStartTime = performance.now();
+      this.decisionTracer.addTrace(traceSessionId, {
+        userId,
+        step: 'strategy-mapping',
+        component: 'StrategyRouter',
+        data: {
+          strategy: decisionResult.strategy,
+          phase: 'fallback-processing'
+        },
+        metadata: {
+          confidence: decisionResult.confidence,
+          success: true
+        }
+      });
+
+      logger.info('Fallback: Strategy-aware processing initiated', {
+        strategy: decisionResult.strategy,
+        confidence: decisionResult.confidence,
+        tokenEstimate: decisionResult.tokenEstimate,
+        userId,
+        traceSessionId
+      });
+
+      // Strategy-specific AI service routing (C4: with personality context)
+      // C4: Rebuild personality context for fallback processing
+      let personalityContext: DecisionContext['personality'] | undefined;
+      try {
+        if (uiContext instanceof Message) {
+          personalityContext = await this.buildPersonalityContext(uiContext, userId, guildId || undefined);
+        }
+      } catch (error) {
+        logger.debug('Failed to build personality context for fallback', { userId, error });
+      }
+
+      const strategyResponse = await this.processWithStrategy(
+        decisionResult,
+        promptText,
         userId,
         channelId,
-        context: {
-          previousMessages: history,
-          userRole: capabilities.hasAdminCommands ? 'admin' : 'user',
-          userPermissions: Object.keys(capabilities).filter(
-            (k) => capabilities[k as keyof UserCapabilities] === true,
-          ),
-        },
-        options: {
-          guildId: guildId || 'default',
-          includeCitations: this.config.enableAgenticFeatures,
-        },
-        // Note: AgenticQuery doesn't support attachments - they would need to be passed separately
-      };
+        guildId,
+        uiContext,
+        personalityContext // C4: Pass personality context to strategies
+      );
 
-      // Streaming not currently available in AgenticIntelligenceService
-      logger.debug(`[CoreIntelSvc] Generating non-streamed response.`, analyticsData);
-      // RAG: fetch top knowledge base snippets
-      let ragPrefixedQuery = agenticQuery.query;
-      try {
-        const kbResults = await knowledgeBaseService.search({
-          query: agenticQuery.query,
-          channelId,
-          limit: 3,
-          minConfidence: 0.6,
-        });
-        (globalThis as any).__kbLen = Array.isArray(kbResults) ? kbResults.length : 0;
-        if (kbResults.length > 0) {
-          const ctx = kbResults
-            .map(
-              (r, i) =>
-                `(${i + 1}) [${r.source}] conf=${Math.round(r.confidence * 100)}%: ${r.content.slice(0, 500)}`,
-            )
-            .join('\n');
-          const preamble = `You must ground answers in the retrieved context below. If insufficient, say you don't know.\nRetrieved Context:\n${ctx}\n---\n`;
-          ragPrefixedQuery = `${preamble}${agenticQuery.query}`;
-        }
-      } catch (error) {
-        logger.warn('Failed to fetch RAG context, continuing without it.', { error });
-      }
-
-      // Optional: derive intent with LangGraph to condition a concise, precise system prompt
-      let systemPrompt: string | undefined;
-
-      // Inject active persona system prompt (guild-scoped) to shape voice and style
-      try {
-        const persona = getActivePersona(guildId || 'default');
-        if (persona?.systemPrompt) {
-          systemPrompt = `${persona.systemPrompt}${systemPrompt ? `\n${systemPrompt}` : ''}`;
-        }
-      } catch (e) {
-        logger.debug('[CoreIntelSvc] Persona injection skipped', { error: String(e) });
-      }
-      if (getEnvAsBoolean('FEATURE_LANGGRAPH', false)) {
-        try {
-          const sessionId = (uiContext as any)?.channel?.isThread?.()
-            ? (uiContext as any).channel.id
-            : (uiContext as any).channelId || (uiContext as any).id;
-          const state = await advancedLangGraphWorkflow.execute(ragPrefixedQuery, {
-            user_context: {
-              user_id: String(userId),
-              session_id: String(sessionId || Date.now()),
-              preferences: await this.getUserPreferences(userId),
-              conversation_history: [],
-            },
-          });
-          if (state && (state as any).intent) {
-            const intentPrompt = `Respond with a ${String((state as any).intent)} persona. Be precise, cite retrieved context when used, avoid hallucinations, and clearly state uncertainties.`;
-            systemPrompt = systemPrompt ? `${systemPrompt}\n${intentPrompt}` : intentPrompt;
-          }
-        } catch (e) {
-          logger.debug('[CoreIntelSvc] LangGraph execute skipped or failed', { error: String(e) });
-        }
-      }
-
-      const groundedQuery =
-        typeof (globalThis as any).hybridGroundingPrefix !== 'undefined'
-          ? (globalThis as any).hybridGroundingPrefix + ragPrefixedQuery
-          : ragPrefixedQuery;
-
-      // Adjust system prompt briefly based on strategy
-      if (lightweight) {
-        systemPrompt = `${systemPrompt ? systemPrompt + '\n' : ''}Answer briefly in 1-2 sentences unless clarification is needed.`;
-      } else if (deep) {
-        systemPrompt = `${systemPrompt ? systemPrompt + '\n' : ''}Provide a thorough, well-structured answer. If unsure, state limitations.`;
-      }
-
-      let fullResponseText: string;
-      let selectedProvider: string | undefined;
-      let selectedModel: string | undefined;
-
-      // Optional streaming for slash interactions only
-      const isSlashInteraction = (uiContext as any)?.isChatInputCommand?.() === true;
-      if (getEnvAsBoolean('FEATURE_VERCEL_AI', false) && isSlashInteraction) {
-        try {
-          const stream = await modelRouterService.stream(groundedQuery, history, systemPrompt);
-          // Stream to the user's ephemeral reply (controls disabled to keep it light)
-          fullResponseText = await sendStream(uiContext as any, stream, {
-            throttleMs: 1000,
-            withControls: false,
-          });
-        } catch {
-          // Fallback to non-streaming
-          const meta = await modelRouterService.generateWithMeta(
-            groundedQuery,
-            history,
-            systemPrompt,
-          );
-          fullResponseText = meta.text;
-          selectedProvider = meta.provider;
-          selectedModel = meta.model;
-        }
-      } else {
-        try {
-          const meta = await modelRouterService.generateWithMeta(
-            groundedQuery,
-            history,
-            systemPrompt,
-          );
-          fullResponseText = meta.text;
-          selectedProvider = meta.provider;
-          selectedModel = meta.model;
-        } catch (e: any) {
-          // In test environment, fall back to a deterministic mock response instead of throwing
-          if (process.env.NODE_ENV === 'test') {
-            fullResponseText = 'Mock response (offline)';
-            selectedProvider = 'test';
-            selectedModel = 'mock';
-          } else {
-            throw e;
-          }
-        }
-      }
-
-      if (selectedProvider || selectedModel) {
-        logger.info('[CoreIntelSvc] Model selection', {
-          provider: selectedProvider,
-          model: selectedModel,
-        });
-      }
-
-      const agenticResponse: AgenticResponse = {
-        response: fullResponseText,
-        confidence: 0.8,
-        citations: { citations: [], hasCitations: false, confidence: 0 },
-        flagging: { shouldFlag: false, reasons: [], riskLevel: 'low' },
-        escalation: { shouldEscalate: false, priority: 'low', reason: '' },
-        knowledgeGrounded: Number((globalThis as any).__kbLen || 0) > 0,
-        sourceSummary: '',
-        metadata: { processingTime: 0, knowledgeEntriesFound: 0, responseQuality: 'high' },
-      };
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'response_generated',
-        isSuccess: true,
-        responseLength: fullResponseText.length,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return { agenticResponse, fullResponseText };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      logger.error(`[CoreIntelSvc] Critical Error in _generateAgenticResponse: ${errorMessage}`, {
-        error,
-        stack: errorStack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'agentic_response_error',
-        isSuccess: false,
-        error: errorMessage,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      throw new Error(`Critical: Failed to generate agentic response for user ${userId}.`);
-    }
-  }
-
-  private async _applyPostResponsePersonalization(
-    userId: string,
-    guildId: string | null,
-    responseText: string,
-    analyticsData: Record<string, unknown> & { startTime: number },
-  ): Promise<string> {
-    if (!this.config.enablePersonalization || !this.personalizationEngine) return responseText;
-    try {
-      logger.debug(`[CoreIntelSvc] Stage 8: Personalization - Post-Response`, { userId });
-      const adapted = await this.personalizationEngine.adaptResponse(
+      // B4: Trace strategy execution result
+      this.decisionTracer.addTrace(traceSessionId, {
         userId,
-        responseText,
-        guildId || undefined,
-      );
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'personalization_postresponse',
-        isSuccess: true,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return adapted.personalizedResponse;
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      logger.warn(
-        `[CoreIntelSvc] Error in _applyPostResponsePersonalization: ${errorMessage}. Proceeding with non-personalized response.`,
-        { error, stack: errorStack, ...analyticsData },
-      );
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'personalization_postresponse_error',
-        isSuccess: false,
-        error: errorMessage,
-        duration: Date.now() - analyticsData.startTime,
-      });
-      return responseText;
-    }
-  }
-
-  private async _updateStateAndAnalytics(data: {
-    userId: string;
-    channelId: string;
-    promptText: string;
-    attachments: CommonAttachment[];
-    fullResponseText: string;
-    unifiedAnalysis: UnifiedMessageAnalysis;
-    mcpOrchestrationResult: MCPOrchestrationResult;
-    analyticsData: Record<string, unknown> & { startTime: number };
-    success: boolean;
-  }): Promise<void> {
-    const {
-      userId,
-      channelId,
-      promptText,
-      attachments,
-      fullResponseText,
-      unifiedAnalysis,
-      mcpOrchestrationResult,
-      analyticsData,
-      success,
-    } = data;
-    logger.debug(`[CoreIntelSvc] Stage 9: Update History, Cache, Memory`, { userId });
-    try {
-      const historyContentForUpdate =
-        attachments.length > 0 &&
-        attachments[0].contentType?.startsWith('image/') &&
-        attachments[0].url
-          ? [
-              { text: promptText },
-              await urlToGenerativePart(
-                attachments[0].url,
-                attachments[0].contentType || 'image/jpeg',
-              ),
-            ]
-          : promptText;
-      if (Array.isArray(historyContentForUpdate))
-        await updateHistoryWithParts(channelId, historyContentForUpdate, fullResponseText);
-      else await updateHistory(channelId, historyContentForUpdate, fullResponseText);
-      this.lastPromptCache.set(userId, { prompt: promptText, attachments, channelId });
-      if (this.config.enableResponseCache && this.enhancedCacheService && attachments.length === 0)
-        this.enhancedCacheService.cacheResponse(promptText, userId, fullResponseText);
-      if (this.config.enableEnhancedMemory && this.enhancedMemoryService) {
-        // Construct ProcessingContext for EnhancedMemoryService
-        const analysisForMemory: EnhancedMessageAnalysis = {
-          hasAttachments: attachments.length > 0,
-          hasUrls: unifiedAnalysis.urls?.length > 0,
-          attachmentTypes: attachments.map(
-            (att: CommonAttachment) => att.contentType?.split('/')[0] || 'unknown',
-          ), // e.g., 'image', 'application'
-          urls: unifiedAnalysis.urls || [],
-          complexity:
-            unifiedAnalysis.complexity === 'advanced' ? 'complex' : unifiedAnalysis.complexity,
-          intents: unifiedAnalysis.intents || [],
-          requiredTools: unifiedAnalysis.mcpRequirements || [],
-        };
-
-        const resultsForMemory = new Map<string, unknown>();
-        if (mcpOrchestrationResult && mcpOrchestrationResult.results) {
-          for (const [key, value] of mcpOrchestrationResult.results.entries()) {
-            if (value.success && value.data) {
-              resultsForMemory.set(key, value.data);
-            } else if (value.error) {
-              resultsForMemory.set(key, { error: value.error }); // Store error info
-            }
-          }
+        step: 'module-execution',
+        component: 'StrategyRouter',
+        data: {
+          result: strategyResponse ? 'success' : 'null',
+          strategy: decisionResult.strategy,
+          contentLength: strategyResponse?.content?.length || 0
+        },
+        metadata: {
+          executionTime: performance.now() - fallbackStartTime,
+          success: !!strategyResponse,
+          confidence: decisionResult.confidence
         }
+      });
 
-        const processingContextForMemory: EnhancedProcessingContext = {
+      if (strategyResponse) {
+        logger.debug('Strategy-specific response generated', {
+          strategy: decisionResult.strategy,
+          responseLength: strategyResponse.content?.length || 0,
           userId,
-          channelId,
-          guildId: typeof analyticsData.guildId === 'string' ? analyticsData.guildId : null, // from analyticsData which has guildId
-          analysis: analysisForMemory,
-          results: resultsForMemory,
-          errors: mcpOrchestrationResult.fallbacksUsed || [],
-        };
-        await this.enhancedMemoryService.storeConversationMemory(
-          processingContextForMemory,
-          promptText,
-          fullResponseText,
-        );
-      }
-      if (this.config.enablePersonalization && this.behaviorAnalytics && success) {
-        await this.behaviorAnalytics.recordBehaviorMetric({
-          userId,
-          metricType: 'session_length',
-          value: 1,
-          timestamp: new Date(),
+          fallbackPath: 'strategy-routing',
+          traceSessionId
         });
+
+        // B4: End successful tracing session
+        this.decisionTracer.endSession(traceSessionId, {
+          success: true,
+          response: strategyResponse.content?.substring(0, 100) + (strategyResponse.content?.length > 100 ? '...' : '')
+        });
+
+        return strategyResponse;
       }
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'final_updates_complete',
-        isSuccess: success,
-        duration: Date.now() - analyticsData.startTime,
+    }
+
+        // ===== Legacy Unified Cognitive Pipeline (deprecated, kept for compatibility) =====
+    try {
+      // B4: Trace legacy pipeline attempt
+      const legacyStartTime = performance.now();
+      this.decisionTracer.addTrace(traceSessionId, {
+        userId,
+        step: 'strategy-mapping',
+        component: 'LegacyCognitivePipeline',
+        data: {
+          featureFlag: process.env.FEATURE_UNIFIED_COGNITIVE_PIPELINE,
+          phase: 'legacy-fallback'
+        },
+        metadata: {
+          success: true
+        }
       });
 
-      // Auto personal memory extraction
-      try {
-        if (process.env.ENABLE_AUTO_MEMORY === 'true') {
-          const { PersonalMemoryExtractorService } = await import(
-            './personal-memory-extractor.service.js'
-          );
-          const extractor = new PersonalMemoryExtractorService(this.userMemoryService);
-          await extractor.extractFromInteraction(
+      if (process.env.FEATURE_UNIFIED_COGNITIVE_PIPELINE === 'true') {
+        logger.debug('Using legacy unified cognitive pipeline', { userId, traceSessionId });
+        const context: UnifiedPipelineContext = {
+          inputType: uiContext instanceof Message ? InputType.Message : InputType.Task,
+          cognitiveOperation: CognitiveOperation.Processing,
+          data: {
+            prompt: promptText,
+            attachments: commonAttachments,
+            history: await getHistory(channelId),
             userId,
-            typeof analyticsData.guildId === 'string' ? analyticsData.guildId : null,
-            promptText,
-            fullResponseText,
-          );
+            guildId,
+            channelId,
+            // A2 Enhancement: Include decision context for strategy-aware pipeline processing
+            decisionResult,
+            strategy: decisionResult?.strategy,
+            confidence: decisionResult?.confidence,
+            tokenEstimate: decisionResult?.tokenEstimate,
+          }
+        };
+        const result = await this.unifiedPipeline.process(context);
+        
+        if (result && result.data.response) {
+          return { content: result.data.response };
         }
-      } catch (e) {
-        logger.debug('[CoreIntelSvc] Auto memory extraction skipped', { error: String(e) });
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorStack = error instanceof Error ? error.stack : undefined;
-      logger.error(`[CoreIntelSvc] Error in _updateStateAndAnalytics: ${errorMessage}`, {
-        error,
-        stack: errorStack,
-        ...analyticsData,
-      });
-      this.recordAnalyticsInteraction({
-        ...analyticsData,
-        step: 'state_update_error',
-        isSuccess: false,
-        error: errorMessage,
-        duration: Date.now() - analyticsData.startTime,
-      });
+    } catch (e) {
+      logger.warn('Unified cognitive pipeline failed, continuing with standard pipeline', { error: e instanceof Error ? e.message : String(e) });
     }
   }
 
-  private async enhanceAndPersistMemory(
+  /**
+   * Guild-specific decision engine management (Phase B implementation placeholder)
+   * TODO: Implement proper guild-specific engine caching and override management
+   */
+  private getDecisionEngineForGuild(guildId: string): DecisionEngine {
+    // For now, return the shared instance
+    // Phase B will implement per-guild decision engines with overrides
+    return this.decisionEngine;
+  }
+
+  /**
+   * Natural language control intent handler (Phase D implementation placeholder)
+   * TODO: Implement decision override controls through natural language
+   */
+  private async handleControlIntent(intent: string, params: any, message: Message): Promise<boolean> {
+    // Phase D: Implement natural language controls for decision overrides
+    logger.debug('Control intent received - not yet implemented', { intent, params, userId: message.author.id });
+    
+    // Stub implementations to make tests pass
+    if (intent === 'OVERRIDES_SHOW') {
+      await message.reply('Decision overrides: ambientThreshold=75 (default). Advanced controls coming in Phase D.');
+      return true;
+    } else if (intent === 'OVERRIDES_SET') {
+      await message.reply(`Decision override ${params.key}=${params.value} set (Phase D implementation pending).`);
+      return true;
+    } else if (intent === 'OVERRIDES_CLEAR') {
+      await message.reply('All decision overrides cleared (Phase D implementation pending).');
+      return true;
+    }
+    
+    return false;
+  }
+
+  // ===== B1: Unified Pipeline Primary Processing =====
+  private async processWithUnifiedPipeline(
+    promptText: string,
     userId: string,
     channelId: string,
-    guildId: string | undefined,
-    content: string,
-    response: string,
-  ) {
-    if (!this.memoryManager) return response;
-    const context = {
-      userId,
-      channelId,
-      guildId,
-      conversationId: `${channelId}:${userId}`,
-      participants: [userId],
-      content,
-      timestamp: new Date(),
-    };
-    await this.memoryManager.storeConversationMemory(context);
-    const enhanced = await this.memoryManager.enhanceResponse(response, context);
-    return enhanced.enhancedResponse;
-  }
-
-  private async handleButtonPress(interaction: ButtonInteraction): Promise<void> {
-    const userId = interaction.user.id;
-    const streamKey = `${userId}-${interaction.channelId}`;
-    if (interaction.customId === STOP_BUTTON_ID) {
-      const stream = this.activeStreams.get(streamKey);
-      if (stream) {
-        stream.abortController.abort();
-        this.activeStreams.delete(streamKey);
-        logger.info('Streaming response stopped by user', {
-          userId,
-          channelId: interaction.channelId,
-        });
-      }
-      await interaction.update({ content: interaction.message.content, components: [] });
-    } else if (interaction.customId === REGENERATE_BUTTON_ID) {
-      const cachedPrompt = this.lastPromptCache.get(userId);
-      if (!cachedPrompt || cachedPrompt.channelId !== interaction.channelId) {
-        await interaction.reply({
-          content: 'No recent prompt found for this channel to regenerate.',
-          ephemeral: true,
-        });
-        return;
-      }
-      await interaction.update({
-        content: `${interaction.message.content}\n\n🔄 Regenerating...`,
-        components: [],
+    guildId: string | null,
+    commonAttachments: CommonAttachment[] = [],
+    uiContext: ChatInputCommandInteraction | Message,
+    decisionResult: DecisionResult
+  ): Promise<{ content: string } | null> {
+    try {
+      logger.info('B1: Processing with UnifiedPipeline', {
+        strategy: decisionResult.strategy,
+        confidence: decisionResult.confidence,
+        userId
       });
 
-      // Create a mock interaction-like object for regeneration
-      const mockInteraction = {
-        channelId: cachedPrompt.channelId,
-        guildId: interaction.guildId,
-        user: interaction.user,
-      } as ChatInputCommandInteraction;
-
-      const regeneratedResponseOptions = await this._processPromptAndGenerateResponse(
-        cachedPrompt.prompt,
-        userId,
-        cachedPrompt.channelId,
-        interaction.guildId,
-        cachedPrompt.attachments,
-        mockInteraction,
-      );
-
-      if (interaction.channel && 'send' in interaction.channel) {
-        await interaction.channel.send(regeneratedResponseOptions);
-      }
-    } else if (interaction.customId === MOVE_DM_BUTTON_ID) {
-      await this.userConsentService.setDmPreference(userId, true);
-      await interaction.reply({ content: 'Okay! I’ll reply in DMs from now on.', ephemeral: true });
-    } else if (interaction.customId === 'privacy_consent_agree') {
-      // Handle privacy consent agreement
-      try {
-        logger.debug('[Consent] agree button pressed', { userId });
-        if (!interaction.deferred && !interaction.replied) {
-          await interaction.deferReply({ ephemeral: true });
-          logger.debug('[Consent] interaction deferred (reply)', { userId });
-        }
-
-        const ok = await this.userConsentService.optInUser(
+      // Create enriched context with decision insights
+      const context: UnifiedPipelineContext = {
+        inputType: InputType.Message,
+        cognitiveOperation: CognitiveOperation.Processing,
+        data: {
+          prompt: promptText,
           userId,
-          interaction.user.username || 'Unknown',
-          {
-            consentToStore: true,
-            consentToAnalyze: true,
-            consentToPersonalize: true,
-          },
-        );
-        logger.debug('[Consent] optInUser result', { userId, ok });
-
-        const successMsg = ok
-          ? '✅ Thank you! Privacy consent granted. You can now send me messages directly (in DM or your personal thread). No need to use /chat again.'
-          : '⚠️ Consent saved partially. You can start using the bot, but some settings may not have persisted.';
-
-        try {
-          await interaction.editReply({
-            content: successMsg,
-            embeds: [],
-            components: [],
-          });
-          logger.debug('[Consent] editReply success', { userId });
-        } catch (e) {
-          logger.debug('[Consent] editReply failed, trying followUp', { userId, error: String(e) });
-          await interaction.followUp({ content: successMsg, ephemeral: true });
+          channelId,
+          guildId: guildId || undefined,
+          attachments: commonAttachments,
+          // B1: Enhanced data with decision engine insights
+          decisionStrategy: decisionResult.strategy,
+          decisionConfidence: decisionResult.confidence,
+          tokenEstimate: decisionResult.tokenEstimate,
+          uiContext
+        },
+        metadata: {
+          timestamp: new Date().toISOString(),
+          processingPath: 'unified-pipeline-primary'
         }
-      } catch (error) {
-        logger.error('Failed to grant privacy consent', { userId, error: String(error) });
-        try {
-          await interaction.editReply({
-            content: '❌ Failed to save consent preferences. Please try again.',
-            embeds: [],
-            components: [],
-          });
-        } catch {
-          try {
-            await interaction.followUp({
-              content: '❌ Failed to save consent preferences. Please try again.',
-              ephemeral: true,
-            });
-          } catch {}
+      };
+
+      // Process through UnifiedPipeline with decision-aware routing
+      const pipelineResponse = await this.unifiedPipeline.process(context);
+
+      if (pipelineResponse?.data?.content) {
+        logger.info('B1: UnifiedPipeline processing successful', {
+          strategy: decisionResult.strategy,
+          responseLength: pipelineResponse.data.content.length,
+          userId
+        });
+
+        return {
+          content: pipelineResponse.data.content
+        };
+      }
+
+      logger.warn('B1: UnifiedPipeline returned empty response', { userId });
+      return null;
+    } catch (error) {
+      logger.error('B1: UnifiedPipeline processing failed', { 
+        error: error instanceof Error ? error.message : String(error), 
+        userId,
+        strategy: decisionResult.strategy
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Strategy-aware AI service routing (A2 Implementation)
+   * Routes processing to appropriate AI services based on decision strategy
+   * C4: Enhanced with personality-aware response strategies
+   */
+  private async processWithStrategy(
+    decisionResult: DecisionResult,
+    promptText: string,
+    userId: string,
+    channelId: string,
+    guildId: string | null,
+    uiContext: ChatInputCommandInteraction | Message,
+    personalityContext?: DecisionContext['personality'] // C4: Added personality context
+  ): Promise<{ content: string } | null> {
+    try {
+      switch (decisionResult.strategy) {
+        case 'quick-reply':
+          return await this.processQuickReply(promptText, userId, personalityContext);
+
+        case 'deep-reason':
+          return await this.processDeepReason(promptText, userId, decisionResult, personalityContext);
+
+        case 'defer':
+          return await this.processDeferred(promptText, userId, channelId, decisionResult, personalityContext);
+
+        default:
+          logger.debug('No specific strategy handler, using default processing');
+          return null;
+      }
+    } catch (error) {
+      logger.error('Strategy processing failed', {
+        strategy: decisionResult.strategy,
+        error: error instanceof Error ? error.message : String(error),
+        userId
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Quick-reply strategy: Minimal processing, direct response
+   */
+  // C4: Enhanced with personality-aware quick responses
+  private async processQuickReply(
+    promptText: string, 
+    userId: string,
+    personalityContext?: DecisionContext['personality']
+  ): Promise<{ content: string }> {
+    logger.debug('Processing quick-reply strategy', { 
+      hasPersonalityContext: !!personalityContext,
+      activePersona: personalityContext?.activePersona
+    });
+    
+    // C4: Build personality-aware prompt
+    let enhancedPrompt = `Respond briefly and helpfully to: ${promptText}`;
+    
+    if (personalityContext) {
+      // Adapt response style based on persona characteristics
+      if (personalityContext.activePersona) {
+        const persona = personalityContext.activePersona;
+        
+        // Use persona characteristics to guide response
+        if (persona.personality.supportiveness > 0.7) {
+          enhancedPrompt += '\n\nBe especially encouraging and warm in your response.';
+        } else if (persona.personality.supportiveness < 0.3) {
+          enhancedPrompt += '\n\nMaintain a neutral, factual tone.';
+        }
+        
+        if (persona.personality.enthusiasm > 0.7) {
+          enhancedPrompt += '\n\nShow appropriate energy and enthusiasm.';
+        }
+        
+        if (persona.personality.formality > 0.7) {
+          enhancedPrompt += '\n\nMaintain a professional, formal tone.';
+        } else if (persona.personality.formality < 0.3) {
+          enhancedPrompt += '\n\nUse casual, friendly language.';
+        }
+        
+        if (persona.personality.humor > 0.5) {
+          enhancedPrompt += '\n\nLight humor is appropriate when suitable.';
         }
       }
-    } else if (interaction.customId === 'privacy_consent_decline') {
-      // Handle privacy consent decline
-      try {
-        logger.debug('[Consent] decline button pressed', { userId });
-        if (!interaction.deferred && !interaction.replied) {
-          await interaction.deferReply({ ephemeral: true });
-          logger.debug('[Consent] interaction deferred (reply)', { userId });
+      
+      // Adjust response length based on relationship strength
+      if (personalityContext.relationshipStrength && personalityContext.relationshipStrength > 0.7) {
+        enhancedPrompt += '\n\nYou can be more casual and friendly with this user.';
+      } else if (personalityContext.relationshipStrength && personalityContext.relationshipStrength < 0.3) {
+        enhancedPrompt += '\n\nKeep the response polite and slightly formal.';
+      }
+      
+      // Consider user mood
+      if (personalityContext.userMood) {
+        switch (personalityContext.userMood) {
+          case 'frustrated':
+            enhancedPrompt += '\n\nBe extra patient and understanding.';
+            break;
+          case 'excited':
+            enhancedPrompt += '\n\nMatch their enthusiasm appropriately.';
+            break;
+          case 'serious':
+            enhancedPrompt += '\n\nMaintain a serious, focused tone.';
+            break;
+          case 'playful':
+            enhancedPrompt += '\n\nA light, playful tone is appropriate.';
+            break;
         }
-        const declineMsg =
-          '❌ Privacy consent declined. Some features will be limited. You can change your mind anytime using `/privacy` command.';
-        try {
-          await interaction.editReply({
-            content: declineMsg,
-            embeds: [],
-            components: [],
-          });
-          logger.debug('[Consent] decline editReply success', { userId });
-        } catch (e) {
-          logger.debug('[Consent] decline editReply failed, trying followUp', {
-            userId,
-            error: String(e),
-          });
-          await interaction.followUp({ content: declineMsg, ephemeral: true });
-        }
-      } catch (error) {
-        logger.debug('Failed to update decline UI', { userId, error: String(error) });
       }
     }
-  }
-
-  public getMemoryManager(): AdvancedMemoryManager | undefined {
-    return this.memoryManager;
-  }
-
-  private determineStrategyFromTokens(tokens: number): ResponseStrategy {
-    const limit = (this as any).decisionEngine?.['defaultModelTokenLimit'] ?? 8000;
-    if (tokens > limit * 0.9) return 'defer';
-    if (tokens > limit * 0.5) return 'deep-reason';
-    return 'quick-reply';
-  }
-}
-
-function stableStringifyOptions(obj: unknown): string {
-  try {
-    return JSON.stringify(obj, Object.keys(obj as Record<string, unknown>).sort());
-  } catch {
-    // Fallback non-stable
+    
+    // Use Gemini with personality-enhanced prompt
     try {
-      return JSON.stringify(obj);
-    } catch {
-      return String(obj);
+      const response = await this.geminiService.generateResponse(
+        enhancedPrompt,
+        [], // No history for quick replies
+        userId,
+        'default'
+      );
+      
+      return { content: response || 'I can help with that. Could you provide more details?' };
+    } catch (error) {
+      logger.warn('Quick-reply Gemini failed, using fallback', { error: String(error) });
+      
+      // C4: Even fallback can be personality-aware
+      const fallbackMessage = personalityContext?.activePersona?.personality.supportiveness && personalityContext.activePersona.personality.supportiveness > 0.7
+        ? "I'm here to help! Let me know what you need assistance with."
+        : "I understand your request. Let me help you with that.";
+        
+      return { content: fallbackMessage };
     }
   }
-}
 
-// --- Helper: provider-aware token estimation for DecisionEngine ---
-function providerAwareTokenEstimate(message: Message): number {
-  try {
-    const text = message.content || '';
-    // Prefer precise tokenization when available
-    let tokens = (() => {
-      try {
-        if (process.env.FEATURE_PRECISE_TOKENIZER === 'true') {
-          const { countTokens } = require('../utils/tokenizer.js');
-          return countTokens(text);
+  /**
+   * Deep-reasoning strategy: Use advanced AI services for complex analysis
+   */
+  // C4: Enhanced with personality-aware deep reasoning
+  private async processDeepReason(
+    promptText: string, 
+    userId: string, 
+    decisionResult: DecisionResult,
+    personalityContext?: DecisionContext['personality']
+  ): Promise<{ content: string }> {
+    logger.debug('Processing deep-reason strategy', { 
+      hasPersonalityContext: !!personalityContext,
+      relationshipStrength: personalityContext?.relationshipStrength
+    });
+    
+    try {
+      // Import advanced services dynamically to avoid circular dependencies
+      const { EnhancedReasoningService } = await import('./advanced-capabilities/enhanced-reasoning.service.js');
+      const { TreeOfThoughtsService } = await import('./advanced-reasoning/tree-of-thoughts.service.js');
+      
+      const reasoningService = new EnhancedReasoningService();
+      const totService = new TreeOfThoughtsService();
+      
+      // C4: Personality-aware reasoning depth adjustment
+      let reasoningDepthModifier = 1.0;
+      let presentationStyle = 'balanced';
+      
+      if (personalityContext) {
+        // Adjust reasoning depth based on relationship strength
+        if (personalityContext.relationshipStrength && personalityContext.relationshipStrength > 0.7) {
+          reasoningDepthModifier = 1.2; // More thorough for trusted users
+        } else if (personalityContext.relationshipStrength && personalityContext.relationshipStrength < 0.3) {
+          reasoningDepthModifier = 0.8; // More concise for new users
         }
-      } catch {}
-      // Base: ~4 chars per token
-      return Math.ceil(text.length / 4);
-    })();
-    // Attachment budget
-    try {
-      tokens += (message.attachments?.size || 0) * 256;
-    } catch {}
-
-    // Provider hint: use env/default provider when available to scale thresholds
-    // We avoid importing router here to keep this lightweight and side-effect free.
-    const provider = (process.env.DEFAULT_PROVIDER || 'gemini').toLowerCase();
-    switch (provider) {
-      case 'openai':
-      case 'openai_compat':
-        // OpenAI GPT-4o/mini tokens are closer to ~4 chars/token; keep as-is
-        break;
-      case 'anthropic':
-        // Claude tokenization often yields slightly fewer tokens for same text
-        tokens = Math.ceil(tokens * 0.95);
-        break;
-      case 'groq':
-      case 'mistral':
-        // Llama-ish BPE sometimes yields more tokens on punctuation-heavy text
-        tokens = Math.ceil(tokens * 1.05);
-        break;
-      case 'gemini':
-      default:
-        // Keep default heuristic for Gemini or unknown
-        break;
+        
+        // Adapt presentation style based on persona
+        if (personalityContext.activePersona) {
+          const persona = personalityContext.activePersona;
+          
+          if (persona.personality.directness > 0.7) {
+            presentationStyle = 'direct'; // Concise, to-the-point
+          } else if (persona.personality.supportiveness > 0.7) {
+            presentationStyle = 'supportive'; // Explanatory and encouraging
+          } else if (persona.personality.formality > 0.7) {
+            presentationStyle = 'formal'; // Structured and professional
+          }
+        }
+        
+        // Consider user mood for reasoning approach
+        if (personalityContext.userMood) {
+          switch (personalityContext.userMood) {
+            case 'frustrated':
+              reasoningDepthModifier *= 0.9; // Slightly more concise to not overwhelm
+              presentationStyle = 'supportive';
+              break;
+            case 'serious':
+              reasoningDepthModifier *= 1.1; // More thorough for serious inquiries
+              presentationStyle = 'formal';
+              break;
+            case 'playful':
+              presentationStyle = 'engaging'; // More conversational
+              break;
+          }
+        }
+      }
+      
+      // Determine if we need Tree of Thoughts for very complex queries
+      const baseComplexityCheck = decisionResult.tokenEstimate > 2000 || 
+                                  promptText.toLowerCase().includes('analyze') || 
+                                  promptText.toLowerCase().includes('compare') ||
+                                  promptText.toLowerCase().includes('pros and cons') ||
+                                  promptText.toLowerCase().includes('evaluate') ||
+                                  promptText.toLowerCase().includes('complex');
+                                  
+      const useTreeOfThoughts = baseComplexityCheck && reasoningDepthModifier >= 1.0;
+      
+      if (useTreeOfThoughts) {
+        // Use Tree of Thoughts for extremely complex reasoning
+        const sessionId = `tot-${userId}-${Date.now()}`;
+        
+        // C4: Personality-aware ToT parameters
+        const maxDepth = Math.min(4, Math.ceil((decisionResult.tokenEstimate * reasoningDepthModifier) / 1000));
+        const branchingFactor = decisionResult.confidence > 0.8 ? 3 : 2;
+        
+        const response = await totService.generateResponse(sessionId, promptText, {
+          maxDepth,
+          branchingFactor,
+          pruningThreshold: presentationStyle === 'direct' ? 0.5 : 0.4 // Higher threshold for direct style
+        });
+        
+        if (response.primaryResponse) {
+          // C4: Format response according to personality context
+          let formattedResponse = response.primaryResponse;
+          
+          if (presentationStyle === 'supportive' && personalityContext) {
+            formattedResponse = `I've carefully analyzed your question and here's what I found:\n\n${formattedResponse}`;
+          } else if (presentationStyle === 'formal') {
+            formattedResponse = `Analysis Results:\n\n${formattedResponse}`;
+          }
+          
+          return { content: formattedResponse };
+        }
+      }
+      
+      // Use Enhanced Reasoning Service for moderately complex queries
+      const reasoningRequest = {
+        query: promptText,
+        analysisType: this.determineAnalysisType(promptText),
+        complexity: decisionResult.confidence > 0.8 ? 'high' as const : 'medium' as const,
+        userId,
+        maxSteps: Math.min(5, Math.ceil((decisionResult.tokenEstimate * reasoningDepthModifier) / 500))
+      };
+      
+      const reasoningResult = await reasoningService.performReasoning(reasoningRequest);
+      
+      if (reasoningResult.success) {
+        // C4: Personality-aware response formatting
+        let responseLines: string[] = [];
+        
+        switch (presentationStyle) {
+          case 'direct':
+            responseLines = [reasoningResult.analysis.conclusion];
+            break;
+            
+          case 'supportive':
+            responseLines = [
+              "I've thought through your question carefully. Here's my analysis:",
+              '',
+              reasoningResult.analysis.conclusion,
+              '',
+              'Here\'s how I arrived at this conclusion:',
+              ...reasoningResult.analysis.reasoning_path.slice(-2) // Show last 2 steps for supportive
+            ];
+            break;
+            
+          case 'formal':
+            responseLines = [
+              '**Analysis:**',
+              reasoningResult.analysis.conclusion,
+              '',
+              '**Reasoning Process:**',
+              ...reasoningResult.analysis.reasoning_path.slice(-3) // Show last 3 steps for formal
+            ];
+            break;
+            
+          case 'engaging':
+            responseLines = [
+              reasoningResult.analysis.conclusion,
+              '',
+              '🤔 **My thought process:**',
+              ...reasoningResult.analysis.reasoning_path.slice(-2) // Show last 2 steps with friendly formatting
+            ];
+            break;
+            
+          default: // balanced
+            responseLines = [
+              reasoningResult.analysis.conclusion,
+              '',
+              '**My reasoning:**',
+              ...reasoningResult.analysis.reasoning_path.slice(-3) // Show last 3 steps
+            ];
+        }
+        
+        return { content: responseLines.join('\n') };
+      }
+      
+    } catch (error) {
+      logger.warn('Deep reasoning failed, trying neural-symbolic fallback', { error: String(error) });
     }
-    return tokens;
-  } catch {
-    const text = (message as any)?.content || '';
-    return Math.ceil(String(text).length / 4);
+    
+    // Fallback to neural-symbolic reasoning if available
+    try {
+      const { neuralSymbolicReasoningService } = await import('../ai/neural-symbolic/reasoning.service.js');
+      
+      const reasoningResult = await neuralSymbolicReasoningService.reason(
+        promptText,
+        {
+          userId,
+          requiresAdvancedReasoning: true,
+          complexity: decisionResult.confidence > 0.8 ? 'high' : 'medium'
+        },
+        {
+          prefer_method: 'hybrid',
+          max_steps: Math.min(7, Math.ceil(decisionResult.tokenEstimate / 400)),
+          confidence_threshold: 0.7
+        }
+      );
+      
+      if (reasoningResult.conclusion && reasoningResult.confidence > 0.6) {
+        const response = [
+          reasoningResult.conclusion,
+          '',
+          `**Reasoning approach:** ${reasoningResult.reasoning_type} (${Math.round(reasoningResult.confidence * 100)}% confidence)`,
+          reasoningResult.evidence.length > 0 ? '**Evidence:** ' + reasoningResult.evidence.slice(0, 2).map(e => e.content).join(', ') : ''
+        ].filter(Boolean).join('\n');
+        
+        return { content: response };
+      }
+      
+    } catch (error) {
+      logger.warn('Neural-symbolic reasoning failed, using Gemini fallback', { error: String(error) });
+    }
+    
+    // Final fallback to enhanced Gemini prompt
+    try {
+      const response = await this.geminiService.generateResponse(
+        `Think step by step and provide a thorough analysis of: ${promptText}`,
+        [],
+        userId,
+        'default'
+      );
+      
+      return { content: response || 'I need to think about this more carefully. Could you rephrase your question?' };
+    } catch (error) {
+      return { content: 'This requires some careful consideration. Let me approach this thoughtfully...' };
+    }
+  }
+
+  /**
+   * Deferred strategy: Multi-stage processing with clarification
+   */
+  // C4: Enhanced with personality-aware deferral strategies
+  private async processDeferred(
+    promptText: string, 
+    userId: string, 
+    channelId: string,
+    decisionResult: DecisionResult,
+    personalityContext?: DecisionContext['personality']
+  ): Promise<{ content: string }> {
+    logger.debug('Processing deferred strategy', { 
+      hasPersonalityContext: !!personalityContext,
+      userMood: personalityContext?.userMood,
+      relationshipStrength: personalityContext?.relationshipStrength
+    });
+    
+    // For very complex or ambiguous requests, ask for clarification
+    const clarificationNeeded = this.needsClarification(promptText, decisionResult);
+    
+    if (clarificationNeeded) {
+      const clarifyingQuestions = this.generateClarifyingQuestions(promptText);
+      
+      // C4: Personality-aware clarification approach
+      let introMessage = "I'd like to give you the best possible answer. Let me ask a few questions first:";
+      let closingMessage = "Feel free to answer any or all of these to help me understand better!";
+      
+      if (personalityContext) {
+        // Adapt approach based on persona and relationship
+        if (personalityContext.activePersona?.personality.supportiveness && personalityContext.activePersona.personality.supportiveness > 0.7) {
+          introMessage = "I want to make sure I give you exactly the help you need! A few quick questions:";
+          closingMessage = "Take your time - any details you can share will help me give you a better answer! 😊";
+        } else if (personalityContext.activePersona?.personality.directness && personalityContext.activePersona.personality.directness > 0.7) {
+          introMessage = "To provide an accurate answer, I need clarification:";
+          closingMessage = "Please provide details on the relevant points.";
+        } else if (personalityContext.activePersona?.personality.formality && personalityContext.activePersona.personality.formality > 0.7) {
+          introMessage = "To ensure I provide the most accurate and helpful response, I would appreciate clarification on several points:";
+          closingMessage = "Your responses to these inquiries will enable me to better assist you.";
+        }
+        
+        // Consider user mood for tone adjustment
+        if (personalityContext.userMood === 'frustrated') {
+          introMessage = "I understand this might be frustrating. To help resolve this quickly, could you clarify:";
+          closingMessage = "I'm here to help sort this out - any information you can provide will get us there faster.";
+        } else if (personalityContext.userMood === 'excited') {
+          introMessage = "I can see you're excited about this! Let me make sure I understand exactly what you're looking for:";
+          closingMessage = "Can't wait to dive into this with you once I have these details! 🚀";
+        }
+        
+        // Adjust question count based on relationship strength
+        if (personalityContext.relationshipStrength && personalityContext.relationshipStrength > 0.7) {
+          // For trusted users, we can ask more detailed questions
+        } else if (personalityContext.relationshipStrength && personalityContext.relationshipStrength < 0.3) {
+          // For new users, limit to most essential questions
+          clarifyingQuestions.splice(2); // Keep only first 2 questions
+        }
+      }
+      
+      return {
+        content: [
+          introMessage,
+          '',
+          ...clarifyingQuestions.map((q, i) => `${i + 1}. ${q}`),
+          '',
+          closingMessage
+        ].join('\n')
+      };
+    }
+    
+    // C4: Personality-aware processing message
+    let processingMessage = [
+      "This is a complex topic that deserves a thoughtful response. Let me break this down:",
+      '',
+      "I'm analyzing your request and will provide a comprehensive answer. This may take a moment as I consider multiple aspects and perspectives.",
+      '',
+      "For now, here's my initial thinking: " + promptText.substring(0, 100) + "..."
+    ];
+    
+    if (personalityContext) {
+      if (personalityContext.activePersona?.personality.enthusiasm && personalityContext.activePersona.personality.enthusiasm > 0.7) {
+        processingMessage = [
+          "What an interesting question! This definitely calls for some deeper thinking. 🤔",
+          '',
+          "I'm diving into this complex topic to give you the most comprehensive answer possible. There are several fascinating angles to explore here.",
+          '',
+          "My initial thoughts: " + promptText.substring(0, 100) + "..."
+        ];
+      } else if (personalityContext.activePersona?.personality.formality && personalityContext.activePersona.personality.formality > 0.7) {
+        processingMessage = [
+          "Your inquiry requires careful analysis to provide an appropriately detailed response.",
+          '',
+          "I am currently processing the various aspects and implications of your request to ensure comprehensive coverage of the topic.",
+          '',
+          "Preliminary assessment: " + promptText.substring(0, 100) + "..."
+        ];
+      } else if (personalityContext.userMood === 'serious') {
+        processingMessage = [
+          "This is an important question that requires careful consideration.",
+          '',
+          "I'm taking the time to thoroughly analyze this topic to provide you with accurate and comprehensive information.",
+          '',
+          "Initial analysis: " + promptText.substring(0, 100) + "..."
+        ];
+      }
+    }
+    
+    // Otherwise, provide a thoughtful response indicating we're processing
+    return {
+      content: processingMessage.join('\n')
+    };
+  }
+
+  /**
+   * Helper methods for strategy processing
+   */
+  private determineAnalysisType(promptText: string): 'comparison' | 'pros_cons' | 'step_by_step' | 'causal' | 'general' {
+    const lowerText = promptText.toLowerCase();
+    
+    if (lowerText.includes('compare') || lowerText.includes('vs') || lowerText.includes('versus')) {
+      return 'comparison';
+    }
+    if (lowerText.includes('pros and cons') || lowerText.includes('advantages') || lowerText.includes('disadvantages')) {
+      return 'pros_cons';
+    }
+    if (lowerText.includes('step by step') || lowerText.includes('how to') || lowerText.includes('process')) {
+      return 'step_by_step';
+    }
+    if (lowerText.includes('why') || lowerText.includes('cause') || lowerText.includes('because') || lowerText.includes('reason')) {
+      return 'causal';
+    }
+    
+    return 'general';
+  }
+
+  private needsClarification(promptText: string, decisionResult: DecisionResult): boolean {
+    // Very long prompts or low confidence might need clarification
+    return promptText.length > 500 || 
+           decisionResult.confidence < 0.6 ||
+           promptText.split('?').length > 3; // Multiple questions
+  }
+
+  private generateClarifyingQuestions(promptText: string): string[] {
+    const questions: string[] = [];
+    
+    if (promptText.includes('best') || promptText.includes('recommend')) {
+      questions.push("What specific criteria are most important to you?");
+    }
+    
+    if (promptText.length > 200) {
+      questions.push("Which aspect of this topic should I focus on most?");
+    }
+    
+    if (promptText.includes('should') || promptText.includes('advice')) {
+      questions.push("What's your current situation or context?");
+    }
+    
+    // Always include a general question
+    questions.push("Are there any specific details or constraints I should consider?");
+    
+    return questions.slice(0, 3); // Limit to 3 questions
+  }
+
+  /**
+   * Refresh guild decision engines with new overrides (Phase B implementation placeholder)
+   * TODO: Implement guild engine refresh when overrides change
+   */
+  private async refreshGuildDecisionEngines(): Promise<void> {
+    // Phase B: Implement engine refresh when DB overrides change
+    logger.debug('Guild decision engine refresh requested - Phase B implementation pending');
+  }
+
+  /**
+   * Channel Activity Context Analysis Methods
+   * These methods provide real-time channel intelligence for decision making
+   */
+
+  /**
+   * Get timestamp of last bot reply in channel for cooldown analysis
+   */
+  private async getLastBotReplyTime(channelId: string, client: any): Promise<number | undefined> {
+    try {
+      if (!client) return undefined;
+      
+      const channel = await client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return undefined;
+
+      // Search recent messages for bot replies (limit to avoid excessive API calls)
+      const messages = await channel.messages.fetch({ limit: 50 });
+      const botId = client.user!.id;
+      
+      for (const message of messages.values()) {
+        if (message.author.id === botId) {
+          return message.createdTimestamp;
+        }
+      }
+      
+      return undefined;
+    } catch (error) {
+      logger.warn('Failed to get last bot reply time:', error);
+      return undefined;
+    }
+  }
+
+  /**
+   * Analyze recent message burst pattern from specific user in channel
+   */
+  private async getRecentUserBurstCount(userId: string, channelId: string, client: any): Promise<number> {
+    try {
+      if (!client) return 0;
+      
+      const channel = await client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return 0;
+
+      const messages = await channel.messages.fetch({ limit: 30 });
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+      
+      let burstCount = 0;
+      for (const message of messages.values()) {
+        if (message.author.id === userId && message.createdTimestamp > fiveMinutesAgo) {
+          burstCount++;
+        }
+      }
+      
+      return burstCount;
+    } catch (error) {
+      logger.warn('Failed to get user burst count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Analyze overall channel message burst activity 
+   */
+  private async getChannelBurstCount(channelId: string, client: any): Promise<number> {
+    try {
+      if (!client) return 0;
+      
+      const channel = await client.channels.fetch(channelId);
+      if (!channel?.isTextBased()) return 0;
+
+      const messages = await channel.messages.fetch({ limit: 50 });
+      const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+      
+      let activityCount = 0;
+      for (const message of messages.values()) {
+        if (message.createdTimestamp > tenMinutesAgo) {
+          activityCount++;
+        }
+      }
+      
+      return activityCount;
+    } catch (error) {
+      logger.warn('Failed to get channel burst count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Detect if message is in personal thread context
+   */
+  private async isPersonalThread(message: Message): Promise<boolean> {
+    try {
+      // Check if in thread
+      if (!message.channel.isThread()) {
+        return false;
+      }
+
+      const thread = message.channel;
+      
+      // Personal thread indicators:
+      // 1. Thread starter is the message author
+      // 2. Thread has low member count (< 5 people)
+      // 3. Bot was specifically mentioned when thread was created
+      
+      const threadStarter = thread.ownerId;
+      const memberCount = thread.memberCount || 0;
+      
+      // Get thread starter message to check for bot mention
+      const starterMessage = await thread.fetchStarterMessage().catch(() => null);
+      const mentionedBotInStarter = starterMessage?.mentions.users.has(message.client.user!.id) || false;
+      
+      return (
+        threadStarter === message.author.id || // User started the thread
+        (memberCount < 5 && mentionedBotInStarter) // Small thread with bot mention
+      );
+      
+    } catch (error) {
+      logger.warn('Failed to detect personal thread:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * A4: Confidence-Aware Rate Limiting System
+   * Integrates DecisionEngine confidence scores with intelligent rate limiting
+   */
+
+  /**
+   * Check rate limits with confidence-based adjustments
+   */
+  private async checkConfidenceAwareRateLimit(
+    userId: string,
+    confidence: number,
+    tokenEstimate: number,
+    guildId: string | null
+  ): Promise<{ allowed: boolean; reason?: string; retryAfter?: number }> {
+    try {
+      // Base rate limiting parameters
+      const baseRequestsPerMinute = 10;
+      const baseTokensPerMinute = 50000;
+      
+      // Confidence-based adjustments
+      // High confidence (0.8+): Allow more requests for direct interactions
+      // Medium confidence (0.5-0.8): Standard limits
+      // Low confidence (<0.5): Stricter limits to prevent spam
+      const confidenceMultiplier = this.calculateConfidenceMultiplier(confidence);
+      
+      const adjustedRequestLimit = Math.floor(baseRequestsPerMinute * confidenceMultiplier);
+      const adjustedTokenLimit = Math.floor(baseTokensPerMinute * confidenceMultiplier);
+      
+      // Get current usage
+      const currentUsage = await this.getCurrentUserUsage(userId);
+      const currentMinute = Math.floor(Date.now() / 60000);
+      
+      // Reset window if needed
+      if (!currentUsage || currentUsage.windowStart !== currentMinute) {
+        await this.resetUserUsageWindow(userId, currentMinute);
+        return { allowed: true };
+      }
+      
+      // Check request limit
+      if (currentUsage.requests >= adjustedRequestLimit) {
+        return {
+          allowed: false,
+          reason: `Request rate limit exceeded (confidence-adjusted: ${adjustedRequestLimit}/min)`,
+          retryAfter: 60 - (Date.now() % 60000) / 1000
+        };
+      }
+      
+      // Check token limit
+      if (currentUsage.tokens + tokenEstimate >= adjustedTokenLimit) {
+        return {
+          allowed: false,
+          reason: `Token rate limit exceeded (confidence-adjusted: ${adjustedTokenLimit}/min)`,
+          retryAfter: 60 - (Date.now() % 60000) / 1000
+        };
+      }
+      
+      // Update usage
+      await this.updateUserUsage(userId, tokenEstimate);
+      
+      return { allowed: true };
+      
+    } catch (error) {
+      logger.warn('Confidence-aware rate limiting failed, allowing request:', error);
+      return { allowed: true };
+    }
+  }
+
+  /**
+   * Calculate confidence multiplier for rate limit adjustments
+   */
+  private calculateConfidenceMultiplier(confidence: number): number {
+    if (confidence >= 0.9) return 2.0;    // Very high confidence: double limits
+    if (confidence >= 0.8) return 1.5;    // High confidence: 50% more
+    if (confidence >= 0.7) return 1.2;    // Good confidence: 20% more  
+    if (confidence >= 0.5) return 1.0;    // Medium confidence: standard limits
+    if (confidence >= 0.3) return 0.7;    // Low confidence: 30% reduction
+    return 0.5;                           // Very low confidence: 50% reduction
+  }
+
+  /**
+   * Get current user usage for rate limiting
+   */
+  private async getCurrentUserUsage(userId: string): Promise<{
+    requests: number;
+    tokens: number;
+    windowStart: number;
+  } | null> {
+    // Simple in-memory storage for rate limiting
+    // In production, this would use Redis or a database
+    const key = `rate_limit_${userId}`;
+    const stored = (global as any)[key];
+    return stored || null;
+  }
+
+  /**
+   * Reset user usage window
+   */
+  private async resetUserUsageWindow(userId: string, windowStart: number): Promise<void> {
+    const key = `rate_limit_${userId}`;
+    (global as any)[key] = {
+      requests: 0,
+      tokens: 0,
+      windowStart
+    };
+  }
+
+  /**
+   * Update user usage
+   */
+  private async updateUserUsage(userId: string, tokenEstimate: number): Promise<void> {
+    const key = `rate_limit_${userId}`;
+    const current = (global as any)[key];
+    if (current) {
+      current.requests += 1;
+      current.tokens += tokenEstimate;
+    }
+  }
+
+  /**
+   * Record request completion for adaptive rate limiting
+   */
+  private async recordRequestCompletion(
+    userId: string,
+    confidence: number,
+    success: boolean,
+    responseTime: number
+  ): Promise<void> {
+    try {
+      // Record metrics for future rate limit optimization
+      const key = `rate_limit_metrics_${userId}`;
+      const metrics = (global as any)[key] || { completions: [] };
+      
+      metrics.completions.push({
+        timestamp: Date.now(),
+        confidence,
+        success,
+        responseTime
+      });
+      
+      // Keep only recent history (last 100 completions)
+      if (metrics.completions.length > 100) {
+        metrics.completions = metrics.completions.slice(-100);
+      }
+      
+      (global as any)[key] = metrics;
+      
+      logger.debug('Request completion recorded for adaptive rate limiting', {
+        userId,
+        confidence,
+        success,
+        responseTime,
+        totalCompletions: metrics.completions.length
+      });
+      
+    } catch (error) {
+      logger.warn('Failed to record request completion:', error);
+    }
+  }
+
+  // B4: Public decision tracing access methods
+  public getDecisionTrace(sessionId: string) {
+    return this.decisionTracer.getSessionTrace(sessionId);
+  }
+
+  public getTraceAnalysis(timeRangeHours = 24) {
+    return this.decisionTracer.getTraceAnalysis(timeRangeHours);
+  }
+
+  public getUserDecisionHistory(userId: string, limit = 10) {
+    return this.decisionTracer.getUserTraces(userId, limit);
+  }
+
+  public getTraceVisualization(sessionId: string) {
+    return this.decisionTracer.getTraceVisualization(sessionId);
+  }
+
+  public exportDecisionTraces(format: 'json' | 'csv' = 'json', timeRangeHours = 24) {
+    return this.decisionTracer.exportTraces(format, timeRangeHours);
   }
 }

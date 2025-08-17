@@ -7,6 +7,8 @@ export default {
     '^discord\\.js$': '<rootDir>/src/__mocks__/discord.js',
     // Prisma client mapping
     '^@prisma/client$': '<rootDir>/src/__mocks__/@prisma/client.js',
+  // Langfuse mapping for tests
+  '^langfuse$': '<rootDir>/src/__mocks__/langfuse.js',
   },
   testEnvironment: 'node',
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],

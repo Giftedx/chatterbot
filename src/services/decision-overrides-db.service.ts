@@ -5,10 +5,9 @@
   - Gracefully degrades when Prisma or table is unavailable
 */
 import { logger } from '../utils/logger.js';
-import type { DecisionEngineOptions } from './decision-engine.service.js';
 import { getPrisma } from '../db/prisma.js';
 
-type Overrides = Partial<DecisionEngineOptions>;
+type Overrides = Partial<any>;
 
 const TTL_MS = Number(process.env.DECISION_OVERRIDES_TTL_MS || 60_000);
 

@@ -17,7 +17,6 @@ import { UltraIntelligentResearchService } from './research.service.js';
 import { HumanLikeConversationService } from './conversation.service.js';
 import { AdvancedMemoryManager } from '../advanced-memory/advanced-memory-manager.service.js';
 import type { AdvancedMemoryConfig } from '../advanced-memory/types.js';
-import type { AutonomousReasoningConfig, AutonomousReasoningContext } from '../autonomous-reasoning/types.js';
 import type { ConversationContext, HumanLikeResponse } from './conversation.service.js';
 import type { ResearchResult } from './research.service.js';
 
@@ -364,7 +363,7 @@ export class UltraIntelligenceOrchestrator {
         }
 
         try {
-            const reasoningContext: Partial<AutonomousReasoningContext> = {
+            const reasoningContext: Partial<any> = {
                 userId: context.userId,
                 conversationHistory: context.conversationHistory || [],
                 currentGoals: [],

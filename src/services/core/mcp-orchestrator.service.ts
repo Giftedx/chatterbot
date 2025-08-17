@@ -1325,9 +1325,33 @@ export class UnifiedMCPOrchestratorService {
       needsMCPTools: (analysis.mcpRequirements || []).length > 0,
       mcpRequirements: analysis.mcpRequirements || [],
       
+      // AI Model Routing Intelligence
+      reasoningLevel: analysis.complexity === 'advanced' ? 'expert' : analysis.complexity === 'complex' ? 'advanced' : 'basic',
+      contextRequirement: analysis.hasUrls || (analysis.requiredTools || []).length > 3 ? 'long' : 'medium',
+      responseSpeed: 'balanced',
+      modelCapabilities: {
+        needsCoding: (analysis.intents || []).some(intent => intent.includes('code')),
+        needsReasoning: (analysis.intents || []).includes('analysis'),
+        needsCreativity: false,
+        needsFactuality: analysis.hasUrls || false,
+        needsMultimodal: analysis.hasAttachments || false,
+        needsTools: (analysis.requiredTools || []).length > 1,
+      },
+      
+      // Intelligence Service Routing
+      intelligenceServices: {
+        coreIntelligence: true,
+        agenticIntelligence: analysis.complexity === 'advanced',
+        enhancedIntelligence: false,
+        advancedCapabilities: analysis.hasAttachments || false,
+        mcpIntegration: (analysis.mcpRequirements || []).length > 0,
+      },
+      
       // Analysis metadata
       confidence: analysis.confidence || 0.8,
       processingRecommendations: [],
+      urgency: 'normal',
+      userExpertise: 'intermediate',
       
       // Additional analysis properties
       sentiment: analysis.sentiment || 'neutral',
