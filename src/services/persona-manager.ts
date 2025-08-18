@@ -1,5 +1,6 @@
 import { personaRegistry, type Persona } from '../personas/index.js';
 import { prisma } from '../db/prisma.js';
+import { isLocalDBDisabled } from '../utils/env.js';
 
 async function loadPersistedPersonas(): Promise<void> {
   try {
@@ -7,7 +8,13 @@ async function loadPersistedPersonas(): Promise<void> {
       return;
     }
     const dbPersonas = await prisma.persona.findMany();
-    dbPersonas.forEach((p: { name: string; systemPrompt: string; styleHints?: string }) => personaRegistry.upsert({ name: p.name, systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.parse(p.styleHints) : undefined }));
+    dbPersonas.forEach((p: { name: string; systemPrompt: string; styleHints?: string }) =>
+      personaRegistry.upsert({
+        name: p.name,
+        systemPrompt: p.systemPrompt,
+        styleHints: p.styleHints ? JSON.parse(p.styleHints) : undefined,
+      }),
+    );
   } catch (err) {
     console.error('Failed to load personas from DB', err);
   }
@@ -15,13 +22,22 @@ async function loadPersistedPersonas(): Promise<void> {
 
 async function savePersonas() {
   try {
+    // In local DB-less mode, keep personas in-memory only
+    if (isLocalDBDisabled()) return;
     const list = personaRegistry.list();
     // Upsert each persona into DB
     for (const p of list) {
       await prisma.persona.upsert({
         where: { name: p.name },
-        update: { systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.stringify(p.styleHints) : null },
-        create: { name: p.name, systemPrompt: p.systemPrompt, styleHints: p.styleHints ? JSON.stringify(p.styleHints) : null },
+        update: {
+          systemPrompt: p.systemPrompt,
+          styleHints: p.styleHints ? JSON.stringify(p.styleHints) : null,
+        },
+        create: {
+          name: p.name,
+          systemPrompt: p.systemPrompt,
+          styleHints: p.styleHints ? JSON.stringify(p.styleHints) : null,
+        },
       });
     }
   } catch (err) {
@@ -51,9 +67,16 @@ export function listPersonas(): Persona[] {
   return personaRegistry.list();
 }
 
-export async function createOrUpdatePersona(name: string, systemPrompt: string, styleHints?: string[]): Promise<void> {
+export async function createOrUpdatePersona(
+  name: string,
+  systemPrompt: string,
+  styleHints?: string[],
+): Promise<void> {
   personaRegistry.upsert({ name, systemPrompt, styleHints });
-  await savePersonas();
+  // Skip persistence in local DB-less mode; otherwise persist
+  if (!isLocalDBDisabled()) {
+    await savePersonas();
+  }
 }
 
 // Load persisted personas on startup

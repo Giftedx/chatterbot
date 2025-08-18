@@ -7,7 +7,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/index.js",
+    "start:local": "NODE_ENV=development DISABLE_PRISMA_DB=true FEATURE_TEMPORAL=false FEATURE_QDRANT_VECTOR_DB=false FEATURE_VECTOR_MIGRATION_UTILS=false FEATURE_ADVANCED_FILTERING=false FEATURE_KNOWLEDGE_GRAPHS=false FEATURE_GRAPH_BASED_REASONING=false FEATURE_ENTITY_RELATIONSHIP_TRACKING=false FEATURE_GRAPH_QUERY_CAPABILITIES=false FEATURE_CRAWL4AI_WEB_ACCESS=false FEATURE_WEB_CONTENT_EXTRACTION=false FEATURE_URL_PROCESSING_SERVICE=false node dist/src/index.js",
     "dev": "tsx watch src/index.ts",
+    "dev:local": "NODE_ENV=development DISABLE_PRISMA_DB=true FEATURE_TEMPORAL=false FEATURE_QDRANT_VECTOR_DB=false FEATURE_VECTOR_MIGRATION_UTILS=false FEATURE_ADVANCED_FILTERING=false FEATURE_KNOWLEDGE_GRAPHS=false FEATURE_GRAPH_BASED_REASONING=false FEATURE_ENTITY_RELATIONSHIP_TRACKING=false FEATURE_GRAPH_QUERY_CAPABILITIES=false FEATURE_CRAWL4AI_WEB_ACCESS=false FEATURE_WEB_CONTENT_EXTRACTION=false FEATURE_URL_PROCESSING_SERVICE=false tsx watch src/index.ts",
+    "start:unified": "NODE_ENV=production FEATURE_UNIFIED_COGNITIVE_PIPELINE=true node dist/src/index.js",
+    "dev:unified": "NODE_ENV=development FEATURE_UNIFIED_COGNITIVE_PIPELINE=true DISABLE_PRISMA_DB=true FEATURE_TEMPORAL=false FEATURE_QDRANT_VECTOR_DB=false FEATURE_VECTOR_MIGRATION_UTILS=false FEATURE_ADVANCED_FILTERING=false FEATURE_KNOWLEDGE_GRAPHS=false FEATURE_GRAPH_BASED_REASONING=false FEATURE_ENTITY_RELATIONSHIP_TRACKING=false FEATURE_GRAPH_QUERY_CAPABILITIES=false FEATURE_CRAWL4AI_WEB_ACCESS=false FEATURE_WEB_CONTENT_EXTRACTION=false FEATURE_URL_PROCESSING_SERVICE=false tsx watch src/index.ts",
     "dev:health": "tsx src/dev/health-dev.ts",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
@@ -44,8 +48,8 @@
     "config:check": "node scripts/production-validation.js",
     "health:check": "curl -f http://localhost:${HEALTH_CHECK_PORT:-3000}/health || echo 'Health check failed'",
     "performance:test": "echo 'Performance testing requires running service'",
-  "load:test": "echo 'Load testing requires running service'",
-  "demo:perf-routing": "tsx src/scripts/perf-routing-demo.ts"
+    "load:test": "echo 'Load testing requires running service'",
+    "demo:perf-routing": "tsx src/scripts/perf-routing-demo.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,cts,mts,cjs,mjs}": [

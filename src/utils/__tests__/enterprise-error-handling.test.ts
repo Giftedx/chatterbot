@@ -2,19 +2,8 @@
  * Tests for enterprise error handling and resilience utilities
  */
 
-import { 
-  BusinessError, 
-  APIError, 
-  ValidationError, 
-  SystemError, 
-  ErrorHandler 
-} from '../errors';
-import { 
-  RetryUtility, 
-  CircuitBreaker, 
-  PerformanceMonitor, 
-  HealthChecker 
-} from '../resilience';
+import { BusinessError, APIError, ValidationError, SystemError, ErrorHandler } from '../errors';
+import { RetryUtility, CircuitBreaker, PerformanceMonitor, HealthChecker } from '../resilience';
 import { logger } from '../logger';
 
 // Mock logger for testing
@@ -24,14 +13,14 @@ jest.mock('../logger', () => ({
     warn: jest.fn(),
     error: jest.fn(),
     debug: jest.fn(),
-    performance: jest.fn()
+    performance: jest.fn(),
   },
   LogLevel: {
     ERROR: 0,
     WARN: 1,
     INFO: 2,
-    DEBUG: 3
-  }
+    DEBUG: 3,
+  },
 }));
 
 describe('Error Handling System', () => {
@@ -45,14 +34,16 @@ describe('Error Handling System', () => {
   describe('AppError and subclasses', () => {
     test('BusinessError should have correct properties', () => {
       const error = new BusinessError(
-        'Rate limit exceeded', 
+        'Rate limit exceeded',
         'You have exceeded the rate limit. Please try again later.',
-        { userId: 'test123' }
+        { userId: 'test123' },
       );
 
       expect(error.name).toBe('BusinessError');
       expect(error.message).toBe('Rate limit exceeded');
-      expect(error.getUserFriendlyMessage()).toBe('You have exceeded the rate limit. Please try again later.');
+      expect(error.getUserFriendlyMessage()).toBe(
+        'You have exceeded the rate limit. Please try again later.',
+      );
       expect(error.isOperational).toBe(true);
       expect(error.context).toEqual({ userId: 'test123' });
     });
@@ -69,14 +60,16 @@ describe('Error Handling System', () => {
 
     test('ValidationError should format user message correctly', () => {
       const error = new ValidationError('Username is required', 'username');
-      
+
       expect(error.field).toBe('username');
-      expect(error.getUserFriendlyMessage()).toBe('Invalid input for username: Username is required');
+      expect(error.getUserFriendlyMessage()).toBe(
+        'Invalid input for username: Username is required',
+      );
     });
 
     test('SystemError should have correct severity', () => {
       const criticalError = new SystemError('Database connection failed', 'critical');
-      
+
       expect(criticalError.severity).toBe('critical');
       expect(criticalError.name).toBe('SystemError');
     });
@@ -108,42 +101,43 @@ describe('Error Handling System', () => {
   describe('RetryUtility', () => {
     test('should succeed on first attempt', async () => {
       const operation = jest.fn().mockResolvedValue('success');
-      
+
       const result = await RetryUtility.withRetry(operation);
-      
+
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(1);
     });
 
     test('should retry on failure and eventually succeed', async () => {
-      const operation = jest.fn()
+      const operation = jest
+        .fn()
         .mockRejectedValueOnce(new APIError('Service temporarily unavailable', 503, true))
         .mockResolvedValue('success');
-      
+
       const result = await RetryUtility.withRetry(operation, { maxAttempts: 3 });
-      
+
       expect(result).toBe('success');
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
     test('should fail after max attempts', async () => {
       const operation = jest.fn().mockRejectedValue(new APIError('Persistent failure', 500, true));
-      
-      await expect(
-        RetryUtility.withRetry(operation, { maxAttempts: 2 })
-      ).rejects.toThrow('Persistent failure');
-      
+
+      await expect(RetryUtility.withRetry(operation, { maxAttempts: 2 })).rejects.toThrow(
+        'Persistent failure',
+      );
+
       expect(operation).toHaveBeenCalledTimes(2);
     });
 
     test('should respect retry condition', async () => {
       const operation = jest.fn().mockRejectedValue(new ValidationError('Invalid input'));
       const retryCondition = jest.fn().mockReturnValue(false);
-      
+
       await expect(
-        RetryUtility.withRetry(operation, { maxAttempts: 3, retryCondition })
+        RetryUtility.withRetry(operation, { maxAttempts: 3, retryCondition }),
       ).rejects.toThrow('Invalid input');
-      
+
       expect(operation).toHaveBeenCalledTimes(1);
       expect(retryCondition).toHaveBeenCalled();
     });
@@ -151,28 +145,30 @@ describe('Error Handling System', () => {
     test('should use exponential backoff', async () => {
       const operation = jest.fn().mockRejectedValue(new APIError('Test', 503, true));
       const delays: number[] = [];
-      
+
       // Mock setTimeout to capture delays
-      const setTimeoutSpy = jest.spyOn(global, 'setTimeout').mockImplementation((fn, delay) => {
-        if (delay !== undefined) {
-          delays.push(delay);
-        }
-        if (typeof fn === 'function') {
-          fn();
-        }
-        return {} as NodeJS.Timeout;
-      });
+      const setTimeoutSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((fn: (...args: any[]) => any, delay?: number) => {
+          if (delay !== undefined) {
+            delays.push(delay);
+          }
+          if (typeof fn === 'function') {
+            fn();
+          }
+          return undefined as unknown as ReturnType<typeof setTimeout>;
+        });
 
       await expect(
-        RetryUtility.withRetry(operation, { 
-          maxAttempts: 3, 
+        RetryUtility.withRetry(operation, {
+          maxAttempts: 3,
           baseDelayMs: 100,
-          exponentialBackoff: true 
-        })
+          exponentialBackoff: true,
+        }),
       ).rejects.toThrow();
 
       expect(delays).toEqual([100, 200]);
-      
+
       setTimeoutSpy.mockRestore();
     });
   });
@@ -182,7 +178,7 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('test-service', {
         failureThreshold: 3,
         resetTimeoutMs: 5000,
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       expect(cb.getState()).toBe('CLOSED');
@@ -192,7 +188,7 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('test-service', {
         failureThreshold: 2,
         resetTimeoutMs: 5000,
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       const failingOperation = jest.fn().mockRejectedValue(new Error('Service down'));
@@ -206,7 +202,9 @@ describe('Error Handling System', () => {
       expect(cb.getState()).toBe('OPEN');
 
       // Third attempt should fail fast
-      await expect(cb.execute(failingOperation)).rejects.toThrow('Circuit breaker \'test-service\' is OPEN');
+      await expect(cb.execute(failingOperation)).rejects.toThrow(
+        "Circuit breaker 'test-service' is OPEN",
+      );
       expect(failingOperation).toHaveBeenCalledTimes(2); // Should not call operation when open
     });
 
@@ -214,7 +212,7 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('test-service', {
         failureThreshold: 1,
         resetTimeoutMs: 50, // Very short timeout for testing
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       const operation = jest.fn().mockRejectedValue(new Error('Failure'));
@@ -224,7 +222,7 @@ describe('Error Handling System', () => {
       expect(cb.getState()).toBe('OPEN');
 
       // Wait for reset timeout
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Next call should transition to HALF_OPEN and execute operation
       const successOperation = jest.fn().mockResolvedValue('success');
@@ -238,7 +236,7 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('test-service', {
         failureThreshold: 1,
         resetTimeoutMs: 50,
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       // Open circuit
@@ -247,7 +245,7 @@ describe('Error Handling System', () => {
       expect(cb.getState()).toBe('OPEN');
 
       // Wait for reset timeout
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Execute successful operations
       const successOp = jest.fn().mockResolvedValue('success');
@@ -262,9 +260,9 @@ describe('Error Handling System', () => {
   describe('PerformanceMonitor', () => {
     test('should monitor operation performance', async () => {
       const operation = jest.fn().mockResolvedValue('result');
-      
+
       const result = await PerformanceMonitor.monitor('test-op', operation);
-      
+
       expect(result).toBe('result');
       expect(operation).toHaveBeenCalledTimes(1);
       expect(logger.performance).toHaveBeenCalled();
@@ -273,25 +271,25 @@ describe('Error Handling System', () => {
     test('should handle operation errors', async () => {
       const error = new Error('Operation failed');
       const operation = jest.fn().mockRejectedValue(error);
-      
-      await expect(
-        PerformanceMonitor.monitor('test-op', operation)
-      ).rejects.toThrow('Operation failed');
-      
+
+      await expect(PerformanceMonitor.monitor('test-op', operation)).rejects.toThrow(
+        'Operation failed',
+      );
+
       expect(logger.error).toHaveBeenCalled();
     });
 
     test('should collect performance statistics', async () => {
       const fastOp = jest.fn().mockResolvedValue('fast');
-      const slowOp = jest.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve('slow'), 50))
-      );
+      const slowOp = jest
+        .fn()
+        .mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve('slow'), 50)));
 
       await PerformanceMonitor.monitor('test-op', fastOp);
       await PerformanceMonitor.monitor('test-op', slowOp);
 
       const stats = PerformanceMonitor.getStats('test-op') as Record<string, unknown>;
-      
+
       expect(stats.operation).toBe('test-op');
       expect(stats.count).toBe(2);
       expect(typeof stats.avg).toBe('number');
@@ -301,12 +299,12 @@ describe('Error Handling System', () => {
 
     test('should return all stats when no operation specified', async () => {
       const operation = jest.fn().mockResolvedValue('result');
-      
+
       await PerformanceMonitor.monitor('op1', operation);
       await PerformanceMonitor.monitor('op2', operation);
 
       const allStats = PerformanceMonitor.getStats() as Record<string, unknown>;
-      
+
       expect(allStats).toHaveProperty('op1');
       expect(allStats).toHaveProperty('op2');
     });
@@ -316,13 +314,13 @@ describe('Error Handling System', () => {
     test('should register and run health checks', async () => {
       const healthyCheck = jest.fn().mockResolvedValue(true);
       const unhealthyCheck = jest.fn().mockResolvedValue(false);
-      
+
       HealthChecker.register('service1', healthyCheck);
       HealthChecker.register('service2', unhealthyCheck);
 
-      const results = await HealthChecker.checkAll() as Record<string, unknown>;
+      const results = (await HealthChecker.checkAll()) as Record<string, unknown>;
       const checks = results.checks as Record<string, Record<string, unknown>>;
-      
+
       expect(results.status).toBe('unhealthy');
       expect(checks.service1.status).toBe('healthy');
       expect(checks.service2.status).toBe('unhealthy');
@@ -332,12 +330,12 @@ describe('Error Handling System', () => {
 
     test('should handle health check errors', async () => {
       const errorCheck = jest.fn().mockRejectedValue(new Error('Check failed'));
-      
+
       HealthChecker.register('error-service', errorCheck);
 
-      const results = await HealthChecker.checkAll() as Record<string, unknown>;
+      const results = (await HealthChecker.checkAll()) as Record<string, unknown>;
       const checks = results.checks as Record<string, Record<string, unknown>>;
-      
+
       expect(results.status).toBe('unhealthy');
       expect(checks['error-service'].status).toBe('error');
       expect(checks['error-service'].error).toBe('Error: Check failed');
@@ -346,12 +344,12 @@ describe('Error Handling System', () => {
     test('should report overall healthy status when all checks pass', async () => {
       const check1 = jest.fn().mockResolvedValue(true);
       const check2 = jest.fn().mockResolvedValue(true);
-      
+
       HealthChecker.register('service-a', check1);
       HealthChecker.register('service-b', check2);
 
-      const results = await HealthChecker.checkAll() as Record<string, unknown>;
-      
+      const results = (await HealthChecker.checkAll()) as Record<string, unknown>;
+
       expect(results.status).toBe('healthy');
     });
   });
@@ -361,7 +359,7 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('api-service', {
         failureThreshold: 3, // Higher threshold to prevent premature opening
         resetTimeoutMs: 100,
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       let callCount = 0;
@@ -375,9 +373,12 @@ describe('Error Handling System', () => {
 
       // Should retry and eventually succeed
       const result = await PerformanceMonitor.monitor('api-call', async () => {
-        return RetryUtility.withRetry(async () => {
-          return cb.execute(unreliableOperation);
-        }, { maxAttempts: 3 });
+        return RetryUtility.withRetry(
+          async () => {
+            return cb.execute(unreliableOperation);
+          },
+          { maxAttempts: 3 },
+        );
       });
 
       expect(result).toBe('success');
@@ -389,22 +390,22 @@ describe('Error Handling System', () => {
       const cb = new CircuitBreaker('failing-service', {
         failureThreshold: 1,
         resetTimeoutMs: 1000,
-        monitoringWindowMs: 60000
+        monitoringWindowMs: 60000,
       });
 
       const alwaysFailingOp = jest.fn().mockRejectedValue(new Error('Service down'));
 
       // First call should fail and open circuit
       await expect(
-        RetryUtility.withRetry(() => cb.execute(alwaysFailingOp), { maxAttempts: 1 })
+        RetryUtility.withRetry(() => cb.execute(alwaysFailingOp), { maxAttempts: 1 }),
       ).rejects.toThrow();
 
       expect(cb.getState()).toBe('OPEN');
 
       // Subsequent calls should fail fast without retry
-      await expect(
-        cb.execute(alwaysFailingOp)
-      ).rejects.toThrow('Circuit breaker \'failing-service\' is OPEN');
+      await expect(cb.execute(alwaysFailingOp)).rejects.toThrow(
+        "Circuit breaker 'failing-service' is OPEN",
+      );
 
       // Should only call the operation once (circuit prevents second call)
       expect(alwaysFailingOp).toHaveBeenCalledTimes(1);

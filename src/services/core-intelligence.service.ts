@@ -64,7 +64,7 @@ import {
 // Removed obsolete import: model-router.service.js replaced by performance-aware-routing
 import { knowledgeBaseService } from './knowledge-base.service.js';
 import type { ProviderName } from '../config/models.js';
-import { getEnvAsBoolean } from '../utils/env.js';
+import { getEnvAsBoolean, isLocalDBDisabled } from '../utils/env.js';
 import { langGraphWorkflow, advancedLangGraphWorkflow } from '../agents/langgraph/workflow.js';
 
 // Advanced Capabilities
@@ -304,7 +304,7 @@ export class CoreIntelligenceService {
       });
     }
 
-  if (config.enableEnhancedMemory) {
+    if (config.enableEnhancedMemory) {
       this.memoryManager = new AdvancedMemoryManager({
         enableEpisodicMemory: true,
         enableSocialIntelligence: true,
@@ -325,12 +325,12 @@ export class CoreIntelligenceService {
         .catch(() => {});
     }
 
-  if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
-  if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
-  if (config.enableResponseCache) this.enhancedCacheService = new EnhancedCacheService();
-  this.enhancedResponseService = new EnhancedResponseService();
+    if (config.enableEnhancedMemory) this.enhancedMemoryService = new EnhancedMemoryService();
+    if (config.enableEnhancedUI) this.enhancedUiService = new EnhancedUIService();
+    if (config.enableResponseCache) this.enhancedCacheService = new EnhancedCacheService();
+    this.enhancedResponseService = new EnhancedResponseService();
 
-  if (config.enablePersonalization) {
+    if (config.enablePersonalization) {
       this.personalizationEngine = new PersonalizationEngine(config.mcpManager);
       this.behaviorAnalytics = new UserBehaviorAnalyticsService();
       this.smartRecommendations = new SmartRecommendationService();
@@ -407,19 +407,23 @@ export class CoreIntelligenceService {
 
   public calculateConfidenceMultiplier(confidence: number): number {
     const c = Math.max(0, Math.min(1, confidence));
-    if (c >= 0.9) return 2.0;      // Very high
-    if (c >= 0.8) return 1.5;      // High
-    if (c >= 0.7) return 1.2;      // Good
-    if (c >= 0.5) return 1.0;      // Medium
-    if (c >= 0.3) return 0.7;      // Low
-    return 0.5;                    // Very low
+    if (c >= 0.9) return 2.0; // Very high
+    if (c >= 0.8) return 1.5; // High
+    if (c >= 0.7) return 1.2; // Good
+    if (c >= 0.5) return 1.0; // Medium
+    if (c >= 0.3) return 0.7; // Low
+    return 0.5; // Very low
   }
 
   private getMinuteNow(): number {
     return Math.floor(Date.now() / 60000);
   }
 
-  private ensureUsageWindow(userId: string): { requests: number; tokens: number; windowStart: number } {
+  private ensureUsageWindow(userId: string): {
+    requests: number;
+    tokens: number;
+    windowStart: number;
+  } {
     const key = `rate_limit_${userId}`;
     const minute = this.getMinuteNow();
     const existing = (global as any)[key];
@@ -441,10 +445,14 @@ export class CoreIntelligenceService {
     usage.tokens += Math.max(0, Math.floor(tokens || 0));
   }
 
-  public async getCurrentUserUsage(userId: string): Promise<{ windowStart: number; requests: number; tokens: number } | null> {
+  public async getCurrentUserUsage(
+    userId: string,
+  ): Promise<{ windowStart: number; requests: number; tokens: number } | null> {
     const key = `rate_limit_${userId}`;
     const data = (global as any)[key];
-    return data && typeof data === 'object' ? { windowStart: data.windowStart, requests: data.requests, tokens: data.tokens } : null;
+    return data && typeof data === 'object'
+      ? { windowStart: data.windowStart, requests: data.requests, tokens: data.tokens }
+      : null;
   }
 
   public async checkConfidenceAwareRateLimit(
@@ -556,8 +564,8 @@ export class CoreIntelligenceService {
     uiContext: ChatInputCommandInteraction | Message | null = null,
     strategy?: ResponseStrategy,
   ): Promise<{ content: string } | any> {
-  performanceMonitor.setEnabledFromEnv();
-  const opId = performanceMonitor.isMonitoringEnabled()
+    performanceMonitor.setEnabledFromEnv();
+    const opId = performanceMonitor.isMonitoringEnabled()
       ? performanceMonitor.startOperation(
           'core_intelligence_service',
           'process_prompt_and_generate_response',
@@ -649,9 +657,9 @@ export class CoreIntelligenceService {
         logger.info('AI Evaluation Testing Service initialized');
       }
 
-    logger.info('AI Enhancement Services initialization completed', {
+      logger.info('AI Enhancement Services initialization completed', {
         services: {
-      langfuse: !!this._enhancedLangfuseService,
+          langfuse: !!this._enhancedLangfuseService,
           tokenization: !!this.multiProviderTokenizationService,
           cache: !!this.enhancedSemanticCacheService,
           vector: !!this.qdrantVectorService,
@@ -944,7 +952,9 @@ export class CoreIntelligenceService {
         } else {
           await (interaction as any)
             .reply({ content: errorMessage, ephemeral: true })
-            .catch((e: unknown) => logger.error('[CoreIntelSvc] Failed to send error reply', e as any));
+            .catch((e: unknown) =>
+              logger.error('[CoreIntelSvc] Failed to send error reply', e as any),
+            );
         }
       }
     }
@@ -985,7 +995,7 @@ export class CoreIntelligenceService {
       logger.warn('[CoreIntelSvc] Unknown slash command received:', {
         commandName: interaction.commandName,
       });
-  await (interaction as any).reply({ content: 'Unknown command.', ephemeral: true });
+      await (interaction as any).reply({ content: 'Unknown command.', ephemeral: true });
     }
   }
 
@@ -1016,13 +1026,13 @@ export class CoreIntelligenceService {
     if (!userConsent || !(userConsent as any).privacyAccepted || (userConsent as any).optedOut) {
       const embed = createPrivacyConsentEmbed();
       const buttons = createPrivacyConsentButtons();
-  await (interaction as any).reply({ embeds: [embed], components: [buttons], ephemeral: true });
+      await (interaction as any).reply({ embeds: [embed], components: [buttons], ephemeral: true });
       return;
     }
 
     // Respect pause
     if (await this.userConsentService.isUserPaused(userId)) {
-  await (interaction as any).reply({
+      await (interaction as any).reply({
         content: '⏸️ You’re paused. Say “resume” or use /resume to continue.',
         ephemeral: true,
       });
@@ -1045,7 +1055,7 @@ export class CoreIntelligenceService {
         movedToDm = true;
       } else {
         // Ensure a personal thread exists in this guild/channel
-  if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased?.()) {
+        if (!routing.lastThreadId && interaction.channel && interaction.channel.isTextBased?.()) {
           const parent = interaction.channel as any;
           if (parent && parent.threads && typeof parent.threads.create === 'function') {
             const thread = await parent.threads.create({
@@ -1221,63 +1231,66 @@ export class CoreIntelligenceService {
     userId: string,
     guildId: string | undefined,
     content: string,
-  ): Promise<{
-    userInteractionPattern?: {
-      userId: string;
-      guildId?: string;
-      toolUsageFrequency: Map<string, number>;
-      responsePreferences: {
-        preferredLength: 'short' | 'medium' | 'detailed';
-        communicationStyle: 'formal' | 'casual' | 'technical';
-        includeExamples: boolean;
-        topicInterests: string[];
-      };
-      behaviorMetrics: {
-        averageSessionLength: number;
-        mostActiveTimeOfDay: number;
-        commonQuestionTypes: string[];
-        successfulInteractionTypes: string[];
-        feedbackScores: number[];
-      };
-      learningProgress: {
-        improvementAreas: string[];
-        masteredTopics: string[];
-        recommendedNextSteps: string[];
-      };
-      adaptationHistory: Array<{
-        timestamp: Date;
-        adaptationType: string;
-        reason: string;
-        effectivenessScore: number;
-      }>;
-    };
-    activePersona?: {
-      id: string;
-      name: string;
-      personality: {
-        formality: number;
-        enthusiasm: number;
-        humor: number;
-        supportiveness: number;
-        curiosity: number;
-        directness: number;
-        empathy: number;
-        playfulness: number;
-      };
-      communicationStyle: {
-        messageLength: 'short' | 'medium' | 'long' | 'adaptive';
-        useEmojis: number;
-        useSlang: number;
-        askQuestions: number;
-        sharePersonalExperiences: number;
-        useTypingPhrases: number;
-        reactionTiming: 'immediate' | 'natural' | 'delayed';
-      };
-    };
-    relationshipStrength?: number;
-    userMood?: 'neutral' | 'frustrated' | 'excited' | 'serious' | 'playful';
-    personalityCompatibility?: number;
-  } | undefined> {
+  ): Promise<
+    | {
+        userInteractionPattern?: {
+          userId: string;
+          guildId?: string;
+          toolUsageFrequency: Map<string, number>;
+          responsePreferences: {
+            preferredLength: 'short' | 'medium' | 'detailed';
+            communicationStyle: 'formal' | 'casual' | 'technical';
+            includeExamples: boolean;
+            topicInterests: string[];
+          };
+          behaviorMetrics: {
+            averageSessionLength: number;
+            mostActiveTimeOfDay: number;
+            commonQuestionTypes: string[];
+            successfulInteractionTypes: string[];
+            feedbackScores: number[];
+          };
+          learningProgress: {
+            improvementAreas: string[];
+            masteredTopics: string[];
+            recommendedNextSteps: string[];
+          };
+          adaptationHistory: Array<{
+            timestamp: Date;
+            adaptationType: string;
+            reason: string;
+            effectivenessScore: number;
+          }>;
+        };
+        activePersona?: {
+          id: string;
+          name: string;
+          personality: {
+            formality: number;
+            enthusiasm: number;
+            humor: number;
+            supportiveness: number;
+            curiosity: number;
+            directness: number;
+            empathy: number;
+            playfulness: number;
+          };
+          communicationStyle: {
+            messageLength: 'short' | 'medium' | 'long' | 'adaptive';
+            useEmojis: number;
+            useSlang: number;
+            askQuestions: number;
+            sharePersonalExperiences: number;
+            useTypingPhrases: number;
+            reactionTiming: 'immediate' | 'natural' | 'delayed';
+          };
+        };
+        relationshipStrength?: number;
+        userMood?: 'neutral' | 'frustrated' | 'excited' | 'serious' | 'playful';
+        personalityCompatibility?: number;
+      }
+    | undefined
+  > {
     try {
       // Basic preferences from memory (best-effort)
       const mem = await this.userMemoryService.getUserMemory(userId, guildId);
@@ -1429,12 +1442,9 @@ export class CoreIntelligenceService {
     };
   }
 
-  private detectMoodLightweight(text: string):
-    | 'neutral'
-    | 'frustrated'
-    | 'excited'
-    | 'serious'
-    | 'playful' {
+  private detectMoodLightweight(
+    text: string,
+  ): 'neutral' | 'frustrated' | 'excited' | 'serious' | 'playful' {
     const t = text || '';
     if (/frustrated|annoyed|angry|upset/i.test(t)) return 'frustrated';
     if (/[!]{2,}|awesome|great|hype|so excited/i.test(t)) return 'excited';
@@ -1793,7 +1803,34 @@ export class CoreIntelligenceService {
       } else {
         isOptedIn = await this.userConsentService.isUserOptedIn(userId);
       }
-      if (!isOptedIn) return;
+      if (!isOptedIn) {
+        // If the user directly DMs, mentions, or replies to the bot, nudge them to opt in
+        try {
+          const isDM = !message.guildId;
+          const mentionedBot = !!message.mentions?.users?.has(message.client.user!.id);
+          let repliedToBot = false;
+          if (message.reference?.messageId) {
+            try {
+              const ref = await message.fetchReference();
+              repliedToBot = !!ref?.author && ref.author.id === message.client.user?.id;
+            } catch {
+              repliedToBot = true; // assume true if we cannot fetch reference
+            }
+          }
+
+          if (isDM || mentionedBot || repliedToBot) {
+            // Avoid spamming reminders; reuse lastReplyAt cooldown with a longer window for opt-in prompts
+            const lastAt = this.lastReplyAt.get(userId) || 0;
+            if (Date.now() - lastAt > 60_000) {
+              await message.reply(
+                'Hi! I’m not enabled for you yet. Use /chat to opt in and review the privacy policy before we talk.',
+              );
+              this.markBotReply(userId);
+            }
+          }
+        } catch {}
+        return;
+      }
 
       // Only respond when addressed, mentioned, DM, or in personal thread
       const decision = await this.shouldRespond(message);
@@ -1827,37 +1864,39 @@ export class CoreIntelligenceService {
       await this.userConsentService.updateUserActivity(userId);
       this.optedInUsers.add(userId);
 
-  (message.channel as any)?.sendTyping?.();
+      (message.channel as any)?.sendTyping?.();
       const commonAttachments: CommonAttachment[] = Array.from(message.attachments.values()).map(
         (att) => ({ name: att.name, url: att.url, contentType: att.contentType }),
       );
 
-      // Log incoming
-      try {
-        await prisma.messageLog.create({
-          data: {
-            userId,
-            guildId: message.guildId || undefined,
-            channelId: message.channelId,
-            threadId: message.channelId,
-            msgId: message.id,
-            role: 'user',
-            content: message.content,
-          },
-        });
-      } catch (err) {
-        logger.warn('[CoreIntelSvc] Failed to log user message', {
-          messageId: message.id,
-          error: err,
-        });
+      // Log incoming (skip in local DB-less mode)
+      if (!isLocalDBDisabled()) {
+        try {
+          await prisma.messageLog.create({
+            data: {
+              userId,
+              guildId: message.guildId || undefined,
+              channelId: message.channelId,
+              threadId: message.channelId,
+              msgId: message.id,
+              role: 'user',
+              content: message.content,
+            },
+          });
+        } catch (err) {
+          logger.warn('[CoreIntelSvc] Failed to log user message', {
+            messageId: message.id,
+            error: err,
+          });
+        }
       }
 
       // Full processing pipeline; uiContext = message
       const responseOptions = await this._processPromptAndGenerateResponse(
         message.content,
         message.author.id,
-  message.channel.id,
-  message.guildId ?? null,
+        message.channel.id,
+        message.guildId ?? null,
         commonAttachments,
         message,
         decision.strategy as ResponseStrategy,
@@ -1870,25 +1909,27 @@ export class CoreIntelligenceService {
         throw err;
       }
 
-      // Log assistant reply
-      try {
-        await prisma.messageLog.create({
-          data: {
-            userId,
-            guildId: message.guildId || undefined,
-            channelId: message.channelId,
-            threadId: message.channelId,
-            msgId: `${message.id}:reply`,
-            role: 'assistant',
-            content:
-              typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]',
-          },
-        });
-      } catch (err) {
-        logger.error('[CoreIntelSvc] Failed to log assistant reply:', {
-          messageId: message.id,
-          error: err,
-        });
+      // Log assistant reply (skip in local DB-less mode)
+      if (!isLocalDBDisabled()) {
+        try {
+          await prisma.messageLog.create({
+            data: {
+              userId,
+              guildId: message.guildId || undefined,
+              channelId: message.channelId,
+              threadId: message.channelId,
+              msgId: `${message.id}:reply`,
+              role: 'assistant',
+              content:
+                typeof responseOptions.content === 'string' ? responseOptions.content : '[embed]',
+            },
+          });
+        } catch (err) {
+          logger.error('[CoreIntelSvc] Failed to log assistant reply:', {
+            messageId: message.id,
+            error: err,
+          });
+        }
       }
     } catch (error) {
       logger.error('[CoreIntelSvc] Failed to handle message:', { messageId: message.id, error });
@@ -1923,7 +1964,7 @@ export class CoreIntelligenceService {
 
     // Enhanced Observability - Start conversation trace
     let conversationTrace: any = null;
-  if (this.enhancedLangfuseService) {
+    if (this.enhancedLangfuseService) {
       try {
         const conversationId = `${userId}-${channelId}-${Date.now()}`;
         const traceId = await this.enhancedLangfuseService.startConversationTrace({
@@ -1945,8 +1986,10 @@ export class CoreIntelligenceService {
       }
     }
 
-  const isSlashCtx = (obj: any): obj is ChatInputCommandInteraction => !!obj && typeof (obj as any).commandName === 'string';
-  const isMsgCtx = (obj: any): obj is Message => !!obj && typeof (obj as any).content === 'string' && !!(obj as any).author;
+    const isSlashCtx = (obj: any): obj is ChatInputCommandInteraction =>
+      !!obj && typeof (obj as any).commandName === 'string';
+    const isMsgCtx = (obj: any): obj is Message =>
+      !!obj && typeof (obj as any).content === 'string' && !!(obj as any).author;
     const analyticsData = {
       guildId: guildId || undefined,
       userId,
@@ -2007,7 +2050,7 @@ export class CoreIntelligenceService {
         });
 
         // Track autonomous system usage in Langfuse if available
-  if (conversationTrace && this.enhancedLangfuseService) {
+        if (conversationTrace && this.enhancedLangfuseService) {
           await this.enhancedLangfuseService.trackGeneration({
             traceId: conversationTrace.id,
             name: 'autonomous_capability_system',
@@ -2114,7 +2157,7 @@ export class CoreIntelligenceService {
     const lightweight = mode === 'quick-reply';
     const deep = mode === 'deep-reason';
 
-  // Enhanced Semantic Caching - Check for cached response
+    // Enhanced Semantic Caching - Check for cached response
     if (this.enhancedSemanticCacheService && !lightweight) {
       const cacheOperationId = performanceMonitor.startOperation(
         'enhanced_semantic_cache_service',
@@ -2186,7 +2229,7 @@ export class CoreIntelligenceService {
       }
     }
 
-  // If message is too long, gracefully defer and ask for confirmation to proceed heavy
+    // If message is too long, gracefully defer and ask for confirmation to proceed heavy
     if (mode === 'defer') {
       this.recordAnalyticsInteraction({
         ...analyticsData,
@@ -2272,14 +2315,17 @@ export class CoreIntelligenceService {
             prompt: promptText,
             attachments: commonAttachments.map((a) => ({
               // PipelineRequest requires a string name; ensure a fallback
-              name: (a.name ?? new URL(a.url).pathname.split('/').pop() ?? 'attachment'),
+              name: a.name ?? new URL(a.url).pathname.split('/').pop() ?? 'attachment',
               url: a.url,
               contentType: a.contentType || undefined,
             })),
             history,
           });
 
-          if (pipelineResult && (pipelineResult.status === 'complete' || pipelineResult.status === 'partial')) {
+          if (
+            pipelineResult &&
+            (pipelineResult.status === 'complete' || pipelineResult.status === 'partial')
+          ) {
             // Track in Langfuse if enabled
             if (conversationTrace && this.enhancedLangfuseService) {
               await this.enhancedLangfuseService.trackGeneration({
@@ -2290,7 +2336,11 @@ export class CoreIntelligenceService {
                 model: 'unified_pipeline',
                 startTime: new Date(startTime),
                 endTime: new Date(),
-                usage: { input: promptText.length, output: (pipelineResult.content || '').length, total: (pipelineResult.content || '').length + promptText.length },
+                usage: {
+                  input: promptText.length,
+                  output: (pipelineResult.content || '').length,
+                  total: (pipelineResult.content || '').length + promptText.length,
+                },
                 metadata: {
                   operation: op,
                   usedCapabilities: pipelineResult.usedCapabilities,
@@ -3017,7 +3067,7 @@ export class CoreIntelligenceService {
       const finalComponents =
         this.config.enableEnhancedUI &&
         this.enhancedUiService &&
-  !(isSlashCtx(uiContext) && this.activeStreams.has(`${userId}-${channelId}`))
+        !(isSlashCtx(uiContext) && this.activeStreams.has(`${userId}-${channelId}`))
           ? [this.enhancedUiService.createResponseActionRow()]
           : [];
 
@@ -3253,7 +3303,8 @@ export class CoreIntelligenceService {
     userId: string,
     commonAttachments: CommonAttachment[],
   ): Message {
-    const looksLikeMessage = (obj: any): obj is Message => !!obj && typeof obj.content === 'string' && !!obj.author;
+    const looksLikeMessage = (obj: any): obj is Message =>
+      !!obj && typeof obj.content === 'string' && !!obj.author;
     if (looksLikeMessage(uiContext as any)) return uiContext as Message;
     const interaction = uiContext as any;
     return {
@@ -3261,8 +3312,8 @@ export class CoreIntelligenceService {
       content: promptText,
       author: { id: userId, bot: false, toString: () => `<@${userId}>` } as any,
       channelId: interaction.channelId,
-  guildId: interaction.guildId ?? null,
-  client: interaction.client || ({} as any),
+      guildId: interaction.guildId ?? null,
+      client: interaction.client || ({} as any),
       attachments: new Collection(
         commonAttachments.map((att, i) => {
           const attachmentData = {
@@ -3279,8 +3330,18 @@ export class CoreIntelligenceService {
           return [attachmentData.id, attachmentData as Attachment];
         }),
       ),
-  channel: interaction.channel || ({ id: interaction.channelId, isTextBased: () => true, isThread: () => false, send: async () => ({}), sendTyping: async () => {}, awaitMessages: async () => new Collection(), threads: { create: async () => ({ id: 'thread_mock', send: async () => ({}) }) } } as any),
-  createdTimestamp: interaction.createdTimestamp || Date.now(),
+      channel:
+        interaction.channel ||
+        ({
+          id: interaction.channelId,
+          isTextBased: () => true,
+          isThread: () => false,
+          send: async () => ({}),
+          sendTyping: async () => {},
+          awaitMessages: async () => new Collection(),
+          threads: { create: async () => ({ id: 'thread_mock', send: async () => ({}) }) },
+        } as any),
+      createdTimestamp: interaction.createdTimestamp || Date.now(),
       editedTimestamp: null,
       toString: () => promptText,
       fetchReference: async () => {
@@ -3790,35 +3851,37 @@ export class CoreIntelligenceService {
       // Check if query complexity warrants multi-step decision process
       const queryComplexity = unifiedAnalysis.complexity;
       const tokenEstimate = this._estimateTokens(groundedQuery);
-      const isComplexQuery = mode === 'deep-reason' && 
-                            (queryComplexity === 'advanced' || tokenEstimate > 4000) &&
-                            (groundedQuery.includes('analyze') || 
-                             groundedQuery.includes('compare') ||
-                             groundedQuery.includes('explain how') ||
-                             groundedQuery.includes('what are the implications') ||
-                             groundedQuery.includes('step by step'));
+      const isComplexQuery =
+        mode === 'deep-reason' &&
+        (queryComplexity === 'advanced' || tokenEstimate > 4000) &&
+        (groundedQuery.includes('analyze') ||
+          groundedQuery.includes('compare') ||
+          groundedQuery.includes('explain how') ||
+          groundedQuery.includes('what are the implications') ||
+          groundedQuery.includes('step by step'));
 
       if (isComplexQuery) {
         logger.info('[CoreIntelSvc] D3: Triggering multi-step decision process', {
           complexity: queryComplexity,
           tokenEstimate,
-          strategy: mode
+          strategy: mode,
         });
 
         try {
-          const isMsgCtx = (obj: any): obj is Message => !!obj && typeof (obj as any).content === 'string' && !!(obj as any).author;
+          const isMsgCtx = (obj: any): obj is Message =>
+            !!obj && typeof (obj as any).content === 'string' && !!(obj as any).author;
           const decisionContext = {
             optedIn: true,
-            isDM: isMsgCtx(uiContext) ? !((uiContext as any).guildId) : false,
+            isDM: isMsgCtx(uiContext) ? !(uiContext as any).guildId : false,
             isPersonalThread: false,
             mentionedBot: false,
             repliedToBot: false,
-            personality: personalityContext
+            personality: personalityContext,
           };
 
           const multiStepResult = await this.multiStepDecisionService.executeMultiStepDecision(
             decisionContext,
-            'complex_reasoning'
+            'complex_reasoning',
           );
 
           if (multiStepResult.success && multiStepResult.finalConfidence > 0.7) {
@@ -3826,36 +3889,44 @@ export class CoreIntelligenceService {
               workflowId: multiStepResult.workflowId,
               finalConfidence: multiStepResult.finalConfidence,
               executionTime: multiStepResult.executionTime,
-              stepsCompleted: multiStepResult.completedSteps
+              stepsCompleted: multiStepResult.completedSteps,
             });
 
             // Use multi-step result for response generation
             const agenticResponse = {
-              response: multiStepResult.finalResult?.synthesis || 
-                       multiStepResult.finalResult?.reasoning || 
-                       'Multi-step analysis completed',
+              response:
+                multiStepResult.finalResult?.synthesis ||
+                multiStepResult.finalResult?.reasoning ||
+                'Multi-step analysis completed',
               reasoning: multiStepResult.decisionReasoning.join('\n'),
               confidence: multiStepResult.finalConfidence,
               multiStepEnabled: true,
-              workflowSummary: `Completed ${multiStepResult.completedSteps}/${multiStepResult.totalSteps} steps in ${multiStepResult.executionTime}ms`
+              workflowSummary: `Completed ${multiStepResult.completedSteps}/${multiStepResult.totalSteps} steps in ${multiStepResult.executionTime}ms`,
             };
 
             return {
               agenticResponse,
-              fullResponseText: typeof agenticResponse.response === 'string' 
-                ? agenticResponse.response 
-                : JSON.stringify(agenticResponse.response)
+              fullResponseText:
+                typeof agenticResponse.response === 'string'
+                  ? agenticResponse.response
+                  : JSON.stringify(agenticResponse.response),
             };
           } else {
-            logger.warn('[CoreIntelSvc] D3: Multi-step decision failed, falling back to standard processing', {
-              success: multiStepResult.success,
-              finalConfidence: multiStepResult.finalConfidence
-            });
+            logger.warn(
+              '[CoreIntelSvc] D3: Multi-step decision failed, falling back to standard processing',
+              {
+                success: multiStepResult.success,
+                finalConfidence: multiStepResult.finalConfidence,
+              },
+            );
           }
         } catch (error) {
-          logger.error('[CoreIntelSvc] D3: Multi-step decision error, falling back to standard processing', {
-            error: error instanceof Error ? error.message : 'Unknown error'
-          });
+          logger.error(
+            '[CoreIntelSvc] D3: Multi-step decision error, falling back to standard processing',
+            {
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+          );
         }
       }
 
@@ -4306,7 +4377,7 @@ export class CoreIntelligenceService {
         cachedPrompt.prompt,
         userId,
         cachedPrompt.channelId,
-  interaction.guildId ?? null,
+        interaction.guildId ?? null,
         cachedPrompt.attachments,
         mockInteraction,
       );

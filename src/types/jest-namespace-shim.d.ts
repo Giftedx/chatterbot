@@ -11,4 +11,8 @@ declare namespace jest {
   type SpyInstance<T = any> = any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   type MockedClass<T = any> = any;
+  // Provide a minimal alias for jest.MockedFunction used in some tests
+  // This maps a function type T to a jest.Mock with the same parameters and return type.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  type MockedFunction<T extends (...args: any[]) => any> = Mock<ReturnType<T>, Parameters<T>>;
 }

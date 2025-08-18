@@ -5,8 +5,9 @@
 
 import http from 'http';
 import { logger } from '../utils/logger.js';
+import { isLocalDBDisabled, getEnvAsBoolean } from '../utils/env.js';
 
-let server: http.Server | null = null;
+const server: http.Server | null = null;
 let metricsInterval: NodeJS.Timeout | null = null;
 let dashboardInstance: AnalyticsDashboard | null = null;
 
@@ -21,7 +22,7 @@ const DEFAULT_CONFIG: DashboardConfig = {
   port: 3001,
   host: '0.0.0.0',
   enableCors: true,
-  allowedOrigins: ['http://localhost:3000', 'http://localhost:3001']
+  allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'],
 };
 
 /**
@@ -39,19 +40,56 @@ export class AnalyticsDashboard {
    * Start the analytics dashboard server
    */
   start(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.server = http.createServer(this.handleRequest.bind(this));
-      
-      this.server.listen(this.config.port, this.config.host, () => {
-        logger.info(`Analytics Dashboard API running on http://${this.config.host}:${this.config.port}`);
-        resolve();
-      });
+    // Try to bind to configured port; if in use, optionally fall back to next available port(s)
+    const allowPortFallback = getEnvAsBoolean('ANALYTICS_DASHBOARD_PORT_FALLBACK', true);
+    const maxAttempts = 10; // try up to +10 ports
 
-      this.server.on('error', (error) => {
-        logger.error('Analytics Dashboard server error:', error);
-        reject(error);
+    const attemptListen = (port: number, attemptsLeft: number): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        this.server = http.createServer(this.handleRequest.bind(this));
+
+        const onListening = () => {
+          logger.info(`Analytics Dashboard API running on http://${this.config.host}:${port}`);
+          // Update config.port to the actual bound port (in case of fallback)
+          this.config.port = (this.server!.address() as any)?.port ?? port;
+          resolve();
+        };
+
+        const onError = (error: any) => {
+          // If the port is in use and fallback is allowed, try the next port
+          if (
+            allowPortFallback &&
+            (error?.code === 'EADDRINUSE' || /EADDRINUSE/.test(String(error))) &&
+            attemptsLeft > 0
+          ) {
+            logger.warn(`Port ${port} in use for Analytics Dashboard. Trying ${port + 1}...`);
+            try {
+              this.server?.removeListener('listening', onListening);
+              this.server?.removeListener('error', onError);
+              this.server?.close?.();
+            } catch {}
+            // Try next port
+            attemptListen(port + 1, attemptsLeft - 1)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+          logger.error('Analytics Dashboard server error:', error);
+          reject(error);
+        };
+
+        this.server.on('listening', onListening);
+        this.server.on('error', onError);
+
+        try {
+          this.server.listen(port, this.config.host);
+        } catch (err) {
+          onError(err);
+        }
       });
-    });
+    };
+
+    return attemptListen(this.config.port, maxAttempts);
   }
 
   /**
@@ -103,7 +141,6 @@ export class AnalyticsDashboard {
       } else {
         this.sendError(res, 405, 'Method Not Allowed');
       }
-
     } catch (error) {
       logger.error('Request handling error:', error);
       this.sendError(res, 500, 'Internal Server Error');
@@ -129,7 +166,9 @@ export class AnalyticsDashboard {
 
       case '/api/verification-metrics': {
         try {
-          const { getVerificationMetrics } = await import('./verification/answer-verification.service.js');
+          const { getVerificationMetrics } = await import(
+            './verification/answer-verification.service.js'
+          );
           const m = getVerificationMetrics();
           this.sendJson(res, m);
         } catch (e) {
@@ -163,13 +202,20 @@ export class AnalyticsDashboard {
 
       case '/api/telemetry/db': {
         try {
+          // In local DB-less mode, return an empty dataset instead of touching Prisma
+          if (isLocalDBDisabled()) {
+            const limit = Math.max(1, Math.min(200, parseInt(params.get('limit') || '50', 10)));
+            const offset = Math.max(0, parseInt(params.get('offset') || '0', 10));
+            this.sendJson(res, { items: [], limit, offset, disabled: true });
+            break;
+          }
           const { prisma } = await import('../db/prisma.js');
           const limit = Math.max(1, Math.min(200, parseInt(params.get('limit') || '50', 10)));
           const offset = Math.max(0, parseInt(params.get('offset') || '0', 10));
           const items = await prisma.modelSelection.findMany({
             orderBy: { timestamp: 'desc' },
             take: limit,
-            skip: offset
+            skip: offset,
           });
           this.sendJson(res, { items, limit, offset });
         } catch (e) {
@@ -226,24 +272,38 @@ export function startAnalyticsDashboardIfEnabled(): void {
   if (!dashboardInstance) {
     const port = parseInt(process.env.ANALYTICS_DASHBOARD_PORT || '3001', 10);
     dashboardInstance = new AnalyticsDashboard({ port });
-    dashboardInstance.start().then(() => {
-      logger.info(`Analytics dashboard listening on :${port}`);
-    }).catch((err) => {
-      logger.error('Failed to start analytics dashboard', err as Error);
-    });
+    dashboardInstance
+      .start()
+      .then(() => {
+        try {
+          // Log the actual bound port (after any fallback adjustments)
+          const boundPort = (dashboardInstance as any)?.['config']?.port ?? port;
+          logger.info(`Analytics dashboard listening on :${boundPort}`);
+        } catch {
+          logger.info(`Analytics dashboard listening on :${port}`);
+        }
+      })
+      .catch((err) => {
+        logger.error('Failed to start analytics dashboard', err as Error);
+      });
   }
 
   // Start periodic verification metrics logging every 15 minutes
   if (!metricsInterval) {
-    metricsInterval = setInterval(async () => {
-      try {
-        const { getVerificationMetrics } = await import('./verification/answer-verification.service.js');
-        const m = getVerificationMetrics();
-        logger.info('[VerificationMetrics] Snapshot', m as any);
-      } catch (e) {
-        logger.warn('Failed to emit verification metrics', { error: String(e) });
-      }
-    }, 15 * 60 * 1000);
+    metricsInterval = setInterval(
+      async () => {
+        try {
+          const { getVerificationMetrics } = await import(
+            './verification/answer-verification.service.js'
+          );
+          const m = getVerificationMetrics();
+          logger.info('[VerificationMetrics] Snapshot', m as any);
+        } catch (e) {
+          logger.warn('Failed to emit verification metrics', { error: String(e) });
+        }
+      },
+      15 * 60 * 1000,
+    );
   }
 }
 
@@ -253,8 +313,11 @@ export function stopAnalyticsDashboard(): void {
     metricsInterval = null;
   }
   if (dashboardInstance) {
-    dashboardInstance.stop().catch(() => {}).finally(() => {
-      dashboardInstance = null;
-    });
+    dashboardInstance
+      .stop()
+      .catch(() => {})
+      .finally(() => {
+        dashboardInstance = null;
+      });
   }
 }

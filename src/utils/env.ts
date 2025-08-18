@@ -60,3 +60,20 @@ export function isEnvSet(key: string): boolean {
   const value = process.env[key];
   return value !== undefined && value !== '';
 }
+
+/**
+ * Convenience: Is local database (Prisma) disabled?
+ * Controlled via DISABLE_PRISMA_DB=true to allow DB-less local runs.
+ */
+export function isLocalDBDisabled(): boolean {
+  return getEnvAsBoolean('DISABLE_PRISMA_DB', false);
+}
+
+/**
+ * Convenience: Is analytics logging disabled?
+ * Defaults to disabled when local DB is disabled, or when DISABLE_ANALYTICS=true.
+ */
+export function isAnalyticsDisabled(): boolean {
+  if (getEnvAsBoolean('DISABLE_ANALYTICS', false)) return true;
+  return isLocalDBDisabled();
+}

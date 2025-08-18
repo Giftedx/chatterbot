@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Unified Analytics Service
- * 
+ *
  * Consolidates AnalyticsService and AnalyticsDashboard functionality
  * following the refactoring guide principles and merge intervals pattern.
- * 
+ *
  * Replaces:
  * - AnalyticsService (src/services/analytics.ts)
  * - AnalyticsDashboard (src/services/analytics-dashboard.ts)
@@ -13,6 +13,7 @@
 import { createServer } from 'http';
 import { URL } from 'url';
 import { prisma } from '../../db/prisma.js';
+import { isAnalyticsDisabled } from '../../utils/env.js';
 
 // Consolidated interfaces
 export interface InteractionLog {
@@ -80,7 +81,7 @@ export class UnifiedAnalyticsService {
       enableDashboard: true,
       enableRealTimeMetrics: true,
       retentionDays: 90,
-      ...options
+      ...options,
     };
 
     this.dashboardConfig = {
@@ -88,17 +89,22 @@ export class UnifiedAnalyticsService {
       host: '0.0.0.0',
       enableCors: true,
       allowedOrigins: ['http://localhost:3000', 'http://localhost:3001'],
-      ...options.dashboardConfig
+      ...options.dashboardConfig,
     };
   }
 
   // Backward-compatibility shim for tests expecting logMessage
-  async logMessage(params: { guildId?: string | null; userId: string; command: string; isSuccess: boolean }): Promise<void> {
+  async logMessage(params: {
+    guildId?: string | null;
+    userId: string;
+    command: string;
+    isSuccess: boolean;
+  }): Promise<void> {
     return this.logInteraction({
       guildId: params.guildId ?? null,
       userId: params.userId,
       command: params.command,
-      isSuccess: params.isSuccess
+      isSuccess: params.isSuccess,
     });
   }
 
@@ -106,20 +112,29 @@ export class UnifiedAnalyticsService {
    * Log interaction event (core analytics functionality)
    */
   async logInteraction({ guildId, userId, command, isSuccess }: InteractionLog): Promise<void> {
+    if (isAnalyticsDisabled()) {
+      // Soft-disable in local runs without DB
+      return;
+    }
     try {
-      await prisma.analyticsEvent.create({ 
-        data: { 
-          guildId: guildId ?? undefined, 
-          userId, 
-          command, 
+      await prisma.analyticsEvent.create({
+        data: {
+          guildId: guildId ?? undefined,
+          userId,
+          command,
           isSuccess,
-          timestamp: new Date()
-        } 
+          timestamp: new Date(),
+        },
       });
 
       // Invalidate relevant caches
-      this.invalidateMetricsCache(['detailed-stats', 'usage-metrics-today', 'usage-metrics-week', 'usage-metrics-month', 'usage-metrics-all']);
-      
+      this.invalidateMetricsCache([
+        'detailed-stats',
+        'usage-metrics-today',
+        'usage-metrics-week',
+        'usage-metrics-month',
+        'usage-metrics-all',
+      ]);
     } catch (error) {
       console.error('Failed to log interaction:', error);
     }
@@ -129,12 +144,29 @@ export class UnifiedAnalyticsService {
    * Get comprehensive statistics
    */
   async getDetailedStats(): Promise<DetailedStats> {
+    if (isAnalyticsDisabled()) {
+      // Return empty/default stats when analytics disabled
+      return {
+        total: 0,
+        commandsToday: 0,
+        commandsThisWeek: 0,
+        commandsThisMonth: 0,
+        perUser: {},
+        perGuild: {},
+        perCommand: {},
+        successRate: 0,
+        topUsers: [],
+        topGuilds: [],
+        hourlyDistribution: Array.from({ length: 24 }, (_, i) => ({ hour: i, count: 0 })),
+        dailyTrend: [],
+      };
+    }
     const cached = this.getCachedMetrics('detailed-stats');
     if (cached) return cached;
 
     try {
       const events = await prisma.analyticsEvent.findMany({
-        orderBy: { timestamp: 'desc' }
+        orderBy: { timestamp: 'desc' },
       });
 
       const now = new Date();
@@ -147,7 +179,7 @@ export class UnifiedAnalyticsService {
       const commandsToday = events.filter((e: any) => e.timestamp >= today).length;
       const commandsThisWeek = events.filter((e: any) => e.timestamp >= thisWeek).length;
       const commandsThisMonth = events.filter((e: any) => e.timestamp >= thisMonth).length;
-      
+
       const successfulEvents = events.filter((e: any) => e.isSuccess);
       const successRate = total > 0 ? (successfulEvents.length / total) * 100 : 0;
 
@@ -160,15 +192,15 @@ export class UnifiedAnalyticsService {
       events.forEach((event: any) => {
         // User stats
         perUser[event.userId] = (perUser[event.userId] || 0) + 1;
-        
+
         // Guild stats
         if (event.guildId) {
           perGuild[event.guildId] = (perGuild[event.guildId] || 0) + 1;
         }
-        
+
         // Command stats
         perCommand[event.command] = (perCommand[event.command] || 0) + 1;
-        
+
         // Hourly distribution
         const hour = event.timestamp.getHours();
         hourlyDistribution[hour].count++;
@@ -200,12 +232,11 @@ export class UnifiedAnalyticsService {
         topUsers,
         topGuilds,
         hourlyDistribution,
-        dailyTrend
+        dailyTrend,
       };
 
       this.setCachedMetrics('detailed-stats', stats);
       return stats;
-
     } catch (error) {
       console.error('Failed to get detailed stats:', error);
       throw error;
@@ -215,7 +246,23 @@ export class UnifiedAnalyticsService {
   /**
    * Get usage metrics for specific time range
    */
-  async getUsageMetrics(timeRange: 'today' | 'week' | 'month' | 'all' = 'week'): Promise<UsageMetrics> {
+  async getUsageMetrics(
+    timeRange: 'today' | 'week' | 'month' | 'all' = 'week',
+  ): Promise<UsageMetrics> {
+    if (isAnalyticsDisabled()) {
+      return {
+        timeRange,
+        totalCommands: 0,
+        successfulCommands: 0,
+        failedCommands: 0,
+        uniqueUsers: 0,
+        uniqueGuilds: 0,
+        averageCommandsPerUser: 0,
+        mostActiveHour: 0,
+        mostActiveDay: '',
+        commandBreakdown: {},
+      };
+    }
     const cacheKey = `usage-metrics-${timeRange}`;
     const cached = this.getCachedMetrics(cacheKey);
     if (cached) return cached;
@@ -224,33 +271,34 @@ export class UnifiedAnalyticsService {
       const timeFilter = this.getTimeFilter(timeRange);
       const events = await prisma.analyticsEvent.findMany({
         where: timeFilter ? { timestamp: { gte: timeFilter } } : {},
-        orderBy: { timestamp: 'desc' }
+        orderBy: { timestamp: 'desc' },
       });
 
       const totalCommands = events.length;
       const successfulCommands = events.filter((e: any) => e.isSuccess).length;
       const failedCommands = totalCommands - successfulCommands;
-      
+
       const uniqueUsers = new Set(events.map((e: any) => e.userId)).size;
       const uniqueGuilds = new Set(events.map((e: any) => e.guildId).filter(Boolean)).size;
-      
+
       const averageCommandsPerUser = uniqueUsers > 0 ? totalCommands / uniqueUsers : 0;
-      
+
       // Find most active hour and day
       const hourCounts = new Array(24).fill(0);
       const dayCounts: Record<string, number> = {};
-      
+
       events.forEach((event: any) => {
         const hour = event.timestamp.getHours();
         hourCounts[hour]++;
-        
+
         const day = event.timestamp.toDateString();
         dayCounts[day] = (dayCounts[day] || 0) + 1;
       });
-      
+
       const mostActiveHour = hourCounts.indexOf(Math.max(...hourCounts));
-      const mostActiveDay = Object.entries(dayCounts)
-        .sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0] || '';
+      const mostActiveDay =
+        Object.entries(dayCounts).sort(([, a], [, b]) => (b as number) - (a as number))[0]?.[0] ||
+        '';
 
       // Command breakdown
       const commandBreakdown: Record<string, number> = {};
@@ -268,12 +316,11 @@ export class UnifiedAnalyticsService {
         averageCommandsPerUser,
         mostActiveHour,
         mostActiveDay,
-        commandBreakdown
+        commandBreakdown,
       };
 
       this.setCachedMetrics(cacheKey, metrics);
       return metrics;
-
     } catch (error) {
       console.error('Failed to get usage metrics:', error);
       throw error;
@@ -291,9 +338,11 @@ export class UnifiedAnalyticsService {
 
     return new Promise((resolve, reject) => {
       this.server = createServer(this.handleDashboardRequest.bind(this));
-      
+
       this.server.listen(this.dashboardConfig.port, this.dashboardConfig.host, () => {
-        console.log(`📊 Unified Analytics Dashboard running on http://${this.dashboardConfig.host}:${this.dashboardConfig.port}`);
+        console.log(
+          `📊 Unified Analytics Dashboard running on http://${this.dashboardConfig.host}:${this.dashboardConfig.port}`,
+        );
         resolve();
       });
 
@@ -382,6 +431,7 @@ export class UnifiedAnalyticsService {
    */
   async cleanupOldData(): Promise<void> {
     if (!this.options.retentionDays) return;
+    if (isAnalyticsDisabled()) return;
 
     try {
       const cutoffDate = new Date();
@@ -389,8 +439,8 @@ export class UnifiedAnalyticsService {
 
       const deleted = await prisma.analyticsEvent.deleteMany({
         where: {
-          timestamp: { lt: cutoffDate }
-        }
+          timestamp: { lt: cutoffDate },
+        },
       });
 
       console.log(`🧹 Cleaned up ${deleted.count} old analytics events`);
@@ -416,7 +466,7 @@ export class UnifiedAnalyticsService {
 
   private calculateDailyTrend(events: any[], days: number): Array<{ date: string; count: number }> {
     const dailyCounts: Record<string, number> = {};
-    
+
     events.forEach((event: any) => {
       const date = event.timestamp.toDateString();
       dailyCounts[date] = (dailyCounts[date] || 0) + 1;
@@ -424,7 +474,7 @@ export class UnifiedAnalyticsService {
 
     const trend = [];
     const now = new Date();
-    
+
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
@@ -448,7 +498,7 @@ export class UnifiedAnalyticsService {
   }
 
   private invalidateMetricsCache(keys: string[]): void {
-    keys.forEach(key => this.metricsCache.delete(key));
+    keys.forEach((key) => this.metricsCache.delete(key));
   }
 }
 
