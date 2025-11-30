@@ -11,16 +11,25 @@ import {
   CapabilityState,
 } from './autonomous-capability-registry.js';
 
+/**
+ * Context data required to evaluate feature activation rules.
+ */
 export interface ActivationContext {
+  /** The content of the user's message. */
   messageContent: string;
+  /** Inferred user intents (e.g., 'question', 'command'). */
   userIntent: string[];
+  /** Recent conversation turns. */
   conversationHistory: string[];
+  /** List of currently active capabilities. */
   currentCapabilities: string[];
+  /** Constraints on system resources and latency. */
   performanceConstraints: {
     maxLatency?: number;
     maxMemory?: string;
     maxCpu?: string;
   };
+  /** Requirements for the quality of the response. */
   qualityRequirements: {
     accuracy: 'low' | 'medium' | 'high';
     freshness: 'any' | 'recent' | 'current';
@@ -28,42 +37,84 @@ export interface ActivationContext {
   };
 }
 
+/**
+ * Result of an evaluation for a specific capability.
+ */
 export interface ActivationDecision {
+  /** The ID of the capability being evaluated. */
   capabilityId: string;
+  /** The recommended action: enable, disable, or no change. */
   action: 'activate' | 'deactivate' | 'maintain';
-  confidence: number; // 0-1
+  /** Confidence score (0-1) in this decision. */
+  confidence: number;
+  /** Explanation for the decision. */
   reasoning: string;
-  expectedBenefit: number; // 0-1
-  estimatedCost: number; // 0-1
-  priority: number; // 0-1
+  /** Estimated benefit score (0-1). */
+  expectedBenefit: number;
+  /** Estimated resource cost score (0-1). */
+  estimatedCost: number;
+  /** Priority level of this decision (0-1). */
+  priority: number;
+  /** Optional list of alternative capability IDs if this one fails. */
   fallbacks?: string[];
 }
 
+/**
+ * Definition of a rule governing feature activation.
+ */
 export interface ActivationPolicy {
+  /** Unique identifier for the policy. */
   id: string;
+  /** Human-readable name. */
   name: string;
+  /** Description of the policy's intent. */
   description: string;
+  /** Processing priority (higher runs first). */
   priority: number;
+  /** Conditions that must be met for this policy to apply. */
   conditions: PolicyCondition[];
+  /** Actions to take when conditions are met. */
   actions: PolicyAction[];
+  /** Whether the policy is currently active. */
   enabled: boolean;
 }
 
+/**
+ * A single condition within an activation policy.
+ */
 export interface PolicyCondition {
+  /** The type of check to perform. */
   type: 'context_match' | 'capability_health' | 'performance_threshold' | 'custom';
+  /** The comparison operator. */
   operator: 'equals' | 'contains' | 'greater_than' | 'less_than' | 'exists';
+  /** The field in the context or state to evaluate. */
   field: string;
+  /** The value to compare against. */
   value: any;
+  /** Importance weight of this condition. */
   weight?: number;
 }
 
+/**
+ * An action prescribed by an activation policy.
+ */
 export interface PolicyAction {
+  /** The type of action to enforce. */
   type: 'activate' | 'deactivate' | 'prefer' | 'avoid';
+  /** The target capability ID(s). */
   target: string | string[];
+  /** Optional condition trigger (e.g., only on failure). */
   condition?: 'success' | 'failure' | 'timeout';
+  /** Additional parameters for the action. */
   parameters?: Record<string, any>;
 }
 
+/**
+ * Engine responsible for dynamically activating and deactivating system capabilities.
+ *
+ * It evaluates the current context against a set of policies to optimize for
+ * performance, quality, and resource usage.
+ */
 export class AutonomousActivationEngine {
   private policies: Map<string, ActivationPolicy> = new Map();
   private activationHistory: ActivationDecision[] = [];

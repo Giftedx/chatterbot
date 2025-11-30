@@ -9,13 +9,21 @@ interface ModelCard {
   model: string;
 }
 
+/**
+ * Configuration options for the model router.
+ */
 export interface ModelRouterOptions {
+  /** The default provider to use if no specific model is selected or healthy. */
   defaultProvider?: ProviderName;
 }
 
 /**
- * Lightweight compatibility implementation to satisfy tests depending on legacy ModelRouterService.
- * Focuses on provider selection, health-aware fallback, retry, and basic streaming fallback.
+ * Service responsible for selecting the optimal AI model provider based on availability and health.
+ *
+ * Capabilities:
+ * - Health-aware routing: Avoids providers with high error rates.
+ * - Automatic failover: Retries with alternative providers if the primary fails.
+ * - Token budget management: Truncates context to fit model window limits.
  */
 export class ModelRouterService {
   private defaultProvider: ProviderName;
@@ -35,7 +43,11 @@ export class ModelRouterService {
     this.defaultProvider = opts.defaultProvider || 'gemini';
   }
 
-  /** Select a model card honoring DISALLOW_PROVIDERS and basic health signals. */
+  /**
+   * Selects the best available model card based on configuration and health metrics.
+   *
+   * @returns The selected ModelCard.
+   */
   private selectPreferredCard(): ModelCard {
     const disallowed = this.getDisallowedProviders();
 
@@ -75,7 +87,15 @@ export class ModelRouterService {
     return successRate * 0.8 + latencyComponent * 0.2;
   }
 
-  /** Core generation with metadata about selected provider/model. */
+  /**
+   * Generates a text response while returning metadata about the provider used.
+   * Handles failover logic automatically.
+   *
+   * @param prompt - The user prompt.
+   * @param _attachments - Optional attachments (currently unused in routing logic).
+   * @param _systemPrompt - Optional system instruction.
+   * @returns Object containing the generated text, provider name, and model ID.
+   */
   async generateWithMeta(
     prompt: string,
     _attachments: any[] = [],
@@ -132,13 +152,26 @@ export class ModelRouterService {
     return { text: 'default-response', provider: this.defaultProvider, model: 'default' };
   }
 
+  /**
+   * Convenience method to generate text response only.
+   *
+   * @param prompt - The user prompt.
+   * @param attachments - Optional attachments.
+   * @param systemPrompt - Optional system instruction.
+   * @returns The generated text.
+   */
   async generate(prompt: string, attachments: any[] = [], systemPrompt?: string): Promise<string> {
   const meta = await this.generateWithMeta(prompt, attachments, systemPrompt);
     return meta.text;
   }
 
   /**
-   * Streaming: if provider cannot stream or not implemented, fallback to non-streamed text via generateWithMeta.
+   * Attempts to stream the response. Falls back to non-streamed generation if the provider lacks support.
+   *
+   * @param prompt - The user prompt.
+   * @param attachments - Optional attachments.
+   * @param systemPrompt - Optional system instruction.
+   * @returns An async generator yielding chunks of text.
    */
   async stream(prompt: string, attachments: any[] = [], systemPrompt?: string): Promise<AsyncGenerator<string>> {
     const meta = await this.generateWithMeta(prompt, attachments, systemPrompt);

@@ -1,16 +1,29 @@
 import { performance } from 'perf_hooks';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Represents a single discrete measurement of a service operation.
+ */
 export interface PerformanceMetric {
+  /** Identifier of the service performing the operation. */
   serviceId: string;
+  /** Name of the operation being measured. */
   operationName: string;
+  /** Duration of the operation in milliseconds. */
   executionTimeMs: number;
+  /** When the operation finished. */
   timestamp: Date;
+  /** Whether the operation completed successfully. */
   success: boolean;
+  /** Error details if failed. */
   errorMessage?: string;
+  /** Additional contextual data. */
   metadata?: Record<string, any>;
 }
 
+/**
+ * Aggregated performance statistics for a specific service.
+ */
 export interface ServicePerformanceStats {
   serviceId: string;
   totalOperations: number;
@@ -19,7 +32,9 @@ export interface ServicePerformanceStats {
   averageExecutionTime: number;
   minExecutionTime: number;
   maxExecutionTime: number;
+  /** 95th percentile execution time (approximate). */
   p95ExecutionTime: number;
+  /** Ratio of failed to total operations (0-1). */
   errorRate: number;
   lastOperationTime?: Date;
   // internal incremental fields (non-exported usage ok)
@@ -28,6 +43,9 @@ export interface ServicePerformanceStats {
   _p95LastUpdateOps?: number; // last op count when p95 was computed
 }
 
+/**
+ * A snapshot of the system's performance health.
+ */
 export interface PerformanceDashboard {
   overallStats: {
     totalOperations: number;
@@ -40,6 +58,9 @@ export interface PerformanceDashboard {
   alerts: PerformanceAlert[];
 }
 
+/**
+ * An actionable notification about a performance degradation or failure.
+ */
 export interface PerformanceAlert {
   id: string;
   serviceId: string;
@@ -50,6 +71,15 @@ export interface PerformanceAlert {
   resolved: boolean;
 }
 
+/**
+ * Centralized service for tracking application performance, latency, and reliability.
+ *
+ * Features:
+ * - Real-time metric collection.
+ * - Aggregated statistics per service.
+ * - Automated alerting based on configurable thresholds.
+ * - In-memory storage with periodic cleanup.
+ */
 export class PerformanceMonitoringService {
   private metrics: PerformanceMetric[] = [];
   private serviceStats: Map<string, ServicePerformanceStats> = new Map();
@@ -77,7 +107,12 @@ export class PerformanceMonitoringService {
     }
   }
 
-  /** Enable or disable monitoring at runtime */
+  /**
+   * Dynamically toggles the monitoring service on or off.
+   * Controls background intervals for cleanup and alerting.
+   *
+   * @param enabled - True to enable, false to disable.
+   */
   public setEnabled(enabled: boolean): void {
     if (this.isEnabled === enabled) return;
     this.isEnabled = enabled;
@@ -99,11 +134,17 @@ export class PerformanceMonitoringService {
     }
   }
 
-  /** Convenience to read current env and toggle accordingly */
+  /**
+   * Refreshes the enabled state based on the current `ENABLE_PERFORMANCE_MONITORING` environment variable.
+   */
   public setEnabledFromEnv(): void {
     this.setEnabled(process.env.ENABLE_PERFORMANCE_MONITORING === 'true');
   }
 
+  /**
+   * Returns the current active state of the monitoring service.
+   * @returns True if enabled.
+   */
   public isMonitoringEnabled(): boolean {
     return this.isEnabled;
   }
@@ -123,7 +164,11 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Start timing a service operation
+   * Marks the beginning of an operation to be timed.
+   *
+   * @param serviceId - Unique identifier for the service.
+   * @param operationName - Name of the operation starting.
+   * @returns An operation ID to pass to `endOperation`.
    */
   startOperation(serviceId: string, operationName: string): string {
     // Honor immediate disabled semantics based on current ENV at call time
@@ -141,7 +186,14 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * End timing a service operation and record metrics
+   * Marks the end of an operation, calculates duration, and records the metric.
+   *
+   * @param operationId - The ID returned by `startOperation`.
+   * @param serviceId - The service identifier.
+   * @param operationName - The operation name.
+   * @param success - Whether the operation succeeded.
+   * @param errorMessage - Optional error message if failed.
+   * @param metadata - Optional extra data.
    */
   endOperation(
     operationId: string,
@@ -190,7 +242,9 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Record a performance metric
+   * Internal method to persist a metric and update aggregates.
+   *
+   * @param metric - The collected performance data.
    */
   private recordMetric(metric: PerformanceMetric): void {
     // Add to metrics history
@@ -217,7 +271,9 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Update service performance statistics
+   * Recalculates running statistics (avg, min, max, p95) for a service.
+   *
+   * @param metric - The new metric to incorporate.
    */
   private updateServiceStats(metric: PerformanceMetric): void {
     const serviceId = metric.serviceId;
@@ -288,14 +344,19 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Get performance statistics for a specific service
+   * Retrieves aggregated statistics for a specific service.
+   *
+   * @param serviceId - The service ID to look up.
+   * @returns The statistics object or undefined if not found.
    */
   getServiceStats(serviceId: string): ServicePerformanceStats | undefined {
     return this.serviceStats.get(serviceId);
   }
 
   /**
-   * Get overall performance dashboard
+   * Compiles a complete view of system performance including summaries, recent metrics, and alerts.
+   *
+   * @returns The performance dashboard object.
    */
   getDashboard(): PerformanceDashboard {
     const allMetrics = this.metrics;
@@ -327,7 +388,7 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Check for performance alerts
+   * Evaluates current statistics against configured thresholds to generate alerts.
    */
   private checkPerformanceAlerts(): void {
     for (const [serviceId, stats] of this.serviceStats) {
@@ -371,7 +432,12 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Create a performance alert
+   * Generates a new alert if a similar one is not already active.
+   *
+   * @param serviceId - The service triggering the alert.
+   * @param alertType - The type/category of the issue.
+   * @param severity - How critical the issue is.
+   * @param message - Descriptive message.
    */
   private createAlert(
     serviceId: string,
@@ -412,7 +478,10 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Resolve a performance alert
+   * Marks an alert as resolved.
+   *
+   * @param alertId - The ID of the alert to resolve.
+   * @returns True if the alert was found and updated.
    */
   resolveAlert(alertId: string): boolean {
     const alert = this.alerts.find(a => a.id === alertId);
@@ -425,7 +494,7 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Clean up old metrics and alerts
+   * Removes metrics and alerts older than the configured retention period to manage memory.
    */
   private cleanupOldMetrics(): void {
     // Keep metrics from last 24 hours
@@ -443,7 +512,12 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Get performance metrics for a time range
+   * Retrieves raw metrics filtered by service and time window.
+   *
+   * @param serviceId - Optional service filter.
+   * @param startTime - Optional start time.
+   * @param endTime - Optional end time.
+   * @returns Array of matching metrics.
    */
   getMetricsForTimeRange(
     serviceId?: string,
@@ -468,7 +542,9 @@ export class PerformanceMonitoringService {
   }
 
   /**
-   * Export performance data for analysis
+   * Exports a snapshot of all performance data for external analysis or persistence.
+   *
+   * @returns Object containing all metrics, stats, and alerts.
    */
   exportPerformanceData(): {
     metrics: PerformanceMetric[];

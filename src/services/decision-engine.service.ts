@@ -1,27 +1,52 @@
 import type { Message } from 'discord.js';
 
+/**
+ * Defines the strategy for response generation.
+ * - `quick-reply`: Lightweight, fast response (minimal reasoning).
+ * - `deep-reason`: Comprehensive processing (likely multi-step or chain-of-thought).
+ * - `defer`: Acknowledge and defer processing (for long/complex requests).
+ * - `ignore`: Do not respond.
+ */
 export type ResponseStrategy = 'quick-reply' | 'deep-reason' | 'defer' | 'ignore';
 
+/**
+ * Contextual information required by the Decision Engine to evaluate a message.
+ */
 export interface DecisionContext {
+  /** Whether the user has explicitly opted in to bot interactions. */
   optedIn: boolean;
+  /** Whether the message was sent in a Direct Message channel. */
   isDM: boolean;
+  /** Whether the message is in a dedicated bot thread. */
   isPersonalThread: boolean;
+  /** Whether the bot was explicitly mentioned in the message. */
   mentionedBot: boolean;
+  /** Whether the message is a reply to one of the bot's messages. */
   repliedToBot: boolean;
+  /** Timestamp (ms) of the last response sent by the bot to this user. */
   lastBotReplyAt?: number;
+  /** Count of recent consecutive messages from this user. */
   recentUserBurstCount?: number;
+  /** Count of recent messages in the channel (ambient noise level). */
   channelRecentBurstCount?: number;
-  // C1: Enhanced personality-aware context
+  /**
+   * Enhanced personality and relationship context for smarter decisions.
+   */
   personality?: {
     userInteractionPattern?: UserInteractionPattern;
     activePersona?: ConversationPersona;
-    relationshipStrength?: number; // 0-1 based on interaction history
+    /** 0-1 score indicating relationship strength based on history. */
+    relationshipStrength?: number;
+    /** Detected user mood. */
     userMood?: 'neutral' | 'frustrated' | 'excited' | 'serious' | 'playful';
-    personalityCompatibility?: number; // 0-1 how well user/bot personalities align
+    /** 0-1 score indicating alignment between user and bot personality. */
+    personalityCompatibility?: number;
   };
 }
 
-// C1: Import personality types for decision context
+/**
+ * Represents observed patterns in user interaction behavior.
+ */
 export interface UserInteractionPattern {
   userId: string;
   guildId?: string;
@@ -52,7 +77,9 @@ export interface UserInteractionPattern {
   }>;
 }
 
-// C1: Simplified ConversationPersona for decision context (extracted from ultra-intelligence)
+/**
+ * Defines the personality traits and communication style of a bot persona.
+ */
 export interface ConversationPersona {
   id: string;
   name: string;
@@ -77,31 +104,52 @@ export interface ConversationPersona {
   };
 }
 
+/**
+ * The outcome of the decision process.
+ */
 export interface DecisionResult {
+  /** Whether the bot should proceed with a response. */
   shouldRespond: boolean;
+  /** Human-readable reason(s) for the decision. */
   reason: string;
+  /** 0-1 confidence score in the decision to respond. */
   confidence: number;
+  /** Estimated token cost of the incoming message. */
   tokenEstimate: number;
+  /** The selected strategy for generating the response. */
   strategy: ResponseStrategy;
 }
 
+/**
+ * Configuration options for initializing the Decision Engine.
+ */
 export interface DecisionEngineOptions {
+  /** Minimum time (ms) between responses to the same user. */
   cooldownMs?: number;
+  /** Maximum number of mentions allowed before ignoring (anti-spam). */
   maxMentionsAllowed?: number;
+  /** Reference token limit for the default model to guide strategy. */
   defaultModelTokenLimit?: number;
-  ambientThreshold?: number; // minimum score to respond in ambient channels
-  shortMessageMinLen?: number; // min characters considered not "too short"
-  burstCountThreshold?: number; // number of recent messages to trigger burst penalty
+  /** Minimum heuristic score required to respond in ambient (non-direct) contexts. */
+  ambientThreshold?: number;
+  /** Minimum character length to consider a message for ambient response. */
+  shortMessageMinLen?: number;
+  /** Number of consecutive messages that trigger burst penalties. */
+  burstCountThreshold?: number;
   /** Optional custom token estimator; when provided, overrides internal heuristic */
   tokenEstimator?: (message: Message) => number;
 }
 
 /**
- * Token-aware, self-directed decision engine to decide if the bot should respond.
- * - Prioritizes mentions and direct replies to the bot
- * - Handles DMs and personal threads
- * - Applies heuristics for questions, code, and urgency
- * - Applies exceptions for spammy/overly busy messages
+ * The Decision Engine determines *if* and *how* the bot should respond to a message.
+ *
+ * It employs a scoring system based on:
+ * - Direct engagement signals (mentions, DMs).
+ * - Message content heuristics (questions, code blocks, urgency).
+ * - Contextual factors (burstiness, channel activity).
+ * - Personality and relationship dynamics (mood, history).
+ *
+ * It also acts as a gatekeeper for rate limits and spam protection.
  */
 export class DecisionEngine {
   private readonly cooldownMs: number;
@@ -112,6 +160,10 @@ export class DecisionEngine {
   private readonly burstCountThreshold: number;
   private readonly customTokenEstimator?: (message: Message) => number;
 
+  /**
+   * Creates a new DecisionEngine.
+   * @param opts - Configuration options.
+   */
   constructor(opts: DecisionEngineOptions = {}) {
     this.cooldownMs = opts.cooldownMs ?? 8000;
     this.maxMentionsAllowed = opts.maxMentionsAllowed ?? 6;
@@ -122,6 +174,13 @@ export class DecisionEngine {
     this.customTokenEstimator = opts.tokenEstimator;
   }
 
+  /**
+   * Analyzes a message and context to determine the response decision.
+   *
+   * @param message - The Discord message to analyze.
+   * @param ctx - The decision context (user state, personality data).
+   * @returns The decision result including strategy and reasoning.
+   */
   analyze(message: Message, ctx: DecisionContext): DecisionResult {
     // If not opted-in, never respond
     if (!ctx.optedIn) {

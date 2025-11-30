@@ -9,12 +9,21 @@ import { features } from '../config/feature-flags.js';
 import { getEnvAsBoolean } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Metrics representing token consumption for an LLM request.
+ */
 interface TokenUsage {
+  /** Tokens in the prompt. */
   input?: number;
+  /** Tokens in the completion. */
   output?: number;
+  /** Combined total tokens. */
   total?: number;
 }
 
+/**
+ * Internal tracking object for an active trace session.
+ */
 interface EnhancedTrace {
   id: string;
   sessionId: string;
@@ -24,6 +33,9 @@ interface EnhancedTrace {
   endTime?: Date;
 }
 
+/**
+ * Performance data for a specific model interaction.
+ */
 interface ModelPerformanceMetrics {
   modelName: string;
   tokenUsage: TokenUsage;
@@ -32,6 +44,9 @@ interface ModelPerformanceMetrics {
   quality?: number;
 }
 
+/**
+ * Summary statistics for a completed conversation trace.
+ */
 interface ConversationTrace {
   conversationId: string;
   messageCount: number;
@@ -40,6 +55,15 @@ interface ConversationTrace {
   qualityScore?: number;
 }
 
+/**
+ * Service for deep observability integration via Langfuse.
+ *
+ * Capabilities:
+ * - Distributed tracing of conversation flows.
+ * - Detailed generation tracking (tokens, latency, model usage).
+ * - Component-level spanning (Decision Engine, MCP tools).
+ * - Quality scoring and feedback collection.
+ */
 export class EnhancedLangfuseService {
   private client: any | null = null;
   private isEnabled: boolean;
@@ -79,7 +103,14 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Start comprehensive conversation tracing
+   * Begins a new distributed trace for a user conversation.
+   *
+   * @param params - Trace initialization parameters.
+   * @param params.conversationId - Unique conversation identifier.
+   * @param params.userId - The user involved.
+   * @param params.sessionId - Session context (e.g., Guild ID or DM).
+   * @param params.metadata - Additional context tags.
+   * @returns The trace ID if successful, null otherwise.
    */
   async startConversationTrace(params: {
     conversationId: string;
@@ -120,7 +151,19 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Track AI model generation with enhanced metrics
+   * Records a specific LLM generation event within a trace.
+   *
+   * @param params - Generation details.
+   * @param params.traceId - Parent trace ID.
+   * @param params.name - Descriptive name of the generation step.
+   * @param params.model - Model identifier used.
+   * @param params.input - The prompt or input sent to the model.
+   * @param params.output - The completion or output received.
+   * @param params.usage - Token usage stats.
+   * @param params.startTime - When the request started.
+   * @param params.endTime - When the request completed.
+   * @param params.metadata - Extra context.
+   * @returns The generation span object.
    */
   async trackGeneration(params: {
     traceId: string;
@@ -171,7 +214,14 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Track decision engine operations
+   * Creates a span for internal decision engine logic.
+   *
+   * @param params - Span details.
+   * @param params.traceId - Parent trace ID.
+   * @param params.operation - Name of the decision logic.
+   * @param params.input - Input context.
+   * @param params.output - Decision result.
+   * @returns The created span.
    */
   async trackDecisionEngine(params: {
     traceId: string;
@@ -203,7 +253,15 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Track MCP tool usage
+   * Records the execution of an external tool via MCP.
+   *
+   * @param params - Tool execution details.
+   * @param params.traceId - Parent trace ID.
+   * @param params.toolName - Name of the tool invoked.
+   * @param params.input - Arguments passed to the tool.
+   * @param params.output - Result returned by the tool.
+   * @param params.error - Error message if failed.
+   * @returns The created span.
    */
   async trackMCPTool(params: {
     traceId: string;
@@ -247,7 +305,10 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * End conversation trace with comprehensive metrics
+   * Finalizes a conversation trace, calculating duration and attaching final metadata.
+   *
+   * @param traceId - The ID of the trace to complete.
+   * @param finalMetadata - Any final data to append.
    */
   async endConversationTrace(traceId: string, finalMetadata?: Record<string, any>): Promise<void> {
     if (!this.isEnabled || !this.client) return;
@@ -278,7 +339,7 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Track model performance for analytics
+   * Internal helper to log aggregated performance metrics for a model call.
    */
   private async trackModelPerformance(params: {
     modelName: string;
@@ -309,7 +370,10 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Generate comprehensive conversation analytics
+   * Retrieves aggregated analytics for conversations matching criteria.
+   *
+   * @param params - Filter criteria.
+   * @returns List of conversation summaries.
    */
   async getConversationAnalytics(params: {
     userId?: string;
@@ -330,7 +394,9 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Score conversation quality
+   * Adds a quality score or user feedback to a trace.
+   *
+   * @param params - Score details including type and value.
    */
   async scoreConversation(params: {
     traceId: string;
@@ -353,7 +419,7 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Flush all pending traces
+   * Forces immediate export of all buffered traces.
    */
   async flush(): Promise<void> {
     if (!this.isEnabled || !this.client) return;
@@ -366,7 +432,8 @@ export class EnhancedLangfuseService {
   }
 
   /**
-   * Get service health status
+   * Checks the operational status of the observability service.
+   * @returns Health status object.
    */
   getHealthStatus(): {
     enabled: boolean;

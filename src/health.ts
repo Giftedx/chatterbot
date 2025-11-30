@@ -11,34 +11,56 @@ let totalRequests = 0;
 let healthRequests = 0;
 let metricsRequests = 0;
 
+/**
+ * Detailed report of the system's operational status.
+ */
 interface HealthStatus {
+  /** Overall system health identifier. */
   status: 'healthy' | 'unhealthy';
+  /** ISO timestamp of the check. */
   timestamp: string;
+  /** Process uptime in seconds. */
   uptime: number;
+  /** Memory usage statistics (in MB). */
   memory: {
     used: number;
     total: number;
     percentage: number;
   };
+  /** Deployment environment name (e.g., 'production'). */
   environment: string;
+  /** Current application version. */
   version: string;
+  /** Status of critical dependencies. */
   features: {
     discord: boolean;
     gemini: boolean;
     database: boolean;
     moderation: boolean;
   };
+  /** Deep-dive metrics for AI providers. */
   providers?: {
     health: ReturnType<typeof providerHealthStore.snapshot>;
     recent: ReturnType<typeof modelTelemetryStore.snapshot>;
   };
 }
 
+/**
+ * Lightweight HTTP server for health checking and metrics exposure.
+ *
+ * Endpoints:
+ * - `GET /health`: Returns a JSON status report.
+ * - `GET /metrics`: Returns Prometheus-formatted metrics.
+ */
 export class HealthCheck {
   private server: HttpServer;
   private port: number;
   private isStarted: boolean = false;
 
+  /**
+   * Creates a new health check server.
+   * @param port - The port to listen on (default: env.HEALTH_CHECK_PORT or 3000).
+   */
   constructor(port = Number(process.env.HEALTH_CHECK_PORT ?? 3000)) {
     this.port = port;
     this.server = createServer(this.handleRequest.bind(this));
@@ -124,6 +146,10 @@ export class HealthCheck {
     };
   }
 
+  /**
+   * Starts the HTTP server.
+   * Automatically attempts to bind to the next available port if the configured one is in use.
+   */
   start(): void {
     if (this.isStarted) {
       logger.warn('Health check server already started');
@@ -146,6 +172,9 @@ export class HealthCheck {
     });
   }
 
+  /**
+   * Stops the HTTP server.
+   */
   stop(): void {
     if (this.server && this.isStarted) {
       this.server.close();

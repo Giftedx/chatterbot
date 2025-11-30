@@ -79,6 +79,10 @@ if (enablePersonalization) {
 }
 coreIntelConfig.mcpManager = mcpManagerInstance;
 
+/**
+ * Singleton instance of the CoreIntelligenceService.
+ * This is the central hub for all AI processing logic.
+ */
 const coreIntelligenceService = new CoreIntelligenceService(coreIntelConfig);
 
 // Build command list from core service (e.g., /chat) and serialize for REST
@@ -91,6 +95,10 @@ const allCommands: any[] = (() => {
   }
 })();
 
+/**
+ * Event listener for when the bot is ready.
+ * Handles initialization of orchestration, schedulers, and enhanced intelligence features.
+ */
 client.once('ready', async () => {
   console.log(
     `✅ Logged in as ${client.user ? (client.user as any).tag || client.user.id : 'unknown'}`,

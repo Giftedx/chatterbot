@@ -136,14 +136,24 @@ interface CommonAttachment {
   contentType?: string | null;
 }
 
+/**
+ * Configuration options for the CoreIntelligenceService.
+ */
 export interface CoreIntelligenceConfig {
+  /** Enables agentic features like MCP orchestration. */
   enableAgenticFeatures?: boolean;
+  /** Enables user-specific personalization. */
   enablePersonalization?: boolean;
+  /** Enables long-term memory capabilities. */
   enableEnhancedMemory?: boolean;
+  /** Enables rich UI elements (buttons, embeds). */
   enableEnhancedUI?: boolean;
+  /** Enables semantic response caching. */
   enableResponseCache?: boolean;
+  /** Enables advanced capabilities like image generation. */
   enableAdvancedCapabilities?: boolean;
-  // Additional optional flags (accepted for compatibility with integration tests)
+
+  // Additional optional flags
   enableCrossChannelContext?: boolean;
   enableDynamicPrompts?: boolean;
   enableContextualMemory?: boolean;
@@ -153,7 +163,9 @@ export interface CoreIntelligenceConfig {
   responseTimeoutMs?: number;
   maxConcurrentRequests?: number;
   enableVerboseLogging?: boolean;
+  /** Optional pre-initialized MCP Manager instance. */
   mcpManager?: MCPManager;
+
   // Optional dependency injection for testing
   dependencies?: {
     mcpOrchestrator?: UnifiedMCPOrchestratorService;
@@ -161,13 +173,22 @@ export interface CoreIntelligenceConfig {
     messageAnalysisService?: typeof unifiedMessageAnalysisService;
     geminiService?: GeminiService;
     advancedCapabilitiesManager?: AdvancedCapabilitiesManager;
-    // For tests: allow injecting DB-backed guild overrides fetcher
     fetchGuildDecisionOverrides?: (
       guildId: string,
     ) => Promise<Partial<DecisionEngineOptions> | null>;
   };
 }
 
+/**
+ * The core brain of the Chatterbot system.
+ *
+ * Orchestrates the entire lifecycle of an interaction:
+ * - Handling Discord interactions (Slash commands, Buttons).
+ * - Processing free-form messages.
+ * - Managing the Decision Engine (rate limits, strategy selection).
+ * - Coordinating enhanced intelligence services (Memory, Personalization, MCP).
+ * - Routing to the appropriate AI model or pipeline.
+ */
 export class CoreIntelligenceService {
   // Allow dynamic property access in tests (e.g., jest.spyOn getter) without strict type inference issues
   [key: string]: any;
@@ -264,6 +285,12 @@ export class CoreIntelligenceService {
     return this._enhancedLangfuseService;
   }
 
+  /**
+   * Creates a new instance of CoreIntelligenceService.
+   * Initializes all sub-services, loads configurations, and sets up periodic tasks.
+   *
+   * @param config - The configuration object.
+   */
   constructor(config: CoreIntelligenceConfig) {
     this.config = config;
     // this.agenticIntelligence = AgenticIntelligenceService.getInstance();
@@ -405,6 +432,13 @@ export class CoreIntelligenceService {
   // Keys: rate_limit_${userId} => { requests: number, tokens: number, windowStart: number (minute) }
   // Metrics: rate_limit_metrics_${userId} => { completions: Array<{ confidence:number, success:boolean, responseTime:number, timestamp:number }>} (capped 100)
 
+  /**
+   * Calculates a rate limit multiplier based on the confidence of the operation.
+   * Higher confidence allows for more frequent requests.
+   *
+   * @param confidence - Confidence score (0.0 to 1.0).
+   * @returns Multiplier factor.
+   */
   public calculateConfidenceMultiplier(confidence: number): number {
     const c = Math.max(0, Math.min(1, confidence));
     if (c >= 0.9) return 2.0; // Very high
@@ -433,18 +467,36 @@ export class CoreIntelligenceService {
     return (global as any)[key];
   }
 
+  /**
+   * Resets the usage window for a specific user.
+   *
+   * @param userId - The ID of the user.
+   * @param minute - Optional specific minute timestamp to set.
+   */
   public async resetUserUsageWindow(userId: string, minute?: number): Promise<void> {
     const key = `rate_limit_${userId}`;
     const m = typeof minute === 'number' ? minute : this.getMinuteNow();
     (global as any)[key] = { requests: 0, tokens: 0, windowStart: m };
   }
 
+  /**
+   * Increments the usage counters for a user.
+   *
+   * @param userId - The ID of the user.
+   * @param tokens - The number of tokens consumed.
+   */
   public async updateUserUsage(userId: string, tokens: number): Promise<void> {
     const usage = this.ensureUsageWindow(userId);
     usage.requests += 1;
     usage.tokens += Math.max(0, Math.floor(tokens || 0));
   }
 
+  /**
+   * Retrieves the current usage statistics for a user.
+   *
+   * @param userId - The ID of the user.
+   * @returns An object containing requests, tokens, and window start time, or null if no data exists.
+   */
   public async getCurrentUserUsage(
     userId: string,
   ): Promise<{ windowStart: number; requests: number; tokens: number } | null> {
@@ -455,6 +507,15 @@ export class CoreIntelligenceService {
       : null;
   }
 
+  /**
+   * Checks if a user is within their dynamic rate limits, adjusted by confidence.
+   *
+   * @param userId - The ID of the user.
+   * @param confidence - The confidence score of the current operation.
+   * @param tokenEstimate - Estimated token cost of the operation.
+   * @param _opts - Optional extra parameters (unused).
+   * @returns Object indicating if allowed, and if not, the reason and retry time.
+   */
   public async checkConfidenceAwareRateLimit(
     userId: string,
     confidence: number,
@@ -510,6 +571,14 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Records the result of a request to update usage metrics.
+   *
+   * @param userId - The ID of the user.
+   * @param confidence - The confidence score associated with the request.
+   * @param success - Whether the request was successful.
+   * @param responseTime - The time taken to process the request.
+   */
   public async recordRequestCompletion(
     userId: string,
     confidence: number,
@@ -553,6 +622,16 @@ export class CoreIntelligenceService {
   /**
    * Public entrypoint used by integration tests and higher-level orchestrators to run
    * the core processing pipeline outside Discord event handlers.
+   *
+   * @param message - The Discord message object (or a mock).
+   * @param prompt - The text prompt to process.
+   * @param userId - The ID of the user.
+   * @param channelId - The ID of the channel.
+   * @param guildId - The ID of the guild (can be null).
+   * @param attachments - Array of attachments to include.
+   * @param uiContext - Context for UI interactions (slash commands, etc.).
+   * @param strategy - Optional strategy override (e.g., 'quick-reply', 'deep-reason').
+   * @returns The generated response content or structure.
    */
   public async processMessage(
     message: Message,
@@ -598,7 +677,8 @@ export class CoreIntelligenceService {
   }
 
   /**
-   * Initialize AI Enhancement Services with feature flag controls
+   * Initialize AI Enhancement Services based on feature flags.
+   * Loads services like Vector DB, Knowledge Graph, and Multimodal processing if enabled.
    */
   private initializeAIEnhancementServices(): void {
     try {
@@ -676,7 +756,10 @@ export class CoreIntelligenceService {
   }
 
   /**
-   * Enhanced token estimation using multi-provider tokenization service
+   * Estimates tokens for a message using the multi-provider tokenization service if available.
+   *
+   * @param message - The Discord message to analyze.
+   * @returns The estimated token count.
    */
   private async getEnhancedTokenEstimate(message: Message): Promise<number> {
     if (this.multiProviderTokenizationService) {
@@ -706,7 +789,11 @@ export class CoreIntelligenceService {
   }
 
   /**
-   * Synchronous wrapper for enhanced token estimation with caching
+   * Synchronous wrapper for enhanced token estimation with caching.
+   * Used where async calls are not feasible (e.g., synchronous decision logic).
+   *
+   * @param message - The Discord message.
+   * @returns The estimated token count.
    */
   private getEnhancedTokenEstimateSync(message: Message): number {
     // For synchronous calls (decision engine), use cached or fallback
@@ -716,6 +803,13 @@ export class CoreIntelligenceService {
     return providerAwareTokenEstimate(message);
   }
 
+  /**
+   * Retrieves or initializes the DecisionEngine for a specific guild.
+   * Handles loading of per-guild overrides from DB/Env.
+   *
+   * @param guildId - The ID of the guild.
+   * @returns The configured DecisionEngine instance.
+   */
   private getDecisionEngineForGuild(guildId?: string): DecisionEngine {
     if (!guildId) return this.decisionEngine;
     const existing = this.decisionEngineByGuild.get(guildId);
@@ -764,6 +858,13 @@ export class CoreIntelligenceService {
     return this.decisionEngine;
   }
 
+  /**
+   * Merges environment and database overrides to create the effective decision engine options.
+   *
+   * @param envOverrides - Overrides from environment variables.
+   * @param dbOverrides - Overrides from the database.
+   * @returns The combined options object.
+   */
   private buildEffectiveOptions(
     envOverrides: Partial<DecisionEngineOptions>,
     dbOverrides: Partial<DecisionEngineOptions> | null,
@@ -796,6 +897,9 @@ export class CoreIntelligenceService {
     };
   }
 
+  /**
+   * Reloads decision engine configurations for all known guilds to apply latest overrides.
+   */
   private async refreshGuildDecisionEngines(): Promise<void> {
     // Gather guild IDs we know about from env JSON or from prior engine creations
     const ids = new Set<string>();
@@ -830,7 +934,9 @@ export class CoreIntelligenceService {
   }
 
   /**
-   * Analytics wrapper to match expected interface
+   * Logs an interaction to the analytics service.
+   *
+   * @param data - The interaction data to log.
    */
   private recordAnalyticsInteraction(data: any): void {
     // Use the unified analytics service
@@ -857,6 +963,11 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Constructs the list of slash commands to register with Discord.
+   *
+   * @returns Array of SlashCommandBuilders.
+   */
   public buildCommands(): SlashCommandBuilder[] {
     const commands: SlashCommandBuilder[] = [];
     const chatCommand = new SlashCommandBuilder()
@@ -866,6 +977,12 @@ export class CoreIntelligenceService {
     return commands;
   }
 
+  /**
+   * Handles incoming Discord interactions (slash commands, buttons, modals).
+   * Routes to the appropriate handler or orchestrator.
+   *
+   * @param interaction - The raw Discord interaction object.
+   */
   public async handleInteraction(interaction: Interaction): Promise<void> {
     try {
       // In test mode, some mocks may not implement isChatInputCommand but include options.
@@ -960,6 +1077,11 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Internal handler for slash commands (specifically `/chat`).
+   *
+   * @param interaction - The chat input command interaction.
+   */
   private async handleSlashCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     if (interaction.commandName === 'chat') {
       // In tests, many unified-architecture specs expect defer/editReply flow.
@@ -999,6 +1121,11 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Processes the `/chat` command to handle user opt-in and thread/DM creation.
+   *
+   * @param interaction - The command interaction.
+   */
   private async processChatCommand(interaction: ChatInputCommandInteraction): Promise<void> {
     const userId = interaction.user.id;
     const username = interaction.user.username;
@@ -1128,6 +1255,13 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Evaluates whether the bot should respond to a given message based on
+   * context, user consent, and ambient activity scores.
+   *
+   * @param message - The message object.
+   * @returns An object containing the decision result and reasoning.
+   */
   private async shouldRespond(message: Message): Promise<{
     yes: boolean;
     reason: string;
@@ -1525,6 +1659,14 @@ export class CoreIntelligenceService {
     return { intent: 'NONE' };
   }
 
+  /**
+   * Executes logic for control intents (pause, resume, export, etc.).
+   *
+   * @param intent - The classified intent type.
+   * @param payload - Payload data associated with the intent.
+   * @param message - The original Discord message.
+   * @returns True if handled, false otherwise.
+   */
   private async handleControlIntent(
     intent:
       | 'PAUSE'
@@ -1789,6 +1931,12 @@ export class CoreIntelligenceService {
     }
   }
 
+  /**
+   * Main entry point for processing standard Discord messages.
+   * Handles filtering, decision making, pipeline execution, and error handling.
+   *
+   * @param message - The received Discord message.
+   */
   public async handleMessage(message: Message): Promise<void> {
     // Unified pipeline for free-form messages
     try {

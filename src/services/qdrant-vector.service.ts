@@ -8,46 +8,93 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 import { features } from '../config/feature-flags.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Represents a document to be stored in the vector database.
+ */
 export interface QdrantDocument {
+  /** Unique identifier for the document (UUID or integer). */
   id: string | number;
+  /** The embedding vector. */
   vector: number[];
+  /** Arbitrary payload data associated with the vector. */
   payload: Record<string, any>;
+  /** Optional additional metadata. */
   metadata?: Record<string, any>;
 }
 
+/**
+ * Options for vector similarity search.
+ */
 export interface QdrantSearchOptions {
+  /** Maximum number of results to return. */
   limit?: number;
+  /** Number of results to skip (for pagination). */
   offset?: number;
+  /** Qdrant filter object for pre-filtering. */
   filter?: Record<string, any>;
+  /** Whether to include the payload in results. */
   withPayload?: boolean;
+  /** Whether to include the vector in results. */
   withVector?: boolean;
+  /** Minimum similarity score to include a result. */
   scoreThreshold?: number;
 }
 
+/**
+ * Metadata about a Qdrant collection.
+ */
 export interface QdrantCollection {
+  /** Name of the collection. */
   name: string;
+  /** Dimension of the vectors in this collection. */
   vectorSize: number;
+  /** Distance metric used for similarity. */
   distance: 'Cosine' | 'Euclid' | 'Dot' | 'Manhattan';
+  /** Optional description. */
   description?: string;
+  /** Arbitrary collection metadata. */
   metadata?: Record<string, any>;
 }
 
+/**
+ * Result returned from a vector search.
+ */
 export interface QdrantSearchResult {
+  /** ID of the matching document. */
   id: string | number;
+  /** Similarity score. */
   score: number;
+  /** Payload data of the document. */
   payload: Record<string, any>;
+  /** The document vector (if requested). */
   vector?: number[];
 }
 
+/**
+ * Operational statistics for a collection.
+ */
 export interface QdrantCollectionStats {
   name: string;
+  /** Total number of vectors stored. */
   vectorsCount: number;
+  /** Number of storage segments. */
   segments: number;
+  /** Disk usage in bytes. */
   diskUsage: number;
+  /** RAM usage in bytes. */
   ramUsage: number;
+  /** Operational status (e.g., 'green', 'yellow'). */
   status: string;
 }
 
+/**
+ * Service for interacting with Qdrant Vector Database.
+ *
+ * Provides an abstraction layer for:
+ * - Collection management (create, delete, optimize).
+ * - Vector operations (upsert, delete).
+ * - Advanced search (similarity, hybrid filtering).
+ */
 export class QdrantVectorService {
   private client: QdrantClient | null = null;
   private isEnabled: boolean;
@@ -114,7 +161,10 @@ export class QdrantVectorService {
   }
 
   /**
-   * Create a new collection with specified configuration
+   * Create a new collection with specified configuration.
+   *
+   * @param params - Configuration including name, vector size, and optimization settings.
+   * @returns True if successful, false otherwise.
    */
   async createCollection(params: {
     name: string;
@@ -164,7 +214,10 @@ export class QdrantVectorService {
   }
 
   /**
-   * Delete a collection
+   * Deletes an entire collection and all its data.
+   *
+   * @param collectionName - The name of the collection to delete.
+   * @returns True if successful, false otherwise.
    */
   async deleteCollection(collectionName: string): Promise<boolean> {
     if (!this.client || !this.isConnected) {
@@ -186,7 +239,11 @@ export class QdrantVectorService {
   }
 
   /**
-   * Insert or update documents in a collection
+   * Inserts or updates documents in a collection.
+   *
+   * @param collectionName - The target collection.
+   * @param documents - Array of documents to upsert.
+   * @returns True if successful, false otherwise.
    */
   async upsertDocuments(collectionName: string, documents: QdrantDocument[]): Promise<boolean> {
     if (!this.client || !this.isConnected) {
@@ -226,7 +283,12 @@ export class QdrantVectorService {
   }
 
   /**
-   * Search for similar vectors in a collection
+   * Performs a k-nearest neighbor search for similar vectors.
+   *
+   * @param collectionName - The collection to search in.
+   * @param queryVector - The vector to compare against.
+   * @param options - Search options (limit, filter, score threshold).
+   * @returns Array of matches sorted by similarity score.
    */
   async searchSimilar(
     collectionName: string, 
@@ -270,7 +332,10 @@ export class QdrantVectorService {
   }
 
   /**
-   * Advanced search with hybrid filtering
+   * Performs an advanced hybrid search combining vector similarity with text and metadata filtering.
+   *
+   * @param params - Search parameters including query vector, optional text query, and complex filters.
+   * @returns Array of matches.
    */
   async hybridSearch(params: {
     collectionName: string;
@@ -345,7 +410,10 @@ export class QdrantVectorService {
   }
 
   /**
-   * Get collection statistics and health metrics
+   * Retrieves detailed statistics and health metrics for a collection.
+   *
+   * @param collectionName - The name of the collection.
+   * @returns Statistics object or null if failed.
    */
   async getCollectionStats(collectionName: string): Promise<QdrantCollectionStats | null> {
     if (!this.client || !this.isConnected) {
@@ -373,7 +441,12 @@ export class QdrantVectorService {
   }
 
   /**
-   * Create optimized indices for better search performance
+   * Creates an optimized index for a specific payload field to improve filtering performance.
+   *
+   * @param collectionName - The collection name.
+   * @param fieldName - The path of the field to index.
+   * @param fieldType - The type of data in the field.
+   * @returns True if successful.
    */
   async createPayloadIndex(collectionName: string, fieldName: string, fieldType: 'keyword' | 'integer' | 'float' | 'bool'): Promise<boolean> {
     if (!this.client || !this.isConnected) {
@@ -397,7 +470,11 @@ export class QdrantVectorService {
   }
 
   /**
-   * Batch delete documents by IDs or filter
+   * Deletes specific documents from a collection by ID or filter criteria.
+   *
+   * @param collectionName - The collection name.
+   * @param filter - Criteria for deletion (list of IDs or a filter object).
+   * @returns True if successful.
    */
   async deleteDocuments(
     collectionName: string,
@@ -431,21 +508,25 @@ export class QdrantVectorService {
   }
 
   /**
-   * Get all available collections
+   * Retrieves all known collections from the local cache.
+   * @returns Map of collection names to collection metadata.
    */
   getCollections(): Map<string, QdrantCollection> {
     return new Map(this.collections);
   }
 
   /**
-   * Check if a collection exists
+   * Checks if a specific collection exists in the local cache.
+   * @param collectionName - The name to check.
+   * @returns True if it exists.
    */
   hasCollection(collectionName: string): boolean {
     return this.collections.has(collectionName);
   }
 
   /**
-   * Reconnect to Qdrant if connection is lost
+   * Attempts to re-establish connection to the Qdrant server.
+   * @returns True if reconnected successfully.
    */
   async reconnect(): Promise<boolean> {
     if (!this.isEnabled) return false;
@@ -460,7 +541,10 @@ export class QdrantVectorService {
   }
 
   /**
-   * Perform collection maintenance operations
+   * Triggers optimization (compaction) processes on a collection.
+   *
+   * @param collectionName - The name of the collection.
+   * @returns True if request accepted.
    */
   async optimizeCollection(collectionName: string): Promise<boolean> {
     if (!this.client || !this.isConnected) {
@@ -481,7 +565,8 @@ export class QdrantVectorService {
   }
 
   /**
-   * Get service health status
+   * Returns the current operational status of the service.
+   * @returns Object containing enabled state, connection status, and client readiness.
    */
   getHealthStatus(): {
     enabled: boolean;
