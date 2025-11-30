@@ -11,37 +11,64 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+/**
+ * Options for a standard crawl operation.
+ */
 export interface Crawl4AIOptions {
+  /** The target URL to crawl. */
   url: string;
+  /** Whether to extract media (images, video, audio). */
   extractMedia?: boolean;
+  /** Whether to extract internal and external links. */
   extractLinks?: boolean;
+  /** Whether to extract textual content. */
   extractText?: boolean;
+  /** CSS selector to limit extraction scope. */
   cssSelector?: string;
+  /** Minimum word count to consider content valid. */
   wordCountThreshold?: number;
+  /** HTML tags to exclude from extraction. */
   excludeTags?: string[];
+  /** If true, returns only text content without HTML. */
   onlyText?: boolean;
+  /** Whether to remove noisy lines from output. */
   removeUnwantedLines?: boolean;
+  /** Crawl timeout in milliseconds. */
   timeout?: number;
+  /** Custom user agent string. */
   userAgent?: string;
+  /** Custom HTTP headers. */
   headers?: Record<string, string>;
 }
 
+/**
+ * The structured result of a crawl operation.
+ */
 export interface Crawl4AIResult {
+  /** True if the crawl completed successfully. */
   success: boolean;
+  /** The processed URL. */
   url: string;
+  /** Extracted page title. */
   title?: string;
+  /** Extracted content converted to Markdown. */
   markdown?: string;
+  /** Raw HTML content. */
   html?: string;
+  /** Sanitized HTML content. */
   cleanedHtml?: string;
+  /** Extracted media resources. */
   media?: {
     images: string[];
     videos: string[];
     audios: string[];
   };
+  /** Extracted hyperlinks. */
   links?: {
     internal: string[];
     external: string[];
   };
+  /** Page metadata. */
   metadata?: {
     description?: string;
     keywords?: string[];
@@ -50,22 +77,39 @@ export interface Crawl4AIResult {
     wordCount?: number;
     language?: string;
   };
+  /** Session ID for the crawl (if applicable). */
   sessionId?: string;
+  /** Time taken to execute the crawl in ms. */
   executionTime?: number;
+  /** Error message if the crawl failed. */
   error?: string;
 }
 
+/**
+ * Extended options for advanced crawling scenarios involving dynamic content.
+ */
 export interface AdvancedCrawlOptions extends Crawl4AIOptions {
+  /** Custom JavaScript code to execute on the page. */
   jsCode?: string;
+  /** CSS selector or timeout to wait for before extraction. */
   waitFor?: string;
+  /** Whether to capture a screenshot. */
   screenshot?: boolean;
+  /** Screenshot capture mode. */
   screenshotMode?: 'page' | 'element';
+  /** Whether to generate a PDF of the page. */
   pdfGeneration?: boolean;
+  /** Use AI-based filtering to extract relevant content. */
   magicFilter?: boolean;
+  /** Whether to remove form elements. */
   removeForms?: boolean;
+  /** Whether to try extracting only the main article content. */
   onlyMainContent?: boolean;
+  /** Whether to simulate user interactions (mouse moves, scrolls). */
   simulateUser?: boolean;
+  /** Force a specific encoding. */
   overrideEncoding?: string;
+  /** Configuration for splitting text into chunks. */
   chunking?: {
     strategy: 'semantic' | 'fixed' | 'sentence' | 'regex';
     chunkSize?: number;
@@ -74,9 +118,15 @@ export interface AdvancedCrawlOptions extends Crawl4AIOptions {
   };
 }
 
+/**
+ * Result of an accessibility and structure analysis.
+ */
 export interface WebAccessibilityResult {
+  /** The analyzed URL. */
   url: string;
+  /** The text content. */
   content: string;
+  /** Hierarchical structure of the page. */
   structured: {
     headings: Array<{ level: number; text: string; id?: string }>;
     paragraphs: string[];
@@ -84,6 +134,7 @@ export interface WebAccessibilityResult {
     tables: Array<{ headers: string[]; rows: string[][] }>;
     codeBlocks: Array<{ language?: string; code: string }>;
   };
+  /** Accessibility compliance metrics. */
   accessibility: {
     hasAltTags: boolean;
     hasHeadingStructure: boolean;
@@ -91,6 +142,7 @@ export interface WebAccessibilityResult {
     colorContrastIssues: number;
     missingLandmarks: string[];
   };
+  /** Page performance metrics. */
   performance: {
     loadTime: number;
     contentSize: number;
@@ -99,6 +151,16 @@ export interface WebAccessibilityResult {
   };
 }
 
+/**
+ * Service for intelligent web scraping and content extraction.
+ *
+ * Leverages `crawl4ai` (Python) via child process execution to perform
+ * advanced crawling tasks including:
+ * - Dynamic JS rendering.
+ * - AI-powered content cleaning and extraction.
+ * - Accessibility analysis.
+ * - Screenshot and PDF generation.
+ */
 export class Crawl4AIWebService {
   private isEnabled: boolean;
   private isInitialized: boolean = false;
@@ -144,7 +206,10 @@ export class Crawl4AIWebService {
   }
 
   /**
-   * Simple web scraping with basic options
+   * Performs a basic crawl of a URL using standard settings.
+   *
+   * @param options - Basic crawl configuration.
+   * @returns The crawl result including content and metadata.
    */
   async crawlUrl(options: Crawl4AIOptions): Promise<Crawl4AIResult> {
     if (!this.isEnabled || !this.isInitialized) {
@@ -193,7 +258,10 @@ export class Crawl4AIWebService {
   }
 
   /**
-   * Advanced web scraping with AI-powered content extraction
+   * Executes an advanced crawl with features like JS execution, screenshots, and AI filtering.
+   *
+   * @param options - Advanced configuration options.
+   * @returns The comprehensive crawl result.
    */
   async advancedCrawl(options: AdvancedCrawlOptions): Promise<Crawl4AIResult> {
     if (!this.isEnabled || !this.isInitialized) {
@@ -243,7 +311,11 @@ export class Crawl4AIWebService {
   }
 
   /**
-   * Extract structured content with accessibility analysis
+   * Analyzes a webpage for structured content and accessibility compliance.
+   *
+   * @param url - The URL to analyze.
+   * @param options - Optional overrides for the underlying crawl.
+   * @returns Structured content and accessibility metrics, or null on failure.
    */
   async extractAccessibleContent(url: string, options?: Partial<Crawl4AIOptions>): Promise<WebAccessibilityResult | null> {
     if (!this.isEnabled || !this.isInitialized) {
@@ -288,7 +360,11 @@ export class Crawl4AIWebService {
   }
 
   /**
-   * Batch crawl multiple URLs
+   * Crawls a list of URLs in batches to respect rate limits and resources.
+   *
+   * @param urls - List of URLs to process.
+   * @param options - Common options applied to all URLs.
+   * @returns Array of crawl results.
    */
   async batchCrawl(urls: string[], options?: Partial<Crawl4AIOptions>): Promise<Crawl4AIResult[]> {
     if (!this.isEnabled || !this.isInitialized) {
@@ -317,7 +393,11 @@ export class Crawl4AIWebService {
   }
 
   /**
-   * Search and crawl URLs from search results
+   * Performs a web search and crawls the top results.
+   *
+   * @param query - The search query string.
+   * @param maxResults - Maximum number of search results to process.
+   * @returns Array of crawl results from the found pages.
    */
   async searchAndCrawl(query: string, maxResults: number = 5): Promise<Crawl4AIResult[]> {
     if (!this.isEnabled || !this.isInitialized) {
@@ -499,7 +579,10 @@ asyncio.run(crawl())
   }
 
   /**
-   * Clean and normalize extracted content
+   * sanitizes and formats extracted text content.
+   *
+   * @param content - Raw text content.
+   * @returns Normalized text with consistent spacing.
    */
   normalizeContent(content: string): string {
     return content
@@ -509,7 +592,10 @@ asyncio.run(crawl())
   }
 
   /**
-   * Extract key information using patterns
+   * Uses regex patterns to identify structured data entities within text.
+   *
+   * @param content - The text to analyze.
+   * @returns Object containing lists of found entities (emails, phones, etc.).
    */
   extractKeyInfo(content: string): {
     emails: string[];
@@ -533,7 +619,8 @@ asyncio.run(crawl())
   }
 
   /**
-   * Get service health status
+   * Reports the operational status of the service and its dependencies.
+   * @returns Health status object.
    */
   getHealthStatus(): {
     enabled: boolean;

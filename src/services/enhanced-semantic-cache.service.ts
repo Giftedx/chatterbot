@@ -8,11 +8,19 @@ import { createHash } from 'crypto';
 import { features } from '../config/feature-flags.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Represents a single item stored in the semantic cache.
+ */
 interface CacheEntry {
+  /** Unique ID for the cache entry. */
   id: string;
+  /** The text key used to generate the embedding. */
   key: string;
+  /** The arbitrary content stored. */
   content: any;
+  /** Vector representation of the key. */
   embedding: number[];
+  /** Metadata for cache management and statistics. */
   metadata: {
     createdAt: Date;
     accessCount: number;
@@ -23,21 +31,49 @@ interface CacheEntry {
   };
 }
 
+/**
+ * Configuration options for the semantic cache.
+ */
 interface SemanticCacheConfig {
+  /** Minimum cosine similarity (0-1) to consider a match. */
   similarityThreshold: number;
+  /** Maximum number of items to keep in memory. */
   maxEntries: number;
+  /** Time-to-live in milliseconds for cache entries. */
   defaultTtl: number;
+  /** The model identifier used for generating embeddings. */
   embeddingModel: string;
+  /** Whether to persist cache to an external store (e.g., Redis). */
   persistToDisk: boolean;
+  /** Whether to compress stored content. */
   compressionEnabled: boolean;
 }
 
+/**
+ * Result of a semantic search operation.
+ */
 interface SemanticSearchResult {
+  /** The cached entry found. */
   entry: CacheEntry;
+  /** Similarity score (0-1). */
   similarity: number;
+  /** True if the keys matched exactly, bypassing similarity search. */
   isExactMatch: boolean;
 }
 
+/**
+ * Enhanced Semantic Caching Service.
+ *
+ * Provides an intelligent caching layer that uses vector embeddings to find
+ * semantically similar keys, allowing for cache hits even when queries are not
+ * identical but mean the same thing.
+ *
+ * Features:
+ * - Multi-strategy embedding generation (OpenAI, Local, Hash).
+ * - Cosine similarity matching.
+ * - TTL and capacity management.
+ * - Optional Redis persistence.
+ */
 export class EnhancedSemanticCacheService {
   private cache: Map<string, CacheEntry> = new Map();
   private embeddingCache: Map<string, number[]> = new Map();
@@ -81,7 +117,11 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Generate embeddings for text using multiple strategies
+   * Generates a vector embedding for the given text.
+   * Attempts multiple strategies (OpenAI -> Local -> Hash) for resilience.
+   *
+   * @param text - The text to embed.
+   * @returns A number array representing the embedding vector.
    */
   private async generateEmbedding(text: string): Promise<number[]> {
     const cacheKey = createHash('md5').update(text).digest('hex');
@@ -157,7 +197,12 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Calculate cosine similarity between two embeddings
+   * Computes the cosine similarity between two vectors.
+   *
+   * @param embedding1 - First vector.
+   * @param embedding2 - Second vector.
+   * @returns Similarity score between 0 and 1.
+   * @throws Error if dimensions do not match.
    */
   private calculateSimilarity(embedding1: number[], embedding2: number[]): number {
     if (embedding1.length !== embedding2.length) {
@@ -179,7 +224,14 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Store content in semantic cache
+   * Adds or updates an entry in the semantic cache.
+   *
+   * @param params - The cache entry parameters.
+   * @param params.key - The lookup key (text).
+   * @param params.content - The data to store.
+   * @param params.ttl - Optional custom time-to-live.
+   * @param params.tags - Optional tags for categorization.
+   * @param params.metadata - Optional extra metadata.
    */
   async set(params: {
     key: string;
@@ -232,7 +284,10 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Retrieve content from semantic cache using similarity search
+   * Retrieves an item from the cache, looking for semantic similarity.
+   *
+   * @param key - The query text.
+   * @returns The best match result or null if no match meets the threshold.
    */
   async get(key: string): Promise<SemanticSearchResult | null> {
     if (!this.isEnabled) return null;
@@ -289,7 +344,10 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Search cache entries by tags
+   * Finds all cache entries matching at least one of the provided tags.
+   *
+   * @param tags - Array of tags to search for.
+   * @returns Array of matching cache entries.
    */
   async searchByTags(tags: string[]): Promise<CacheEntry[]> {
     if (!this.isEnabled) return [];
@@ -312,7 +370,11 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Find similar entries to a given text
+   * Returns a list of the most similar cache entries to the given text.
+   *
+   * @param text - The query text.
+   * @param limit - Maximum number of results.
+   * @returns Array of matches sorted by similarity.
    */
   async findSimilar(text: string, limit: number = 5): Promise<SemanticSearchResult[]> {
     if (!this.isEnabled) return [];
@@ -349,7 +411,13 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Invalidate cache entries by pattern or tags
+   * Removes entries from the cache based on criteria.
+   *
+   * @param pattern - Filter criteria for invalidation.
+   * @param pattern.keyPattern - Substring match for keys.
+   * @param pattern.tags - Match any of these tags.
+   * @param pattern.olderThan - Match entries created before this date.
+   * @returns Number of invalidated entries.
    */
   async invalidate(pattern?: {
     keyPattern?: string;
@@ -394,7 +462,8 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Get cache statistics
+   * Retrieves operational statistics for the cache.
+   * @returns Object containing usage metrics.
    */
   getStats(): {
     totalEntries: number;
@@ -492,7 +561,8 @@ export class EnhancedSemanticCacheService {
   }
 
   /**
-   * Get service health status
+   * Checks the health of the service.
+   * @returns Object containing connectivity and status info.
    */
   getHealthStatus(): {
     enabled: boolean;

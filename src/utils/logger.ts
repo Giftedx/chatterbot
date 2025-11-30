@@ -2,30 +2,55 @@
  * Enterprise-grade logging service with structured output and contextual metadata
  */
 
+/**
+ * Severity levels for log entries.
+ */
 export enum LogLevel {
+  /** Critical errors requiring immediate attention. */
   ERROR = 0,
+  /** Warnings about potential issues or non-critical failures. */
   WARN = 1,
+  /** General informational messages about system operation. */
   INFO = 2,
+  /** Detailed debug information for development. */
   DEBUG = 3
 }
 
+/**
+ * Contextual metadata associated with a log entry.
+ */
 export interface LogContext {
+  /** ID of the user initiating the action. */
   userId?: string;
+  /** ID of the guild where the action occurred. */
   guildId?: string;
+  /** ID of the channel where the action occurred. */
   channelId?: string;
+  /** Name of the command being executed. */
   command?: string;
+  /** Name of the specific operation within a command. */
   operation?: string;
+  /** Duration of the operation in milliseconds. */
   duration?: number;
+  /** Additional structured metadata. */
   metadata?: Record<string, unknown>;
   // Allow additional properties for backwards compatibility
   [key: string]: unknown;
 }
 
+/**
+ * Represents a complete log record ready for output.
+ */
 export interface LogEntry {
+  /** ISO 8601 timestamp of the log. */
   timestamp: string;
+  /** Severity level of the log. */
   level: LogLevel;
+  /** The main log message. */
   message: string;
+  /** Optional context data. */
   context?: LogContext;
+  /** Optional error details. */
   error?: {
     name: string;
     message: string;
@@ -35,7 +60,13 @@ export interface LogEntry {
 }
 
 /**
- * Structured logger with contextual metadata and environment-aware configuration
+ * Enterprise-grade structured logger.
+ *
+ * Features:
+ * - Singleton pattern for global access.
+ * - Environment-aware configuration (JSON in prod, colored text in dev).
+ * - Automatic sensitive data redaction.
+ * - Support for contextual child loggers.
  */
 export class Logger {
   private static instance: Logger;

@@ -7,58 +7,109 @@
 import { features } from '../config/feature-flags.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Defines a metric used to evaluate AI performance.
+ */
 export interface EvaluationMetric {
+  /** Unique name of the metric. */
   name: string;
+  /** Category of the metric. */
   type: 'accuracy' | 'latency' | 'cost' | 'satisfaction' | 'custom';
+  /** Importance weight for aggregate scoring. */
   weight: number;
+  /** Acceptable value ranges. */
   threshold?: {
     min?: number;
     max?: number;
     target?: number;
   };
+  /** Function to compute the metric value. */
   calculator: (actual: any, expected?: any, context?: any) => number;
 }
 
+/**
+ * Represents a single test scenario.
+ */
 export interface TestCase {
+  /** Unique ID of the test case. */
   id: string;
+  /** Human-readable name. */
   name: string;
+  /** Optional description. */
   description?: string;
+  /** Input data for the test. */
   input: any;
+  /** Expected output data for validation. */
   expectedOutput?: any;
+  /** Additional context for the test execution. */
   context?: any;
+  /** Tags for categorization. */
   tags?: string[];
+  /** Execution priority. */
   priority: 'low' | 'medium' | 'high' | 'critical';
+  /** Type of test. */
   category: 'functionality' | 'performance' | 'safety' | 'reliability';
 }
 
+/**
+ * A collection of test cases with shared configuration.
+ */
 export interface TestSuite {
+  /** Unique ID of the suite. */
   id: string;
+  /** Name of the suite. */
   name: string;
+  /** Optional description. */
   description?: string;
+  /** List of test cases to execute. */
   testCases: TestCase[];
+  /** Metrics to evaluate for this suite. */
   metrics: EvaluationMetric[];
+  /** Runtime configuration overrides. */
   configuration?: any;
+  /** Target environment. */
   environment?: 'development' | 'staging' | 'production';
 }
 
+/**
+ * Result of a single test case execution.
+ */
 export interface TestResult {
+  /** ID of the executed test case. */
   testCaseId: string;
+  /** ID of the execution run. */
   executionId: string;
+  /** Completion timestamp. */
   timestamp: Date;
+  /** Actual output produced by the system. */
   actualOutput: any;
+  /** Whether the test passed. */
   success: boolean;
+  /** Computed metric values. */
   metrics: { [metricName: string]: number };
+  /** Duration in milliseconds. */
   duration: number;
+  /** Cost in USD (if applicable). */
   cost?: number;
+  /** Error message if failed. */
   error?: string;
+  /** Context used during execution. */
   context?: any;
 }
 
+/**
+ * Aggregate results for a test suite execution.
+ */
 export interface TestSuiteResult {
+  /** ID of the test suite. */
   suiteId: string;
+  /** ID of the execution run. */
   executionId: string;
+  /** Completion timestamp. */
   timestamp: Date;
+  /** Individual test results. */
   results: TestResult[];
+  /** Summary statistics. */
   summary: {
     totalTests: number;
     passedTests: number;
@@ -67,9 +118,13 @@ export interface TestSuiteResult {
     totalDuration: number;
     totalCost: number;
   };
+  /** Aggregate metric statistics. */
   metrics: { [metricName: string]: { average: number; min: number; max: number; std: number } };
 }
 
+/**
+ * Standard benchmark configuration.
+ */
 export interface BenchmarkSuite {
   name: string;
   version: string;
@@ -79,6 +134,9 @@ export interface BenchmarkSuite {
   industry?: { [metricName: string]: number };
 }
 
+/**
+ * Configuration for an A/B test experiment.
+ */
 export interface ABTestConfiguration {
   name: string;
   description?: string;
@@ -94,6 +152,9 @@ export interface ABTestConfiguration {
   minSampleSize: number;
 }
 
+/**
+ * Results of an A/B test experiment.
+ */
 export interface ABTestResult {
   configurationId: string;
   startTime: Date;
@@ -111,6 +172,9 @@ export interface ABTestResult {
   statisticalSignificance: boolean;
 }
 
+/**
+ * Ongoing performance metrics tracking.
+ */
 export interface PerformanceBenchmark {
   category: 'latency' | 'throughput' | 'accuracy' | 'cost' | 'reliability';
   measurements: Array<{
@@ -136,6 +200,15 @@ export interface PerformanceBenchmark {
   }>;
 }
 
+/**
+ * Service for comprehensive AI evaluation, testing, and benchmarking.
+ *
+ * Capabilities:
+ * - Automated test suite execution.
+ * - A/B testing framework.
+ * - Performance benchmarking against baselines.
+ * - Custom evaluation metrics.
+ */
 export class AIEvaluationTestingService {
   private isEnabled: boolean;
   private testSuites: Map<string, TestSuite> = new Map();
@@ -292,7 +365,12 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Execute a test suite
+   * Runs all test cases defined in a test suite.
+   *
+   * @param suiteId - ID of the suite to run.
+   * @param testFunction - The function under test.
+   * @param options - Execution options (parallelism, error handling).
+   * @returns Aggregated results of the run.
    */
   async executeTestSuite(
     suiteId: string,
@@ -454,7 +532,11 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Run A/B test between different configurations
+   * Orchestrates an A/B test comparing multiple variants.
+   *
+   * @param config - Configuration for the experiment.
+   * @param testFunction - Function executing the logic for a specific variant.
+   * @returns Comprehensive results including winner and significance.
    */
   async runABTest(
     config: ABTestConfiguration,
@@ -560,7 +642,11 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Run benchmark against standard industry benchmarks
+   * Executes a standard benchmark suite and compares results against baselines.
+   *
+   * @param benchmarkName - Name of the benchmark to run.
+   * @param testFunction - The function under test.
+   * @returns Detailed comparison against industry standards and baselines.
    */
   async runBenchmark(
     benchmarkName: string,
@@ -642,7 +728,11 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Track performance metrics over time
+   * Records a data point for long-term performance tracking.
+   *
+   * @param category - Metric category.
+   * @param value - Measured value.
+   * @param context - Optional context data.
    */
   trackPerformanceMetric(
     category: PerformanceBenchmark['category'],
@@ -684,7 +774,10 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Create a custom test suite
+   * Registers a new test suite.
+   *
+   * @param suite - Suite definition (without ID).
+   * @returns The generated ID of the new suite.
    */
   createTestSuite(suite: Omit<TestSuite, 'id'>): string {
     const id = `suite_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -697,7 +790,9 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Add custom evaluation metric
+   * Registers a new custom metric calculator.
+   *
+   * @param metric - The metric definition and logic.
    */
   addEvaluationMetric(metric: EvaluationMetric): void {
     this.evaluationMetrics.set(metric.name, metric);
@@ -957,14 +1052,16 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Get test suite results
+   * Retrieves history of results for a specific test suite.
+   * @param suiteId - The suite ID.
    */
   getTestSuiteResults(suiteId: string): TestSuiteResult[] {
     return this.testResults.get(suiteId) || [];
   }
 
   /**
-   * Get performance metrics
+   * Retrieves tracking data for performance benchmarks.
+   * @param category - Optional category filter.
    */
   getPerformanceMetrics(category?: string): Map<string, PerformanceBenchmark> | PerformanceBenchmark | undefined {
     if (category) {
@@ -974,21 +1071,22 @@ export class AIEvaluationTestingService {
   }
 
   /**
-   * Get A/B test results
+   * Retrieves results for all active/completed A/B tests.
    */
   getABTestResults(): Map<string, ABTestResult> {
     return this.abTests;
   }
 
   /**
-   * Get available benchmarks
+   * Retrieves the catalog of standard benchmarks.
    */
   getAvailableBenchmarks(): Map<string, BenchmarkSuite> {
     return this.benchmarkSuites;
   }
 
   /**
-   * Get service health status
+   * Checks the operational status of the evaluation service.
+   * @returns Health status object.
    */
   getHealthStatus(): {
     enabled: boolean;

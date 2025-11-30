@@ -8,55 +8,102 @@ import neo4j, { Driver, Session, Record, Node, Relationship } from 'neo4j-driver
 import { features } from '../config/feature-flags.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Represents a node (entity) in the knowledge graph.
+ */
 export interface GraphEntity {
+  /** Optional ID (assigned by DB if not provided). */
   id?: string;
+  /** Categorical labels (e.g., 'Person', 'Topic'). */
   labels: string[];
+  /** Key-value properties associated with the node. */
   properties: { [key: string]: any };
 }
 
+/**
+ * Represents a directed edge (relationship) between two nodes.
+ */
 export interface GraphRelationship {
+  /** Optional ID. */
   id?: string;
+  /** The semantic type of relationship (e.g., 'MENTIONED', 'RELATED_TO'). */
   type: string;
+  /** Key-value properties for the edge. */
   properties?: { [key: string]: any };
-  from: string; // Node ID or identifier
-  to: string;   // Node ID or identifier
+  /** ID of the source node. */
+  from: string;
+  /** ID of the target node. */
+  to: string;
 }
 
+/**
+ * Configuration for a raw Cypher query execution.
+ */
 export interface GraphQuery {
+  /** The Cypher query string. */
   cypher: string;
+  /** Parameters to inject into the query safely. */
   parameters?: { [key: string]: any };
+  /** Max execution time in ms. */
   timeout?: number;
 }
 
+/**
+ * Options for semantic or keyword-based graph search.
+ */
 export interface GraphSearchOptions {
+  /** Search text or semantic query string. */
   query: string;
+  /** Filter results by node labels. */
   entityTypes?: string[];
+  /** Filter results by relationship types. */
   relationshipTypes?: string[];
+  /** Max results to return. */
   limit?: number;
+  /** Pagination offset. */
   offset?: number;
+  /** Minimum similarity threshold (for semantic search). */
   similarity?: number;
+  /** Whether to fetch connected edges. */
   includeRelationships?: boolean;
+  /** Maximum traversal depth for connected nodes. */
   maxDepth?: number;
 }
 
+/**
+ * Represents a sequence of connected nodes and edges (a path).
+ */
 export interface GraphPath {
+  /** Ordered list of nodes in the path. */
   nodes: GraphEntity[];
+  /** Ordered list of edges connecting the nodes. */
   relationships: GraphRelationship[];
+  /** Total steps in the path. */
   length: number;
+  /** Optional relevance score. */
   score?: number;
 }
 
+/**
+ * Aggregated statistics about the knowledge graph.
+ */
 export interface GraphAnalytics {
+  /** Total number of nodes. */
   nodeCount: number;
+  /** Total number of relationships. */
   relationshipCount: number;
+  /** Count of nodes per label type. */
   labelDistribution: { [key: string]: number };
+  /** Count of relationships per type. */
   relationshipTypeDistribution: { [key: string]: number };
+  /** Nodes with the highest degree of connectivity. */
   topConnectedNodes: Array<{
     id: string;
     labels: string[];
     properties: { [key: string]: any };
     connectionCount: number;
   }>;
+  /** Identified clusters or communities within the graph. */
   clusters?: Array<{
     id: string;
     size: number;
@@ -65,20 +112,39 @@ export interface GraphAnalytics {
   }>;
 }
 
+/**
+ * In-memory representation of a conversation's semantic structure.
+ */
 export interface ConversationGraph {
+  /** ID of the conversation session. */
   conversationId: string;
+  /** Nodes relevant to this conversation. */
   entities: Map<string, GraphEntity>;
+  /** Edges relevant to this conversation. */
   relationships: Map<string, GraphRelationship>;
+  /** Chronological log of graph modifications during the session. */
   timeline: Array<{
     timestamp: Date;
     action: 'add_entity' | 'add_relationship' | 'update_entity';
     data: any;
   }>;
+  /** Key themes or topics extracted. */
   topics: string[];
+  /** High-level insights derived from graph analysis. */
   keyInsights: string[];
+  /** Timestamp of last update. */
   lastUpdated: Date;
 }
 
+/**
+ * Service for interacting with Neo4j to manage and query the Knowledge Graph.
+ *
+ * Capabilities:
+ * - Entity and Relationship management (CRUD).
+ * - Semantic graph search and pathfinding.
+ * - Conversation-scoped subgraph management.
+ * - Graph analytics.
+ */
 export class Neo4jKnowledgeGraphService {
   private driver: Driver | null = null;
   private isEnabled: boolean;
@@ -148,7 +214,10 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Create or update an entity in the knowledge graph
+   * Creates or updates a node in the graph database.
+   *
+   * @param entity - The entity data to persist.
+   * @returns The entity ID if successful, null otherwise.
    */
   async createEntity(entity: GraphEntity): Promise<string | null> {
     if (!this.driver || !this.isConnected) {
@@ -191,7 +260,10 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Create a relationship between two entities
+   * Creates a directed relationship between two existing nodes.
+   *
+   * @param relationship - The relationship definition.
+   * @returns True if created successfully.
    */
   async createRelationship(relationship: GraphRelationship): Promise<boolean> {
     if (!this.driver || !this.isConnected) {
@@ -229,7 +301,10 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Execute a custom Cypher query
+   * Executes a raw Cypher query against the database.
+   *
+   * @param query - The query configuration.
+   * @returns Array of raw Neo4j records.
    */
   async executeQuery(query: GraphQuery): Promise<Record[]> {
     if (!this.driver || !this.isConnected) {
@@ -256,7 +331,11 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Search entities and relationships using text and semantic matching
+   * Performs a comprehensive search of the graph.
+   * Supports full-text search on node properties and filtering by type.
+   *
+   * @param options - Search criteria.
+   * @returns Object containing matching entities, their relationships, and relevant paths.
    */
   async searchGraph(options: GraphSearchOptions): Promise<{
     entities: GraphEntity[];
@@ -343,7 +422,12 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Find shortest paths between entities
+   * Discovers the shortest paths connecting a set of entities.
+   * Useful for finding hidden connections or relationships.
+   *
+   * @param entityIds - List of entity IDs to connect.
+   * @param maxDepth - Maximum number of hops allowed in a path.
+   * @returns Array of discovered paths.
    */
   async findPaths(entityIds: string[], maxDepth: number = 5): Promise<GraphPath[]> {
     if (!this.driver || !this.isConnected || entityIds.length < 2) {
@@ -407,7 +491,9 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Get comprehensive analytics about the knowledge graph
+   * Computes aggregate statistics for the entire knowledge graph.
+   *
+   * @returns Analytics object or null if failed.
    */
   async getGraphAnalytics(): Promise<GraphAnalytics | null> {
     if (!this.driver || !this.isConnected) {
@@ -490,7 +576,10 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Create a conversation-specific subgraph
+   * Initializes a new subgraph for a specific conversation session.
+   *
+   * @param conversationId - The session ID.
+   * @returns The initialized conversation graph structure.
    */
   async createConversationGraph(conversationId: string): Promise<ConversationGraph> {
     const graph: ConversationGraph = {
@@ -520,7 +609,12 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Add entity to conversation graph
+   * Associates an entity with a specific conversation context.
+   *
+   * @param conversationId - The session ID.
+   * @param entity - The entity to add.
+   * @param relationshipToConversation - Optional label for the edge connecting the conversation to the entity.
+   * @returns True if successful.
    */
   async addToConversationGraph(
     conversationId: string,
@@ -566,7 +660,11 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Extract and create entities from text
+   * Parsons text to identify and persist potential entities using NLP heuristics.
+   *
+   * @param text - The raw text to analyze.
+   * @param conversationId - Optional session ID to associate found entities with.
+   * @returns Array of extracted entities.
    */
   async extractEntitiesFromText(
     text: string,
@@ -658,7 +756,10 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Delete entity and its relationships
+   * Removes an entity and all its incident relationships from the graph.
+   *
+   * @param entityId - The ID of the node to delete.
+   * @returns True if successful.
    */
   async deleteEntity(entityId: string): Promise<boolean> {
     if (!this.driver || !this.isConnected) {
@@ -681,7 +782,9 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Clear all data (use with caution!)
+   * Wipes the entire database.
+   * @warning This action is irreversible.
+   * @returns True if successful.
    */
   async clearAllData(): Promise<boolean> {
     if (!this.driver || !this.isConnected) {
@@ -702,7 +805,7 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Close connections
+   * Gracefully shuts down the driver and closes active sessions.
    */
   async close(): Promise<void> {
     if (this.driver) {
@@ -712,7 +815,8 @@ export class Neo4jKnowledgeGraphService {
   }
 
   /**
-   * Get service health status
+   * Returns the current operational status of the service.
+   * @returns Object with connection and driver health info.
    */
   getHealthStatus(): {
     enabled: boolean;

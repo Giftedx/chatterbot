@@ -1,20 +1,41 @@
+/**
+ * Supported AI model provider names.
+ */
 export type ProviderName = 'gemini' | 'openai' | 'anthropic' | 'groq' | 'mistral' | 'openai_compat';
 
+/**
+ * Definition of an AI model's capabilities and characteristics.
+ */
 export interface ModelCard {
+  /** The provider hosting the model. */
   provider: ProviderName;
+  /** The API identifier for the model. */
   model: string;
+  /** Human-readable name for display. */
   displayName: string;
+  /** Context window size in thousands of tokens (e.g., 128 = 128k). */
   contextWindowK: number;
+  /** Relative cost classification. */
   costTier: 'low' | 'medium' | 'high';
+  /** Relative inference speed classification. */
   speedTier: 'fast' | 'medium' | 'slow';
+  /** List of specific strengths (e.g., 'coding', 'reasoning'). */
   strengths: string[];
+  /** Known limitations or weaknesses. */
   weaknesses?: string[];
+  /** Supported input/output modalities. */
   modalities: Array<'text' | 'image' | 'audio' | 'tools'>;
+  /** Whether the model natively supports tool/function calling. */
   supportsFunctionCalling?: boolean;
+  /** Tags describing ideal use cases. */
   bestFor: string[]; // tags like 'coding', 'long_context', 'reasoning', 'factuality', 'creative'
+  /** Safety filtering level applied by the provider. */
   safetyLevel: 'standard' | 'high';
 }
 
+/**
+ * Registry of available models and their metadata.
+ */
 export const MODEL_CARDS: ModelCard[] = [
   {
     provider: 'openai',
@@ -149,15 +170,30 @@ export const MODEL_CARDS: ModelCard[] = [
   }
 ];
 
+/**
+ * Signals extracted from a request to guide model selection.
+ */
 export interface RoutingSignal {
+  /** Request involves code generation or analysis. */
   mentionsCode: boolean;
+  /** Request exceeds standard context limits. */
   requiresLongContext: boolean;
+  /** Request involves image or audio processing. */
   needsMultimodal: boolean;
+  /** Request requires strict safety guardrails. */
   needsHighSafety: boolean;
+  /** The semantic domain of the request. */
   domain: 'gaming' | 'technical' | 'general' | 'realworld';
+  /** Latency requirements. */
   latencyPreference: 'low' | 'normal';
 }
 
+/**
+ * Filters the list of models to include only those with active API keys.
+ *
+ * @param cards - The full list of model cards.
+ * @returns Array of models available for use.
+ */
 export function filterAvailableModels(cards: ModelCard[]): ModelCard[] {
   return cards.filter(card => {
     if (card.provider === 'openai' && !process.env.OPENAI_API_KEY) return false;
@@ -170,6 +206,13 @@ export function filterAvailableModels(cards: ModelCard[]): ModelCard[] {
   });
 }
 
+/**
+ * Ranks models based on how well they match the routing signals.
+ *
+ * @param cards - Available model cards.
+ * @param signal - Extracted routing signals.
+ * @returns Models sorted by suitability (highest score first).
+ */
 export function rankModelsForSignals(cards: ModelCard[], signal: RoutingSignal): ModelCard[] {
   const scored = cards.map(card => {
     let score = 0;

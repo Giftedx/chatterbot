@@ -12,12 +12,12 @@ Chatterbot is a modern Discord bot that gives your server a helpful, safe, multi
 - Turn‑key Docker Compose with volume‑backed SQLite and auto‑migrations
 
 ## System architecture (at a glance)
-- Discord interface: `src/index.ts` registers `/chat` and handles interactions/messages
-- **Enhanced AI Pipeline**: `src/services/core-intelligence.service.ts`
-  - **Multi-layered Processing**: Semantic caching → Enhanced observability → Message analysis → Multimodal processing → Knowledge graph integration → RAG optimization → Model routing → AI evaluation → Performance monitoring
-  - **10 AI Enhancement Services**: Advanced capabilities including sentiment analysis, context memory, conversation threading, predictive responses, and more
-  - Optional: Unified Cognitive Pipeline orchestrator (`src/services/unified-cognitive-pipeline.service.ts`) behind a feature flag for end-to-end, options-tree-driven processing. Enable with `FEATURE_UNIFIED_COGNITIVE_PIPELINE=true` in `.env`.
-- Providers and routing: `src/services/model-router.service.ts`, `src/config/models.ts`
+- **Discord Interface**: `src/index.ts` handles gateway events, registers `/chat`, and initializes core services.
+- **Core Intelligence**: `src/services/core-intelligence.service.ts` is the central brain. It orchestrates:
+  - **Decision Engine**: Determines *if* and *how* to respond based on token budgets, confidence scores, and user context.
+  - **Processing Pipeline**: A multi-stage flow including moderation, capability checks, message analysis, and response generation.
+- **Unified Cognitive Pipeline**: `src/services/unified-cognitive-pipeline.service.ts` offers a deterministic, tree-based execution path for complex reasoning tasks, enabled via `FEATURE_UNIFIED_COGNITIVE_PIPELINE=true`.
+- **Autonomous Activation**: The `AutonomousActivationEngine` (`src/orchestration/autonomous-activation-engine.ts`) dynamically enables/disables capabilities based on real-time performance and context.
 - **Enhanced Knowledge Systems**: 
   - Vector search: `src/services/qdrant-vector.service.ts` (Qdrant integration)
   - Knowledge graph: `src/services/neo4j-knowledge-graph.service.ts` (Neo4j integration)
