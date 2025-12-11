@@ -8,6 +8,7 @@ import { MCPToolResult } from './types.js';
 import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { braveWebSearch } from '../../mcp/index.js';
 
 const MAX_TEXT_CONTENT_LENGTH = 1000;
 
@@ -112,9 +113,45 @@ export class DirectMCPExecutor {
    * Execute web search using Brave API or MCP tool if available
    */
   async executeWebSearch(query: string, count: number = 5): Promise<MCPToolResult> {
-    // TODO: If a real MCP tool system is available, invoke it here
     try {
-      console.log(`🔍 Real Web Search: ${query} (count: ${count})`);
+      // 1. Try Real MCP Tool first
+      try {
+        const mcpResult = await braveWebSearch({ query, count });
+
+        let results = mcpResult.results;
+        // Handle alternative response shape if necessary
+        if (!results && mcpResult.webPages?.value) {
+          results = mcpResult.webPages.value.map((item, index) => ({
+            title: item.name,
+            url: item.url,
+            snippet: item.snippet,
+            rank: index + 1
+          }));
+        }
+
+        if (results) {
+          console.log(`🔍 Real Web Search (MCP): ${query} (count: ${count})`);
+          return {
+            success: true,
+            data: {
+              results: results,
+              searchInfo: {
+                query,
+                totalResults: results.length,
+                apiUsed: 'mcp_brave_search',
+                timestamp: new Date().toISOString()
+              }
+            },
+            toolUsed: 'mcp-brave-search',
+            requiresExternalMCP: true
+          };
+        }
+      } catch (mcpError) {
+        // MCP tool not available, proceed to fallback
+        // console.debug('MCP Web Search not available:', mcpError);
+      }
+
+      console.log(`🔍 Real Web Search (Direct): ${query} (count: ${count})`);
       if (this.braveApiKey) {
         try {
           const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
