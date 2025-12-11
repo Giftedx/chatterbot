@@ -8,6 +8,7 @@ import { MCPToolResult } from './types.js';
 import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { contentScrape } from '../../mcp/index.js';
 
 const MAX_TEXT_CONTENT_LENGTH = 1000;
 
@@ -273,9 +274,42 @@ export class DirectMCPExecutor {
    * Execute content extraction using Firecrawl API or MCP tool if available
    */
   async executeContentExtraction(urls: string[]): Promise<MCPToolResult> {
-    // TODO: If a real MCP tool system is available, invoke it here
+    // Try to use real MCP tool first if available in the environment
     try {
       console.log(`🔍 Real Content Extraction: ${urls.length} URLs`);
+
+      // Attempt to check if the function is available by trying one (or just assume we try and catch)
+      // We will try to map all URLs to the MCP tool
+      try {
+        const mcpResults = await Promise.all(urls.map(async (url) => {
+          return contentScrape({ url });
+        }));
+
+        const results = mcpResults.map((res, index) => ({
+          url: urls[index],
+          title: res.title || urls[index],
+          content: res.content || '',
+          success: res.success !== false,
+          extractionMethod: 'mcp_tool_firecrawl'
+        }));
+
+        console.log(`✅ Used Real MCP Tool for content extraction`);
+        return {
+          success: true,
+          data: { results },
+          toolUsed: 'mcp-firecrawl',
+          requiresExternalMCP: true
+        };
+      } catch (mcpError: any) {
+        // If the function is not available, it throws a specific error.
+        // We catch it and proceed to fallback.
+        if (mcpError.message && mcpError.message.includes('not available')) {
+          // MCP tool not present, proceed to API/fallback silently
+        } else {
+          console.warn('MCP Tool execution failed, falling back:', mcpError);
+        }
+      }
+
       if (this.firecrawlApiKey && urls.length > 0) {
         try {
           const results = await Promise.all(
