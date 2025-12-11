@@ -198,6 +198,21 @@ export class UserMemoryService {
   }
 
   /**
+   * Extract and store memory from a string content
+   * Adapts simple string content to the memory extraction process
+   */
+  public async extractAndStoreMemory(userId: string, content: string, guildId?: string): Promise<void> {
+    const context: MemoryContext = {
+      userId,
+      guildId,
+      channelId: 'internal-process',
+      messageContent: content
+    };
+
+    await this.processConversation(context);
+  }
+
+  /**
    * Process conversation for memory extraction
    */
   public async processConversation(context: MemoryContext): Promise<boolean> {

@@ -30,8 +30,7 @@ import type { MessageAnalysis } from './types.js';
 import { PersonalizationEngine } from './personalization-engine.service.js';
 import { UserBehaviorAnalyticsService } from './behavior-analytics.service.js';
 import { SmartRecommendationService } from './smart-recommendation.service.js';
-// TODO: Re-enable when interface compatibility is resolved
-// import { CrossSessionLearningEngine } from './cross-session-learning.service.js';
+import { CrossSessionLearningEngine } from './cross-session-learning.service.js';
 
 // Import types
 import { ProcessingContext } from './types.js';
@@ -75,8 +74,7 @@ export class EnhancedInvisibleIntelligenceService {
   private personalizationEngine?: IPersonalizationEngine;
   private behaviorAnalytics?: IBehaviorAnalyticsService;
   private smartRecommendations?: ISmartRecommendationService;
-  // TODO: Add crossSessionLearning when interface compatibility is resolved
-  // private crossSessionLearning: CrossSessionLearningEngine;
+  private crossSessionLearning?: CrossSessionLearningEngine;
 
   // Ultra-Intelligence System
   private ultraIntelligence?: UltraIntelligenceOrchestrator;
@@ -94,8 +92,7 @@ export class EnhancedInvisibleIntelligenceService {
     try {
       this.behaviorAnalytics = dependencies.behaviorAnalytics;
       this.smartRecommendations = dependencies.smartRecommendations;
-      // TODO: Fix interface compatibility for CrossSessionLearningEngine
-      // this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
+      this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
       this.personalizationEngine = dependencies.personalizationEngine;
       
       // Initialize Advanced Memory Manager if available

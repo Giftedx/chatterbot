@@ -108,6 +108,7 @@ export interface ICacheService {
 
 export interface IUserMemoryService {
   processConversation(context: MemoryContext): Promise<boolean>;
+  extractAndStoreMemory(userId: string, content: string, guildId?: string): Promise<void>;
 }
 
 export interface IPersonalizationEngine {
