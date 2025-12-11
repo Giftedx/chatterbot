@@ -10,6 +10,7 @@ import {
   TextBasedChannel,
 } from 'discord.js';
 import { URL } from 'url';
+import crypto from 'crypto';
 import _ from 'lodash';
 // MCP specific
 import { MCPManager } from './mcp-manager.service.js';
@@ -63,6 +64,7 @@ import {
 } from './enhanced-intelligence/types.js';
 // Removed obsolete import: model-router.service.js replaced by performance-aware-routing
 import { knowledgeBaseService } from './knowledge-base.service.js';
+import { knowledgeBaseEmbeddingsService } from './knowledge-base-embeddings.service.js';
 import type { ProviderName } from '../config/models.js';
 import { getEnvAsBoolean, isLocalDBDisabled } from '../utils/env.js';
 import { langGraphWorkflow, advancedLangGraphWorkflow } from '../agents/langgraph/workflow.js';
@@ -215,6 +217,7 @@ export class CoreIntelligenceService {
   private guildDecisionLastApplied = new Map<string, string>(); // stable JSON of applied options
   private overridesRefreshTimer?: NodeJS.Timeout;
   private readonly overridesRefreshIntervalMs = getEnvAsNumber('DECISION_OVERRIDES_TTL_MS', 60_000);
+  private conversationsCollectionReady = false;
 
   private readonly mcpOrchestrator: UnifiedMCPOrchestratorService;
   private readonly analyticsService: UnifiedAnalyticsService;
@@ -2855,23 +2858,68 @@ export class CoreIntelligenceService {
 
       const history = await getHistory(channelId);
 
-      // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
-      const vectorContext = '';
+      // Qdrant Vector Search - Enhanced context retrieval
+      let vectorContext = '';
+      let promptEmbedding: number[] | null = null;
+
       if (this.qdrantVectorService && !lightweight) {
         try {
-          // Placeholder for vector context retrieval - requires embedding generation
-          // The Qdrant service is initialized but needs embedding integration
-          logger.debug('Qdrant vector service available but embeddings not integrated yet', {
-            hasService: !!this.qdrantVectorService,
-            userId,
-          });
+          promptEmbedding = await knowledgeBaseEmbeddingsService.generateEmbedding(promptText);
+          if (promptEmbedding) {
+            // Ensure collection exists (lazy check with caching)
+            if (!this.conversationsCollectionReady) {
+              if (!this.qdrantVectorService.hasCollection('conversations')) {
+                await this.qdrantVectorService.createCollection({
+                  name: 'conversations',
+                  vectorSize: 1536, // OpenAI text-embedding-3-small size
+                  distance: 'Cosine',
+                });
+              }
+              this.conversationsCollectionReady = true;
+            }
 
-          // TODO: Integrate embedding generation for vector search
-          // 1. Generate embeddings for promptText
-          // 2. Search similar conversation contexts
-          // 3. Provide relevant context snippets
+            const searchResults = await this.qdrantVectorService.searchSimilar(
+              'conversations',
+              promptEmbedding,
+              { limit: 3, scoreThreshold: 0.7 },
+            );
+
+            if (searchResults.length > 0) {
+              const snippets = searchResults
+                .map((r) => {
+                  const content = r.payload.content || r.payload.prompt || '';
+                  const response = r.payload.response || '';
+                  return `User: ${content}\nAssistant: ${response}`;
+                })
+                .join('\n\n');
+              vectorContext = snippets;
+              logger.debug('Retrieved vector context', {
+                count: searchResults.length,
+                userId,
+              });
+
+              // Track vector search in Langfuse if available
+              if (conversationTrace && this.enhancedLangfuseService) {
+                await this.enhancedLangfuseService.trackGeneration({
+                  traceId: conversationTrace.id,
+                  name: 'vector_context_retrieval',
+                  input: promptText,
+                  output: snippets,
+                  model: 'qdrant_vector_search',
+                  startTime: new Date(),
+                  endTime: new Date(),
+                  usage: { input: 0, output: 0, total: 0 },
+                  metadata: {
+                    operation: 'vector_search',
+                    resultsCount: searchResults.length,
+                    scores: searchResults.map((r) => r.score),
+                  },
+                });
+              }
+            }
+          }
         } catch (error) {
-          logger.warn('Qdrant vector search preparation failed', {
+          logger.warn('Qdrant vector search failed', {
             error,
             userId,
             guildId: guildId || undefined,
@@ -2907,6 +2955,7 @@ export class CoreIntelligenceService {
         webAnalysis,
         ragOptimization,
         autonomousEnhancedContext, // Pass autonomous context for enhancement
+        vectorContext,
       );
 
       let { fullResponseText } = await this._generateAgenticResponse(
@@ -3061,6 +3110,7 @@ export class CoreIntelligenceService {
         mcpOrchestrationResult,
         analyticsData,
         success: true,
+        embedding: promptEmbedding,
       });
 
       // Prepare final response with advanced capabilities attachments
@@ -3573,6 +3623,7 @@ export class CoreIntelligenceService {
     webAnalysis?: any,
     ragOptimization?: any,
     autonomousEnhancedContext?: any,
+    vectorContext?: string,
   ): Promise<EnhancedContext> {
     logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, {
       userId: messageForAnalysis.author.id,
@@ -3587,8 +3638,13 @@ export class CoreIntelligenceService {
       );
 
       // Enhance context with multimodal and web analysis
-      if (multimodalAnalysis || webAnalysis || ragOptimization) {
+      if (multimodalAnalysis || webAnalysis || ragOptimization || vectorContext) {
         let enhancedSystemPrompt = agenticContextData.systemPrompt || '';
+
+        if (vectorContext) {
+          enhancedSystemPrompt += '\n\n## Relevant Past Conversation Context (Vector Retrieved)\n';
+          enhancedSystemPrompt += `${vectorContext}\n`;
+        }
 
         if (multimodalAnalysis) {
           enhancedSystemPrompt += '\n\n## Visual Context\n';
@@ -4194,6 +4250,7 @@ export class CoreIntelligenceService {
     mcpOrchestrationResult: MCPOrchestrationResult;
     analyticsData: Record<string, unknown> & { startTime: number };
     success: boolean;
+    embedding?: number[] | null;
   }): Promise<void> {
     const {
       userId,
@@ -4205,6 +4262,7 @@ export class CoreIntelligenceService {
       mcpOrchestrationResult,
       analyticsData,
       success,
+      embedding,
     } = data;
     logger.debug(`[CoreIntelSvc] Stage 9: Update History, Cache, Memory`, { userId });
     try {
@@ -4274,6 +4332,48 @@ export class CoreIntelligenceService {
           timestamp: new Date(),
         });
       }
+      // Qdrant Vector Storage: Store conversation turn
+      if (this.qdrantVectorService && !this.config.enableResponseCache /* ensure not just cached */) {
+        try {
+          let vector = embedding;
+          if (!vector) {
+            vector = await knowledgeBaseEmbeddingsService.generateEmbedding(promptText);
+          }
+
+          if (vector) {
+            // Ensure collection exists (lazy check with caching)
+            if (!this.conversationsCollectionReady) {
+              if (!this.qdrantVectorService.hasCollection('conversations')) {
+                await this.qdrantVectorService.createCollection({
+                  name: 'conversations',
+                  vectorSize: 1536,
+                  distance: 'Cosine',
+                });
+              }
+              this.conversationsCollectionReady = true;
+            }
+
+            await this.qdrantVectorService.upsertDocuments('conversations', [
+              {
+                id: crypto.randomUUID(),
+                vector,
+                payload: {
+                  content: promptText,
+                  response: fullResponseText,
+                  userId,
+                  channelId,
+                  guildId: typeof analyticsData.guildId === 'string' ? analyticsData.guildId : null,
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            ]);
+            logger.debug('Stored conversation turn in Qdrant', { userId });
+          }
+        } catch (error) {
+          logger.warn('Failed to store conversation in Qdrant', { error });
+        }
+      }
+
       this.recordAnalyticsInteraction({
         ...analyticsData,
         step: 'final_updates_complete',
