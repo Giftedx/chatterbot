@@ -8,7 +8,12 @@ import { MCPToolResult } from './types.js';
 import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { createRequire } from 'module';
+import path from 'path';
 
+const nodeRequire = createRequire(path.join(process.cwd(), 'src/services/enhanced-intelligence/direct-mcp-executor.service.ts'));
 const MAX_TEXT_CONTENT_LENGTH = 1000;
 
 export class DirectMCPExecutor {
@@ -20,6 +25,7 @@ export class DirectMCPExecutor {
   private tenorApiKey?: string;
   private elevenLabsApiKey?: string;
   private elevenLabsVoiceId?: string;
+  private sequentialThinkingClient: Client | null = null;
   
   constructor() {
     console.log('🚀 DirectMCPExecutor initialized with real API integrations');
@@ -180,12 +186,148 @@ export class DirectMCPExecutor {
   }
 
   /**
+   * Initialize connection to the Sequential Thinking MCP server
+   */
+  private async initializeSequentialThinkingClient(): Promise<void> {
+    if (this.sequentialThinkingClient) return;
+
+    try {
+      // Resolve path to the server executable
+      const serverPath = nodeRequire.resolve('@modelcontextprotocol/server-sequential-thinking/dist/index.js');
+
+      const transport = new StdioClientTransport({
+        command: "node",
+        args: [serverPath]
+      });
+
+      const client = new Client(
+        {
+          name: "chatterbot-client",
+          version: "1.0.0",
+        },
+        {
+          capabilities: {},
+        }
+      );
+
+      await client.connect(transport);
+      this.sequentialThinkingClient = client;
+      console.log('✅ Sequential Thinking MCP Client initialized');
+    } catch (error) {
+      console.warn('Failed to initialize Sequential Thinking MCP Client:', error);
+    }
+  }
+
+  /**
    * Execute sequential thinking using Gemini AI or MCP tool if available
    */
   async executeSequentialThinking(thought: string): Promise<MCPToolResult> {
-    // TODO: If a real MCP tool system is available, invoke it here
     try {
       console.log(`🤔 Real Sequential Thinking: ${thought.substring(0, 50)}...`);
+      await this.initializeSequentialThinkingClient();
+
+      // Use MCP Tool + Gemini Loop if available
+      if (this.genAI && this.sequentialThinkingClient) {
+        try {
+          const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+          const accumulatedThoughts: any[] = [];
+          let currentThought = thought;
+          let thoughtNumber = 1;
+          const totalThoughts = 5; // Default estimate
+          let nextThoughtNeeded = true;
+
+          // Perform iterative thinking loop
+          while (nextThoughtNeeded && thoughtNumber <= 10) {
+             const prompt = `You are a sequential thinking assistant. You must use the "sequentialthinking" tool logic to structure your analysis.
+
+Current problem: "${thought}"
+History of thoughts: ${JSON.stringify(accumulatedThoughts)}
+
+Step ${thoughtNumber}:
+Please generate the parameters for the next thought step as a valid JSON object.
+Do NOT call the tool directly, just provide the JSON object matching this schema:
+{
+  "thought": "Your detailed thought content",
+  "nextThoughtNeeded": boolean,
+  "thoughtNumber": integer,
+  "totalThoughts": integer
+}
+
+The JSON should be the ONLY output.`;
+
+            const result = await model.generateContent(prompt);
+            let responseText = result.response.text();
+
+            // Clean up Markdown JSON if present
+            responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            let toolInput;
+            try {
+              toolInput = JSON.parse(responseText);
+            } catch (e) {
+               console.warn(`Failed to parse JSON from Gemini for step ${thoughtNumber}, retrying with simple structure`);
+               toolInput = {
+                 thought: responseText,
+                 nextThoughtNeeded: thoughtNumber < 3,
+                 thoughtNumber: thoughtNumber,
+                 totalThoughts: 3
+               };
+            }
+
+            // Enforce schema integrity
+            toolInput.thoughtNumber = thoughtNumber;
+            if (!toolInput.totalThoughts) toolInput.totalThoughts = totalThoughts;
+
+            // Call the MCP Tool to record state
+            const toolResult = await this.sequentialThinkingClient.callTool({
+              name: "sequentialthinking",
+              arguments: toolInput
+            });
+
+            accumulatedThoughts.push({
+               step: thoughtNumber,
+               input: toolInput,
+               result: toolResult
+            });
+
+            if (toolInput.nextThoughtNeeded === false) {
+              nextThoughtNeeded = false;
+            }
+            thoughtNumber++;
+          }
+
+          const finalAnswer = accumulatedThoughts.length > 0
+            ? accumulatedThoughts[accumulatedThoughts.length - 1].input.thought
+            : "Analysis completed.";
+
+          return {
+            success: true,
+            data: {
+              steps: accumulatedThoughts.map(t => ({
+                stepNumber: t.step,
+                thought: t.input.thought,
+                reasoning: JSON.stringify(t.result),
+                conclusion: t.step === accumulatedThoughts.length ? 'Final Step' : 'Proceeding...'
+              })),
+              finalAnswer: finalAnswer,
+              completed: true,
+              metadata: {
+                startTime: new Date().toISOString(),
+                stepsCompleted: accumulatedThoughts.length,
+                reasoningMethod: 'mcp_sequential_thinking_loop',
+                processingTime: 'Iterative AI analysis'
+              }
+            },
+            toolUsed: 'mcp-sequential-thinking',
+            requiresExternalMCP: true
+          };
+
+        } catch (mcpError) {
+          console.warn('MCP Sequential Thinking loop failed, falling back to simple Gemini:', mcpError);
+        }
+      }
+
+      // Existing Gemini Fallback (if MCP failed or not available)
       if (this.genAI) {
         try {
           const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -220,7 +362,7 @@ export class DirectMCPExecutor {
           console.warn('Gemini AI failed, using local reasoning:', aiError);
         }
       }
-      // Fallback
+      // Local Fallback
       const steps = [
         {
           stepNumber: 1,
