@@ -63,6 +63,7 @@ import {
 } from './enhanced-intelligence/types.js';
 // Removed obsolete import: model-router.service.js replaced by performance-aware-routing
 import { knowledgeBaseService } from './knowledge-base.service.js';
+import { knowledgeBaseEmbeddingsService } from './knowledge-base-embeddings.service.js';
 import type { ProviderName } from '../config/models.js';
 import { getEnvAsBoolean, isLocalDBDisabled } from '../utils/env.js';
 import { langGraphWorkflow, advancedLangGraphWorkflow } from '../agents/langgraph/workflow.js';
@@ -2855,21 +2856,47 @@ export class CoreIntelligenceService {
 
       const history = await getHistory(channelId);
 
-      // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
-      const vectorContext = '';
+      // Qdrant Vector Search - Enhanced context retrieval
+      let vectorContext = '';
       if (this.qdrantVectorService && !lightweight) {
         try {
-          // Placeholder for vector context retrieval - requires embedding generation
-          // The Qdrant service is initialized but needs embedding integration
-          logger.debug('Qdrant vector service available but embeddings not integrated yet', {
-            hasService: !!this.qdrantVectorService,
-            userId,
-          });
-
-          // TODO: Integrate embedding generation for vector search
+          // Integrate embedding generation for vector search
           // 1. Generate embeddings for promptText
-          // 2. Search similar conversation contexts
-          // 3. Provide relevant context snippets
+          const embedding = await knowledgeBaseEmbeddingsService.generateEmbedding(promptText);
+
+          if (embedding) {
+            // 2. Search similar conversation contexts
+            const collectionName = 'conversations';
+            if (this.qdrantVectorService.hasCollection(collectionName)) {
+              const searchResults = await this.qdrantVectorService.searchSimilar(
+                collectionName,
+                embedding,
+                {
+                  limit: 3,
+                  scoreThreshold: 0.7,
+                  withPayload: true,
+                },
+              );
+
+              // 3. Provide relevant context snippets
+              if (searchResults.length > 0) {
+                vectorContext = searchResults
+                  .map((r) => {
+                    const payload = r.payload as any;
+                    return `[Context from similar conversation]: ${payload.content || payload.response || ''}`;
+                  })
+                  .join('\n');
+                logger.debug('Qdrant vector search found relevant context', {
+                  count: searchResults.length,
+                  userId,
+                });
+              }
+            } else {
+              logger.debug(
+                `Qdrant collection '${collectionName}' not found or empty, skipping search.`,
+              );
+            }
+          }
         } catch (error) {
           logger.warn('Qdrant vector search preparation failed', {
             error,
@@ -2907,6 +2934,7 @@ export class CoreIntelligenceService {
         webAnalysis,
         ragOptimization,
         autonomousEnhancedContext, // Pass autonomous context for enhancement
+        vectorContext,
       );
 
       let { fullResponseText } = await this._generateAgenticResponse(
@@ -3573,6 +3601,7 @@ export class CoreIntelligenceService {
     webAnalysis?: any,
     ragOptimization?: any,
     autonomousEnhancedContext?: any,
+    vectorContext?: string,
   ): Promise<EnhancedContext> {
     logger.debug(`[CoreIntelSvc] Stage 5: Context Aggregation`, {
       userId: messageForAnalysis.author.id,
@@ -3587,8 +3616,12 @@ export class CoreIntelligenceService {
       );
 
       // Enhance context with multimodal and web analysis
-      if (multimodalAnalysis || webAnalysis || ragOptimization) {
+      if (multimodalAnalysis || webAnalysis || ragOptimization || vectorContext) {
         let enhancedSystemPrompt = agenticContextData.systemPrompt || '';
+
+        if (vectorContext) {
+          enhancedSystemPrompt += `\n\n## Similar Conversation Context\n${vectorContext}\n`;
+        }
 
         if (multimodalAnalysis) {
           enhancedSystemPrompt += '\n\n## Visual Context\n';

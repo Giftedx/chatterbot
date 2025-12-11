@@ -11,6 +11,17 @@ export class KnowledgeBaseEmbeddingsService {
     if (process.env.OPENAI_API_KEY) this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
 
+  async generateEmbedding(text: string): Promise<number[] | null> {
+    if (!this.client) return null;
+    try {
+      const res = await this.client.embeddings.create({ model: this.model, input: text });
+      return res.data?.[0]?.embedding || null;
+    } catch (error) {
+      console.error('Failed to generate embedding:', error);
+      return null;
+    }
+  }
+
   async embedAndStoreChunk(sourceId: string, content: string, section?: string, guildId?: string): Promise<void> {
     if (!this.client) return;
     const res = await this.client.embeddings.create({ model: this.model, input: content });
