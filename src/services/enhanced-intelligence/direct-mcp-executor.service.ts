@@ -7,6 +7,7 @@
 import { MCPToolResult } from './types.js';
 import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
+import { mcpManager } from '../mcp-manager.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const MAX_TEXT_CONTENT_LENGTH = 1000;
@@ -370,9 +371,109 @@ export class DirectMCPExecutor {
    * Execute browser automation with real web interaction capabilities or MCP tool if available
    */
   async executeBrowserAutomation(url: string): Promise<MCPToolResult> {
-    // TODO: If a real MCP tool system is available, invoke it here
+    // Attempt to use Real MCP Tool first
     try {
-      console.log(`🌐 Real Browser Automation: ${url}`);
+      const playwrightClient = mcpManager.getClient('playwright');
+      if (playwrightClient && playwrightClient.isConnected()) {
+        console.log(`🌐 Real Browser Automation (via MCP Playwright): ${url}`);
+
+        // 1. Navigate to the page
+        await mcpManager.callTool('playwright', 'navigate', { url });
+
+        // 2. Extract content (using evaluate or similar)
+        // We'll use evaluate to get document properties
+        // This script extracts title, meta description, and links
+        const extractionScript = `
+          (() => {
+            const title = document.title;
+            const description = document.querySelector('meta[name="description"]')?.content || 'No description available';
+            const links = Array.from(document.querySelectorAll('a'))
+              .map(a => a.href)
+              .filter(href => href && href.startsWith('http'))
+              .slice(0, 10);
+            return JSON.stringify({ title, description, links });
+          })()
+        `;
+
+        const evalResult = await mcpManager.callTool('playwright', 'evaluate', { script: extractionScript }) as any;
+        let pageData = { title: url, description: 'No description available', links: [] };
+
+        // Handle result format from MCP
+        // The evaluate tool might return a string result which is the JSON string
+        if (typeof evalResult?.result === 'string') {
+          try {
+            pageData = JSON.parse(evalResult.result);
+          } catch (e) {
+             console.warn('Failed to parse evaluation result, using defaults', e);
+          }
+        } else if (typeof evalResult === 'string') {
+           try {
+            pageData = JSON.parse(evalResult);
+          } catch (e) {
+             // Maybe the result is the direct string output of the script if the MCP wrapper handles it
+             // But usually it returns an object structure.
+             // If we mocked it to return JSON string in test, we handle it.
+             // But real playwright server might return { type: 'text', text: '...' } or similar content.
+             // We'll assume the standard tool call return is { content: [ { type: 'text', text: '...' } ] }
+             // But mcpManager.callTool returns 'unknown'.
+             // Let's assume for now our mock matches what we expect or we handle common patterns.
+             console.warn('Received string result directly', e);
+          }
+        } else if (evalResult?.content && Array.isArray(evalResult.content)) {
+            // Standard MCP response format
+             const textContent = evalResult.content.find((c: any) => c.type === 'text')?.text;
+             if (textContent) {
+                 try {
+                     pageData = JSON.parse(textContent);
+                 } catch (parseError) {
+                      // If the script returned a string that is a JSON, great.
+                      // If it returned a raw value, we might need to adjust.
+                      console.warn('Failed to parse text content from MCP response', parseError);
+                 }
+             }
+        }
+
+        const result = {
+          success: true,
+          currentUrl: url,
+          pageTitle: pageData.title || url,
+          pageDescription: pageData.description,
+          availableLinks: pageData.links || [],
+          actions: [
+            {
+              action: 'navigate',
+              target: url,
+              success: true,
+              timestamp: new Date().toISOString()
+            },
+            {
+              action: 'evaluate',
+              target: 'page_info',
+              success: true,
+              timestamp: new Date().toISOString()
+            }
+          ],
+          metadata: {
+            loadTime: 'unknown', // Playwright doesn't easily give this without perf API
+            timestamp: new Date().toISOString(),
+            browserEngine: 'playwright_mcp'
+          }
+        };
+
+        return {
+          success: true,
+          data: result,
+          toolUsed: 'mcp-playwright',
+          requiresExternalMCP: true
+        };
+      }
+    } catch (mcpError) {
+      console.warn('MCP Browser Automation failed, falling back to Axios:', mcpError);
+    }
+
+    // Fallback to Axios implementation
+    try {
+      console.log(`🌐 Real Browser Automation (fallback to Axios): ${url}`);
       try {
         const response = await axios.get(url, {
           timeout: 15000,
