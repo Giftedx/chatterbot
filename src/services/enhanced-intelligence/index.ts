@@ -93,7 +93,16 @@ export class EnhancedInvisibleIntelligenceService {
       this.behaviorAnalytics = dependencies.behaviorAnalytics;
       this.smartRecommendations = dependencies.smartRecommendations;
       this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
+
       this.personalizationEngine = dependencies.personalizationEngine;
+
+      // Initialize CrossSessionLearningEngine if dependencies are met
+      if (dependencies.crossSessionLearning) {
+        this.crossSessionLearning = dependencies.crossSessionLearning;
+      } else {
+        // Fallback initialization if not provided in dependencies
+        this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
+      }
       
       // Initialize Advanced Memory Manager if available
       if (this.advancedMemoryManager) {
@@ -933,6 +942,8 @@ export function createEnhancedInvisibleIntelligenceService(
     adaptationAggressiveness: parseFloat(process.env.ADAPTATION_AGGRESSIVENESS || '0.6')
   };
 
+  const userMemoryService = new UserMemoryService();
+
   // Import the concrete implementations
   const dependencies: IEnhancedIntelligenceServiceDependencies = {
     mcpToolsService: new UnifiedMCPOrchestratorService(mcpManager),
@@ -940,13 +951,15 @@ export function createEnhancedInvisibleIntelligenceService(
     uiService: new EnhancedUIService(),
     responseService: new EnhancedResponseService(),
     cacheService: new EnhancedCacheService(),
-    userMemoryService: new UserMemoryService(),
+    userMemoryService: userMemoryService,
     // Advanced Memory & Social Intelligence System
     advancedMemoryManager: new AdvancedMemoryManager(advancedMemoryConfig),
     // Optional personalization services
     behaviorAnalytics: new UserBehaviorAnalyticsService(),
     smartRecommendations: new SmartRecommendationService(),
-    personalizationEngine: new PersonalizationEngine(mcpManager)
+    personalizationEngine: new PersonalizationEngine(mcpManager),
+    // Cross-session learning
+    crossSessionLearning: new CrossSessionLearningEngine(userMemoryService)
   };
   
   return new EnhancedInvisibleIntelligenceService(dependencies);

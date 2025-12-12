@@ -216,4 +216,5 @@ export interface IEnhancedIntelligenceServiceDependencies {
   personalizationEngine?: IPersonalizationEngine;
   behaviorAnalytics?: IBehaviorAnalyticsService;
   smartRecommendations?: ISmartRecommendationService;
+  crossSessionLearning?: any; // Avoiding circular dependency with CrossSessionLearningEngine
 }
