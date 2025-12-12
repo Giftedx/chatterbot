@@ -548,4 +548,58 @@ export class UserMemoryService {
 
     return context.length > 0 ? context.join('. ') + '.' : '';
   }
+
+  /**
+   * Extract and store memory from content (Interface implementation for CrossSessionLearningEngine)
+   */
+  public async extractAndStoreMemory(userId: string, content: string, guildId?: string): Promise<void> {
+    try {
+      // 1. Try standard extraction first
+      const context: MemoryContext = {
+        userId,
+        guildId,
+        messageContent: content
+      };
+      await this.processConversation(context);
+
+      // 2. Handle specific session insights if present (which standard extraction might miss)
+      if (content.startsWith('Session insights:')) {
+        const insights = content.replace('Session insights: ', '').trim();
+        if (insights) {
+          const memory = await this.getUserMemory(userId, guildId);
+          let currentInsights = '';
+
+          if (memory && memory.memories['session_insights']) {
+             currentInsights = String(memory.memories['session_insights']);
+          }
+
+          // Append new insights with a separator
+          // We limit the size to avoid hitting database limits or token limits
+          const separator = ' | ';
+          let newInsights = currentInsights
+            ? `${currentInsights}${separator}${insights}`
+            : insights;
+
+          // Simple truncation strategy if it gets too large (arbitrary 4000 char limit)
+          if (newInsights.length > 4000) {
+            newInsights = '...' + newInsights.substring(newInsights.length - 3900);
+          }
+
+          await this.updateUserMemory(
+            userId,
+            { session_insights: newInsights },
+            {},
+            guildId
+          );
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to extract and store memory', {
+        operation: 'extract-and-store',
+        userId,
+        guildId,
+        error: String(error)
+      });
+    }
+  }
 }

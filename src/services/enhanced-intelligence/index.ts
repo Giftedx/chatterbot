@@ -92,6 +92,8 @@ export class EnhancedInvisibleIntelligenceService {
     try {
       this.behaviorAnalytics = dependencies.behaviorAnalytics;
       this.smartRecommendations = dependencies.smartRecommendations;
+      this.crossSessionLearning = new CrossSessionLearningEngine(this.userMemoryService);
+
       this.personalizationEngine = dependencies.personalizationEngine;
 
       // Initialize CrossSessionLearningEngine if dependencies are met
