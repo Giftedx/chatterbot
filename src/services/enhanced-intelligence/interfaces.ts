@@ -108,6 +108,7 @@ export interface ICacheService {
 
 export interface IUserMemoryService {
   processConversation(context: MemoryContext): Promise<boolean>;
+  extractAndStoreMemory(userId: string, content: string, guildId?: string): Promise<void>;
 }
 
 export interface IPersonalizationEngine {
@@ -215,4 +216,5 @@ export interface IEnhancedIntelligenceServiceDependencies {
   personalizationEngine?: IPersonalizationEngine;
   behaviorAnalytics?: IBehaviorAnalyticsService;
   smartRecommendations?: ISmartRecommendationService;
+  crossSessionLearning?: any; // Avoiding circular dependency with CrossSessionLearningEngine
 }

@@ -198,6 +198,62 @@ export class UserMemoryService {
   }
 
   /**
+   * Extract and store memory from content
+   * Implements the interface required by CrossSessionLearningEngine
+   */
+  public async extractAndStoreMemory(userId: string, content: string, guildId?: string): Promise<void> {
+    try {
+      // Special handling for session insights
+      if (content.startsWith('Session insights:')) {
+        const insights = content.replace('Session insights: ', '');
+        if (!insights) return;
+
+        // Retrieve existing memory to append insights
+        const existing = await this.getUserMemory(userId, guildId);
+        let currentInsights = (existing?.memories['session_insights'] as string) || '';
+
+        // Append new insights with a delimiter if there are existing ones
+        if (currentInsights) {
+          currentInsights += ' | ';
+        }
+        currentInsights += insights;
+
+        // Store updated insights
+        await this.updateUserMemory(
+          userId,
+          { session_insights: currentInsights },
+          {},
+          guildId
+        );
+
+        logger.info('Session insights stored', {
+          userId,
+          guildId,
+          insightsLength: insights.length
+        });
+        return;
+      }
+
+      // Default behavior: Process as conversation
+      const context: MemoryContext = {
+        userId,
+        guildId,
+        messageContent: content,
+        responseContent: ''
+      };
+
+      await this.processConversation(context);
+    } catch (error) {
+      logger.error('Failed to extract and store memory', {
+        operation: 'extract-and-store',
+        userId,
+        guildId,
+        error: String(error)
+      });
+    }
+  }
+
+  /**
    * Process conversation for memory extraction
    */
   public async processConversation(context: MemoryContext): Promise<boolean> {
