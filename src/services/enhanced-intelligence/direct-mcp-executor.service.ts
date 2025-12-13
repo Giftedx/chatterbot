@@ -8,6 +8,7 @@ import { MCPToolResult } from './types.js';
 import axios from 'axios';
 import { knowledgeBaseService } from '../knowledge-base.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { memorySearchNodes } from '../../mcp/index.js';
 
 const MAX_TEXT_CONTENT_LENGTH = 1000;
 
@@ -59,10 +60,37 @@ export class DirectMCPExecutor {
    * Execute memory search using real knowledge base integration or MCP tool if available
    */
   async executeMemorySearch(query: string): Promise<MCPToolResult> {
-    // TODO: If a real MCP tool system is available, invoke it here (e.g., via VS Code MCP tool API)
-    // For now, use the knowledge base service as the real implementation
+    // Try to invoke real MCP tool system first (e.g., via VS Code MCP tool API)
     try {
-      console.log(`🧠 Real Memory Search: ${query}`);
+      const mcpResult = await memorySearchNodes({ query });
+      console.log(`🧠 Real MCP Memory Search: ${query}`);
+
+      return {
+        success: true,
+        data: {
+          entities: mcpResult.entities || [],
+          relations: mcpResult.relations || [],
+          memories: mcpResult.memories || [],
+          totalResults: (mcpResult.entities?.length || 0) + (mcpResult.memories?.length || 0),
+          searchMethod: 'mcp_tool',
+          hasGroundedKnowledge: (mcpResult.entities?.length || 0) > 0,
+          averageConfidence: 1.0 // Assumed high confidence from direct tool
+        },
+        toolUsed: 'mcp-memory-search',
+        requiresExternalMCP: false
+      };
+    } catch (mcpError) {
+      // MCP tool not available, fall back to knowledge base service
+      return this.executeFallbackMemorySearch(query);
+    }
+  }
+
+  /**
+   * Fallback implementation for memory search using internal knowledge base service
+   */
+  private async executeFallbackMemorySearch(query: string): Promise<MCPToolResult> {
+    try {
+      console.log(`🧠 Real Memory Search (Fallback): ${query}`);
       const knowledgeEntries = await knowledgeBaseService.search({
         query,
         minConfidence: 0.5,
