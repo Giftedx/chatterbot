@@ -118,6 +118,7 @@ import { EnhancedLangfuseService } from './enhanced-langfuse.service.js';
 import { MultiProviderTokenizationService } from './multi-provider-tokenization.service.js';
 import { EnhancedSemanticCacheService } from './enhanced-semantic-cache.service.js';
 import { QdrantVectorService } from './qdrant-vector.service.js';
+import { knowledgeBaseEmbeddingsService } from './knowledge-base-embeddings.service.js';
 import { QwenVLMultimodalService } from './qwen-vl-multimodal.service.js';
 import { Neo4jKnowledgeGraphService } from './neo4j-knowledge-graph.service.js';
 import { DSPyRAGOptimizationService } from './dspy-rag-optimization.service.js';
@@ -2855,23 +2856,57 @@ export class CoreIntelligenceService {
 
       const history = await getHistory(channelId);
 
-      // Qdrant Vector Search - Enhanced context retrieval (TODO: Add embedding generation)
-      const vectorContext = '';
+      // Qdrant Vector Search - Enhanced context retrieval
+      let vectorContext = '';
       if (this.qdrantVectorService && !lightweight) {
         try {
-          // Placeholder for vector context retrieval - requires embedding generation
-          // The Qdrant service is initialized but needs embedding integration
-          logger.debug('Qdrant vector service available but embeddings not integrated yet', {
-            hasService: !!this.qdrantVectorService,
-            userId,
-          });
+          const vector = await knowledgeBaseEmbeddingsService.generateEmbedding(promptText);
+          if (vector) {
+            const results = await this.qdrantVectorService.searchSimilar('conversations', vector, {
+              limit: 5,
+              scoreThreshold: 0.7,
+            });
 
-          // TODO: Integrate embedding generation for vector search
-          // 1. Generate embeddings for promptText
-          // 2. Search similar conversation contexts
-          // 3. Provide relevant context snippets
+            if (results.length > 0) {
+              const snippets = results
+                .map((r) => {
+                  const content = r.payload?.content || r.payload?.text || '';
+                  // Fallback to JSON stringify if content is object/complex, or skip empty
+                  return typeof content === 'string' ? content : JSON.stringify(content);
+                })
+                .filter((s) => s.length > 0)
+                .join('\n---\n');
+
+              if (snippets) {
+                vectorContext = `\n## Relevant Past Conversations (Vector Search)\n${snippets}\n`;
+                logger.debug('Qdrant vector search found relevant context', {
+                  count: results.length,
+                  userId,
+                });
+
+                // Track RAG retrieval in Langfuse if available
+                if (conversationTrace && this.enhancedLangfuseService) {
+                  await this.enhancedLangfuseService.trackGeneration({
+                    traceId: conversationTrace.id,
+                    name: 'qdrant_vector_search',
+                    input: promptText,
+                    output: snippets,
+                    model: 'qdrant_retrieval',
+                    startTime: new Date(),
+                    endTime: new Date(),
+                    usage: { input: 0, output: 0, total: 0 },
+                    metadata: {
+                      operation: 'vector_search',
+                      resultsCount: results.length,
+                      topScore: results[0]?.score,
+                    },
+                  });
+                }
+              }
+            }
+          }
         } catch (error) {
-          logger.warn('Qdrant vector search preparation failed', {
+          logger.warn('Qdrant vector search failed', {
             error,
             userId,
             guildId: guildId || undefined,
@@ -2908,6 +2943,14 @@ export class CoreIntelligenceService {
         ragOptimization,
         autonomousEnhancedContext, // Pass autonomous context for enhancement
       );
+
+      // Inject vector context if available
+      if (vectorContext) {
+        agenticContextData.systemPrompt += vectorContext;
+        if ((agenticContextData as any).additionalContext) {
+          (agenticContextData as any).additionalContext += `\n- Integrated vector search context`;
+        }
+      }
 
       let { fullResponseText } = await this._generateAgenticResponse(
         agenticContextData,
