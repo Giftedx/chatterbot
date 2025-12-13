@@ -359,7 +359,7 @@ export class QdrantVectorService {
       
       return {
         name: collectionName,
-        vectorsCount: info.vectors_count || 0,
+        vectorsCount: (info as any).vectors_count || info.indexed_vectors_count || info.points_count || 0,
         segments: info.segments_count || 0,
         diskUsage: infoAny.disk_usage || 0,
         ramUsage: infoAny.ram_usage || 0,

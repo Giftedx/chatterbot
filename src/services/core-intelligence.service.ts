@@ -2408,9 +2408,14 @@ export class CoreIntelligenceService {
         analyticsData,
       );
 
-      // Qwen VL Multimodal Analysis - Analyze image attachments for enhanced understanding
-      let multimodalAnalysis: any = null;
-      if (this.qwenVLMultimodalService && !lightweight && commonAttachments.length > 0) {
+      // --- Parallel Execution of Independent Analysis Steps ---
+      // 1. Multimodal Analysis (if enabled, not lightweight, has attachments)
+      // 2. Web Analysis (if enabled, not lightweight, has URLs)
+      // 3. Unified Input Analysis (always required)
+
+      const multimodalTask = async (): Promise<any> => {
+        if (!this.qwenVLMultimodalService || lightweight || commonAttachments.length === 0) return null;
+
         const multimodalOperationId = performanceMonitor.startOperation(
           'qwen_vl_multimodal_service',
           'image_analysis',
@@ -2444,8 +2449,9 @@ export class CoreIntelligenceService {
             const imageAnalyses = await Promise.all(imageAnalysisPromises);
             const successfulAnalyses = imageAnalyses.filter((analysis) => analysis.success);
 
+            let result = null;
             if (successfulAnalyses.length > 0) {
-              multimodalAnalysis = {
+              result = {
                 imageCount: successfulAnalyses.length,
                 descriptions: successfulAnalyses.map((analysis) => analysis.analysis.description),
                 extractedText: successfulAnalyses
@@ -2470,9 +2476,9 @@ export class CoreIntelligenceService {
               logger.debug('Multimodal image analysis completed', {
                 userId,
                 imagesAnalyzed: successfulAnalyses.length,
-                totalObjects: multimodalAnalysis.identifiedObjects.length,
-                hasExtractedText: !!multimodalAnalysis.extractedText,
-                mood: multimodalAnalysis.overallMood,
+                totalObjects: result.identifiedObjects.length,
+                hasExtractedText: !!result.extractedText,
+                mood: result.overallMood,
               });
 
               // Track multimodal analysis in Langfuse if available
@@ -2481,7 +2487,7 @@ export class CoreIntelligenceService {
                   traceId: conversationTrace.id,
                   name: 'multimodal_image_analysis',
                   input: `Analyzed ${successfulAnalyses.length} images with context: ${promptText.substring(0, 100)}...`,
-                  output: multimodalAnalysis.visualContext,
+                  output: result.visualContext,
                   model: 'qwen_vl_multimodal',
                   startTime: new Date(),
                   endTime: new Date(),
@@ -2499,9 +2505,9 @@ export class CoreIntelligenceService {
                   metadata: {
                     operation: 'image_analysis',
                     imageCount: successfulAnalyses.length,
-                    objectsIdentified: multimodalAnalysis.identifiedObjects.length,
-                    textExtracted: !!multimodalAnalysis.extractedText,
-                    moodDetected: !!multimodalAnalysis.overallMood,
+                    objectsIdentified: result.identifiedObjects.length,
+                    textExtracted: !!result.extractedText,
+                    moodDetected: !!result.overallMood,
                   },
                 });
               }
@@ -2515,11 +2521,12 @@ export class CoreIntelligenceService {
               undefined,
               {
                 imagesAnalyzed: successfulAnalyses.length,
-                objectsIdentified: multimodalAnalysis?.identifiedObjects?.length || 0,
-                textExtracted: !!multimodalAnalysis?.extractedText,
+                objectsIdentified: result?.identifiedObjects?.length || 0,
+                textExtracted: !!result?.extractedText,
                 processingSuccess: true,
               },
             );
+            return result;
           } else {
             performanceMonitor.endOperation(
               multimodalOperationId,
@@ -2529,6 +2536,7 @@ export class CoreIntelligenceService {
               undefined,
               { imagesAnalyzed: 0, reason: 'no_image_attachments' },
             );
+            return null;
           }
         } catch (error) {
           performanceMonitor.endOperation(
@@ -2545,12 +2553,13 @@ export class CoreIntelligenceService {
             imageCount: commonAttachments.filter((att) => att.contentType?.startsWith('image/'))
               .length,
           });
+          return null;
         }
-      }
+      };
 
-      // Crawl4AI Web Analysis - Extract and analyze web content from URLs
-      let webAnalysis: any = null;
-      if (this.crawl4aiWebService && !lightweight) {
+      const webTask = async (): Promise<any> => {
+        if (!this.crawl4aiWebService || lightweight) return null;
+
         try {
           // Extract URLs from the prompt text
           const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/gi;
@@ -2580,7 +2589,7 @@ export class CoreIntelligenceService {
             );
 
             if (successfulResults.length > 0) {
-              webAnalysis = {
+              const result = {
                 urlCount: successfulResults.length,
                 titles: successfulResults.map((result) => result.title).filter(Boolean),
                 content: successfulResults
@@ -2606,8 +2615,8 @@ export class CoreIntelligenceService {
               logger.debug('Web content analysis completed', {
                 userId,
                 urlsProcessed: successfulResults.length,
-                totalContent: webAnalysis.content.length,
-                titles: webAnalysis.titles,
+                totalContent: result.content.length,
+                titles: result.titles,
               });
 
               // Track web analysis in Langfuse if available
@@ -2616,23 +2625,24 @@ export class CoreIntelligenceService {
                   traceId: conversationTrace.id,
                   name: 'web_content_analysis',
                   input: `Analyzed ${urlsToProcess.length} URLs: ${urlsToProcess.join(', ')}`,
-                  output: webAnalysis.summaryContext,
+                  output: result.summaryContext,
                   model: 'crawl4ai_web_scraper',
                   startTime: new Date(),
                   endTime: new Date(),
                   usage: {
                     input: urlsToProcess.length,
-                    output: webAnalysis.content.length,
-                    total: urlsToProcess.length + webAnalysis.content.length,
+                    output: result.content.length,
+                    total: urlsToProcess.length + result.content.length,
                   },
                   metadata: {
                     operation: 'web_content_extraction',
                     urlCount: successfulResults.length,
-                    contentLength: webAnalysis.content.length,
-                    titles: webAnalysis.titles,
+                    contentLength: result.content.length,
+                    titles: result.titles,
                   },
                 });
               }
+              return result;
             }
           }
         } catch (error) {
@@ -2641,9 +2651,27 @@ export class CoreIntelligenceService {
             userId,
           });
         }
-      }
+        return null;
+      };
+
+      const unifiedInputTask = async (): Promise<UnifiedMessageAnalysis> => {
+        return await this._analyzeInput(
+          messageForPipeline,
+          commonAttachments,
+          capabilities,
+          analyticsData,
+        );
+      };
+
+      // Execute in parallel
+      const [multimodalAnalysis, webAnalysis, unifiedAnalysis] = await Promise.all([
+        multimodalTask(),
+        webTask(),
+        unifiedInputTask()
+      ]);
 
       // DSPy RAG Optimization - Enhance retrieval and query processing
+      // Runs AFTER parallel block because it depends on multimodalAnalysis and webAnalysis
       let ragOptimization: any = null;
       if (this.dspyRAGOptimizationService && !lightweight) {
         try {
@@ -2728,13 +2756,6 @@ export class CoreIntelligenceService {
           });
         }
       }
-
-      const unifiedAnalysis = await this._analyzeInput(
-        messageForPipeline,
-        commonAttachments,
-        capabilities,
-        analyticsData,
-      );
 
       // For lightweight responses, skip MCP orchestration to reduce latency unless explicitly required by analysis
       const mcpOrchestrationResult = lightweight
