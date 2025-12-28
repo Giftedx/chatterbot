@@ -4123,36 +4123,36 @@ export class CoreIntelligenceService {
           selectedProvider = 'gemini';
           selectedModel = 'gemini-pro';
 
-          // Record successful service usage for adaptive learning - TODO: D1 integrate service selection
-          // if (reasoningServiceRecommendation?.serviceName) {
-          //   try {
-          //     this.reasoningServiceSelector.recordServiceResult(
-          //       reasoningServiceRecommendation.serviceName,
-          //       true,
-          //       Date.now() - analyticsData.startTime,
-          //       unifiedAnalysis.confidence || 0.7
-          //     );
-          //     logger.debug('[CoreIntelSvc] D1: Recorded successful service usage', {
-          //       serviceName: reasoningServiceRecommendation.serviceName
-          //     });
-          //   } catch (recordError) {
-          //     logger.warn('[CoreIntelSvc] D1: Failed to record service success', { recordError });
-          //   }
-          // }
+          // Record successful service usage for adaptive learning
+          if (reasoningService) {
+            try {
+              this.reasoningServiceSelector.recordServiceResult(
+                reasoningService,
+                true,
+                Date.now() - analyticsData.startTime,
+                unifiedAnalysis.confidence || 0.7,
+              );
+              logger.debug('[CoreIntelSvc] D1: Recorded successful service usage', {
+                serviceName: reasoningService,
+              });
+            } catch (recordError) {
+              logger.warn('[CoreIntelSvc] D1: Failed to record service success', { recordError });
+            }
+          }
         } catch (e: any) {
-          // Record failure - TODO: D1 integrate service selection
-          // if (reasoningServiceRecommendation?.serviceName) {
-          //   try {
-          //     this.reasoningServiceSelector.recordServiceResult(
-          //       reasoningServiceRecommendation.serviceName,
-          //       false,
-          //       Date.now() - analyticsData.startTime,
-          //       0.0
-          //     );
-          //   } catch (recordError) {
-          //     logger.warn('[CoreIntelSvc] D1: Failed to record service failure', { recordError });
-          //   }
-          // }
+          // Record failure
+          if (reasoningService) {
+            try {
+              this.reasoningServiceSelector.recordServiceResult(
+                reasoningService,
+                false,
+                Date.now() - analyticsData.startTime,
+                0.0,
+              );
+            } catch (recordError) {
+              logger.warn('[CoreIntelSvc] D1: Failed to record service failure', { recordError });
+            }
+          }
 
           // In test environment, fall back to a deterministic mock response instead of throwing
           if (process.env.NODE_ENV === 'test') {
